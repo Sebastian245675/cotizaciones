@@ -1,0 +1,978 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ProductCard } from './ProductCard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Product } from '@/contexts/CartContext';
+import { Search, Filter, MessageCircle, Flame, ChevronDown } from 'lucide-react';
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/firebase";
+import { Badge } from '@/components/ui/badge';
+import { useCategories } from '@/hooks/use-categories';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// Función para depuración de productos y categorías
+function debugProducts(products, selectedCategory, selectedSubcategory, selectedTerceraCategoria, categories) {
+  console.log('======= DEPURACIÓN DE FILTRADO =======');
+  console.log('Selecciones actuales:', {
+    categoria: selectedCategory,
+    subcategoria: selectedSubcategory,
+    terceraCategoria: selectedTerceraCategoria
+  });
+  
+  // 1. Mostrar información sobre la categoría seleccionada
+  const selectedCatObj = categories.find(cat => cat.name === selectedCategory);
+  console.log('Categoría seleccionada:', {
+    nombre: selectedCategory,
+    id: selectedCatObj?.id || 'no encontrado'
+  });
+  
+  // 2. Mostrar información sobre la subcategoría seleccionada
+  if (selectedSubcategory !== 'Todas') {
+    const selectedSubObj = categories.find(cat => cat.name === selectedSubcategory);
+    console.log('Subcategoría seleccionada:', {
+      nombre: selectedSubcategory,
+      id: selectedSubObj?.id || 'no encontrado',
+      parentId: selectedSubObj?.parentId,
+      parentName: selectedSubObj?.parentName
+    });
+  }
+  
+  // 3. Mostrar información sobre la tercera categoría seleccionada
+  if (selectedTerceraCategoria !== 'Todas') {
+    const selectedTercObj = categories.find(cat => cat.name === selectedTerceraCategoria);
+    console.log('Tercera categoría seleccionada:', {
+      nombre: selectedTerceraCategoria,
+      id: selectedTercObj?.id || 'no encontrado',
+      parentId: selectedTercObj?.parentId,
+      parentName: selectedTercObj?.parentName
+    });
+  }
+  
+  // 4. Mostrar primeros 5 productos para depuración
+  console.log('Muestra de productos disponibles:');
+  products.slice(0, 5).forEach((product, i) => {
+    console.log(`Producto #${i+1}: ${product.name}`, {
+      id: product.id,
+      categoria: {
+        id: product.category,
+        nombre: product.categoryName
+      },
+      subcategoria: {
+        id: product.subcategory,
+        nombre: product.subcategoryName
+      },
+      terceraCategoria: {
+        id: product.terceraCategoria,
+        nombre: product.terceraCategoriaName
+      }
+    });
+  });
+  
+  // 5. Verificar qué productos coinciden con las selecciones actuales
+  if (selectedSubcategory !== 'Todas' || selectedTerceraCategoria !== 'Todas') {
+    // Buscar productos que coincidan con la selección actual
+    const matchingProducts = products.filter(product => {
+      // Filtro por categoría principal
+      if (selectedCategory !== 'Todos') {
+        const matchesCategoryName = product.categoryName?.toLowerCase() === selectedCategory.toLowerCase();
+        const matchesCategoryId = selectedCatObj && product.category === selectedCatObj.id;
+        if (!matchesCategoryName && !matchesCategoryId) return false;
+      }
+      
+      // Filtro por subcategoría
+      if (selectedSubcategory !== 'Todas') {
+        const selectedSubObj = categories.find(cat => cat.name === selectedSubcategory);
+        const matchesSubcategoryName = product.subcategoryName?.toLowerCase() === selectedSubcategory.toLowerCase();
+        const matchesSubcategoryId = selectedSubObj && product.subcategory === selectedSubObj.id;
+        if (!matchesSubcategoryName && !matchesSubcategoryId) return false;
+      }
+      
+      // Filtro por tercera categoría
+      if (selectedTerceraCategoria !== 'Todas') {
+        const selectedTercObj = categories.find(cat => cat.name === selectedTerceraCategoria);
+        const matchesTerceraCatName = product.terceraCategoriaName?.toLowerCase() === selectedTerceraCategoria.toLowerCase();
+        const matchesTerceraCatId = selectedTercObj && product.terceraCategoria === selectedTercObj.id;
+        return matchesTerceraCatName || matchesTerceraCatId;
+      }
+      
+      return true;
+    });
+    
+    console.log(`Productos que coinciden con los filtros: ${matchingProducts.length}`);
+    matchingProducts.slice(0, 3).forEach((product, i) => {
+      console.log(`Producto coincidente #${i+1}: ${product.name}`);
+    });
+  }
+  
+  console.log('======= FIN DE DEPURACIÓN =======');
+}
+
+// Función para inspeccionar las estructuras de datos del producto
+function inspectProduct(product) {
+  console.log('======= INSPECCIÓN DE PRODUCTO =======');
+  console.log(`Nombre: ${product.name} (ID: ${product.id})`);
+  console.log('Datos de categoría:');
+  console.log(`- category: ${product.category}`);
+  console.log(`- categoryName: ${product.categoryName}`);
+  console.log('Datos de subcategoría:');
+  console.log(`- subcategory: ${product.subcategory}`);
+  console.log(`- subcategoryName: ${product.subcategoryName}`);
+  console.log('Datos de tercera categoría:');
+  console.log(`- terceraCategoria: ${product.terceraCategoria}`);
+  console.log(`- terceraCategoriaName: ${product.terceraCategoriaName}`);
+  console.log('Propiedades completas:');
+  console.log(Object.keys(product).reduce((acc, key) => {
+    acc[key] = product[key];
+    return acc;
+  }, {}));
+  console.log('======= FIN DE INSPECCIÓN =======');
+}
+
+interface Category {
+  id?: string;
+  name: string;
+  image?: string;
+  parentId?: string;
+  parentName?: string;
+}
+
+interface ProductsSectionProps {
+  selectedCategory: string;
+  setSelectedCategory: (cat: string) => void;
+  setCategories: (cats: string[]) => void;
+  selectedSubcategory: string;
+  setSelectedSubcategory: (subcat: string) => void;
+  selectedTerceraCategoria: string;
+  setSelectedTerceraCategoria: (terceraCat: string) => void;
+}
+
+export const ProductsSection: React.FC<ProductsSectionProps> = ({
+  selectedCategory,
+  setSelectedCategory,
+  setCategories,
+  selectedSubcategory,
+  setSelectedSubcategory,
+  selectedTerceraCategoria,
+  setSelectedTerceraCategoria,
+}) => {
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [products, setProducts] = useState<Product[]>([]);
+  const { categoriesData: categories } = useCategories();
+  const [loading, setLoading] = useState(true);
+  
+  // Estado para carga progresiva de categorías
+  const [visibleCategories, setVisibleCategories] = useState({
+    main: 5, // Mostrar primeras 5 categorías principales
+    sub: {}, // Objeto para controlar subcategorías visibles por categoría principal
+    third: {} // Objeto para controlar terceras categorías visibles por subcategoría
+  });
+  
+  // Estado para carga progresiva de productos por categoría
+  const [visibleProductsPerCategory, setVisibleProductsPerCategory] = useState<Record<string, number>>({});
+  const PRODUCTS_PER_ROW = 12; // Número de productos a mostrar inicialmente por cada categoría (3 filas de 4)
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState<Record<string, boolean>>({});
+
+  // Función para obtener productos por categoría, incluyendo sus subcategorías si corresponde
+  const getProductsByCategory = (categoryName: string) => {
+    // Obtener el objeto de categoría por nombre
+    const categoryObj = categories.find(cat => cat.name === categoryName);
+    
+    // Productos directamente asignados a esta categoría (por nombre o por ID)
+    const directProducts = products.filter(p => 
+      p.category === categoryName || 
+      p.categoryName === categoryName || 
+      (categoryObj && p.category === categoryObj.id)
+    );
+    
+    // Obtener subcategorías de esta categoría principal
+    const subCats = categories.filter(cat => 
+      (cat.parentName === categoryName) || 
+      (categoryObj && cat.parentId === categoryObj.id)
+    );
+    
+    // Productos en subcategorías (buscando tanto por ID como por nombre)
+    const subCategoryProducts = subCats.flatMap(subCat => 
+      products.filter(p => 
+        p.subcategory === subCat.id || 
+        p.subcategoryName === subCat.name
+      )
+    );
+    
+    // Combinar productos directos y de subcategorías, evitando duplicados
+    const allProducts = [...directProducts];
+    subCategoryProducts.forEach(p => {
+      if (!allProducts.some(existing => existing.id === p.id)) {
+        allProducts.push(p);
+      }
+    });
+    
+    return allProducts;
+  };
+
+  // Cargar productos reales de Firestore
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      const querySnapshot = await getDocs(collection(db, "products"));
+      const productsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Product[];
+      setProducts(productsData);
+      setLoading(false);
+    };
+    fetchProducts();
+  }, []);
+  
+  // Ordenar categorías principales por importancia o cantidad de productos
+  const sortedMainCategories = useMemo(() => {
+    const mainCats = categories.filter(cat => cat.name !== "Todos" && !cat.parentId);
+    
+    // Ordenar por cantidad de productos (de mayor a menor)
+    return mainCats.sort((a, b) => {
+      const aProducts = getProductsByCategory(a.name).length;
+      const bProducts = getProductsByCategory(b.name).length;
+      return bProducts - aProducts;
+    });
+  }, [categories, products]);
+  
+  // Función para cargar más categorías principales
+  const loadMoreMainCategories = () => {
+    setVisibleCategories(prev => ({
+      ...prev,
+      main: prev.main + 5
+    }));
+  };
+  
+  // Función para expandir/contraer subcategorías de una categoría principal
+  const toggleSubcategoriesVisibility = (categoryId: string) => {
+    setVisibleCategories(prev => ({
+      ...prev,
+      sub: {
+        ...prev.sub,
+        [categoryId]: prev.sub[categoryId] ? 
+          (prev.sub[categoryId] === -1 ? 5 : -1) : // -1 significa ver todas
+          5 // Mostrar primeras 5 subcategorías
+      }
+    }));
+  };
+  
+  // Función para expandir/contraer terceras categorías de una subcategoría
+  const toggleThirdCategoriesVisibility = (subcategoryId: string) => {
+    setVisibleCategories(prev => ({
+      ...prev,
+      third: {
+        ...prev.third,
+        [subcategoryId]: prev.third[subcategoryId] ? 
+          (prev.third[subcategoryId] === -1 ? 5 : -1) : // -1 significa ver todas
+          5 // Mostrar primeras 5 terceras categorías
+      }
+    }));
+  };
+  
+  // Función para cargar más subcategorías de una categoría principal
+  const loadMoreSubcategories = (categoryId: string) => {
+    setVisibleCategories(prev => ({
+      ...prev,
+      sub: {
+        ...prev.sub,
+        [categoryId]: prev.sub[categoryId] + 5
+      }
+    }));
+  };
+  
+  // Función para cargar más terceras categorías de una subcategoría
+  const loadMoreThirdCategories = (subcategoryId: string) => {
+    setVisibleCategories(prev => ({
+      ...prev,
+      third: {
+        ...prev.third,
+        [subcategoryId]: prev.third[subcategoryId] + 5
+      }
+    }));
+  };
+  
+  // Función para cargar más productos por categoría
+  const loadMoreProductsForCategory = (categoryId: string) => {
+    // Marcamos esta categoría como cargando
+    setLoadingMoreProducts(prev => ({
+      ...prev,
+      [categoryId]: true
+    }));
+    
+    // Simulamos un pequeño retraso para la carga
+    setTimeout(() => {
+      setVisibleProductsPerCategory(prev => ({
+        ...prev,
+        [categoryId]: (prev[categoryId] || PRODUCTS_PER_ROW) + 4
+      }));
+      
+      setLoadingMoreProducts(prev => ({
+        ...prev,
+        [categoryId]: false
+      }));
+    }, 500);
+  };
+
+  // Obtener subcategorías para la categoría seleccionada
+  const subcategories = useMemo(() => {
+    if (selectedCategory === 'Todos') {
+      return [];
+    }
+
+    // Obtener la categoría seleccionada por su nombre
+    const selectedCategoryObj = categories.find(cat => cat.name === selectedCategory);
+    
+    // Buscar subcategorías que tienen esta categoría como padre
+    // Podemos buscar tanto por name como por id para mayor compatibilidad
+    const subCats = categories.filter(cat => 
+      (cat.parentName === selectedCategory) || 
+      (selectedCategoryObj && cat.parentId === selectedCategoryObj.id)
+    );
+    
+    return [
+      { id: "todas", name: "Todas" },
+      ...subCats.map(cat => ({ id: cat.id, name: cat.name }))
+    ];
+  }, [categories, selectedCategory]);
+
+  // Obtener terceras categorías para la subcategoría seleccionada
+  const tercerasCategorias = useMemo(() => {
+    // Si no hay subcategoría seleccionada o es "Todas", no hay terceras categorías disponibles
+    if (selectedSubcategory === 'Todas' || !selectedSubcategory) {
+      return [];
+    }
+
+    // Obtener el objeto de la subcategoría seleccionada
+    const selectedSubcategoryObj = categories.find(cat => cat.name === selectedSubcategory);
+    if (!selectedSubcategoryObj) return [];
+    
+    // Buscar categorías que tienen esta subcategoría como padre
+    const terceraCats = categories.filter(cat => 
+      cat.parentId === selectedSubcategoryObj.id
+    );
+    
+    return [
+      { id: "todas", name: "Todas" },
+      ...terceraCats.map(cat => ({ id: cat.id, name: cat.name }))
+    ];
+  }, [categories, selectedSubcategory]);
+
+  const filteredAndSortedProducts = useMemo(() => {
+    // Ejecutar depuración cada vez que cambian los filtros
+    debugProducts(products, selectedCategory, selectedSubcategory, selectedTerceraCategoria, categories);
+    
+    // PASO 1: Filtrar por texto de búsqueda
+    let filtered = products.filter(product => {
+      const matchesSearch = !searchTerm || 
+        (product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      return matchesSearch;
+    });
+    
+    // PASO 2: Filtrar por categoría principal
+    if (selectedCategory !== 'Todos') {
+      const selectedCategoryLower = selectedCategory.toLowerCase();
+      const selectedCatObj = categories.find(cat => cat.name.toLowerCase() === selectedCategoryLower);
+      
+      filtered = filtered.filter(product => {
+        // Por nombre de categoría (string)
+        const matchesCategoryName = product.categoryName?.toLowerCase() === selectedCategoryLower;
+        
+        // Por ID de categoría (referencia)
+        const matchesCategoryId = selectedCatObj && product.category === selectedCatObj.id;
+        
+        // Depuración para identificar problemas
+        if (product === filtered[0]) {
+          console.log('Primer producto, filtro de categoría:', {
+            producto: product.name,
+            categoriaProducto: product.categoryName,
+            categoriaId: product.category,
+            categoriaSeleccionada: selectedCategoryLower,
+            categoriaSeleccionadaId: selectedCatObj?.id,
+            matchNombre: matchesCategoryName,
+            matchId: matchesCategoryId
+          });
+        }
+        
+        return matchesCategoryName || matchesCategoryId;
+      });
+      
+      // PASO 3: Filtrar por subcategoría (si está seleccionada)
+      if (selectedSubcategory !== 'Todas') {
+        const selectedSubcategoryLower = selectedSubcategory.toLowerCase();
+        const selectedSubcatObj = categories.find(cat => cat.name.toLowerCase() === selectedSubcategoryLower);
+        
+        console.log('DEBUG - Aplicando filtro de subcategoría:', {
+          subcategoria: selectedSubcategory,
+          id: selectedSubcatObj?.id,
+          productosAntesFiltro: filtered.length
+        });
+        
+        // MEJORA IMPORTANTE: Solución para el caso en que los productos no tienen subcategoria/subcategoryName establecidos
+        // Si no encontramos productos que coincidan con la subcategoría directamente,
+        // intentamos buscar entre los productos de la categoría principal que coinciden
+        const productsWithExplicitSubcategory = filtered.filter(product => {
+          // Coincidencia exacta por nombre
+          const matchesSubcategoryName = product.subcategoryName?.toLowerCase() === selectedSubcategoryLower;
+          
+          // Coincidencia por ID 
+          const matchesSubcategoryId = selectedSubcatObj && product.subcategory === selectedSubcatObj.id;
+
+          return matchesSubcategoryName || matchesSubcategoryId;
+        });
+        
+        // Si encontramos productos con la subcategoría explícitamente asignada, los usamos
+        if (productsWithExplicitSubcategory.length > 0) {
+          filtered = productsWithExplicitSubcategory;
+        } else {
+          console.log('ALERTA: No se encontraron productos con subcategoría explícita. Usando heurística alternativa.');
+          
+          // Si no hay productos con subcategoría explícita, usamos los productos de la categoría principal
+          // y filtramos según una heurística (por ejemplo, productos que contienen el nombre de la subcategoría)
+          filtered = filtered.filter(product => {
+            const productNameIncludesSubcategory = product.name?.toLowerCase().includes(selectedSubcategoryLower);
+            const productDescriptionIncludesSubcategory = product.description?.toLowerCase().includes(selectedSubcategoryLower);
+            
+            return productNameIncludesSubcategory || productDescriptionIncludesSubcategory;
+          });
+        }
+        
+        console.log(`DEBUG - Después del filtro de subcategoría: ${filtered.length} productos`);
+        
+        // PASO 4: Filtrar por tercera categoría (si está seleccionada)
+        if (selectedTerceraCategoria !== 'Todas') {
+          const selectedTerceraLower = selectedTerceraCategoria.toLowerCase();
+          const selectedTerceraObj = categories.find(cat => cat.name.toLowerCase() === selectedTerceraLower);
+          
+          console.log('DEBUG - Aplicando filtro de tercera categoría:', {
+            terceraCategoria: selectedTerceraCategoria,
+            id: selectedTerceraObj?.id,
+            productosAntesFiltro: filtered.length
+          });
+          
+          // Similar a la solución para subcategorías
+          const productsWithExplicitTerceraCategoria = filtered.filter(product => {
+            // Coincidencia por nombre
+            const matchesTerceraCatName = product.terceraCategoriaName?.toLowerCase() === selectedTerceraLower;
+            
+            // Coincidencia por ID
+            const matchesTerceraCatId = selectedTerceraObj && product.terceraCategoria === selectedTerceraObj.id;
+            
+            return matchesTerceraCatName || matchesTerceraCatId;
+          });
+          
+          // Si encontramos productos con tercera categoría explícita, los usamos
+          if (productsWithExplicitTerceraCategoria.length > 0) {
+            filtered = productsWithExplicitTerceraCategoria;
+          } else {
+            console.log('ALERTA: No se encontraron productos con tercera categoría explícita. Usando heurística alternativa.');
+            
+            // Si no hay productos con tercera categoría explícita, usamos heurística
+            filtered = filtered.filter(product => {
+              const productNameIncludesTercera = product.name?.toLowerCase().includes(selectedTerceraLower);
+              const productDescriptionIncludesTercera = product.description?.toLowerCase().includes(selectedTerceraLower);
+              
+              return productNameIncludesTercera || productDescriptionIncludesTercera;
+            });
+          }
+          
+          console.log(`DEBUG - Después del filtro de tercera categoría: ${filtered.length} productos`);
+        }
+      }
+    } else {
+      // Si seleccionamos "Todos", excluimos las ofertas
+      filtered = filtered.filter(product => {
+        const isOferta = product.category?.toLowerCase() === "oferta" || 
+                         product.category?.toLowerCase() === "ofertas";
+        return !isOferta;
+      });
+    }
+    
+    // Log final con resultados del filtrado
+    console.log(`Filtrado completado. Encontrados: ${filtered.length} productos de ${products.length} totales.`);
+    if (filtered.length > 0 && filtered.length <= 5) {
+      filtered.forEach((p, i) => console.log(`Producto filtrado ${i+1}: ${p.name}`));
+    }
+    
+    // Ordenar productos
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'price-asc':
+          return a.price - b.price;
+        case 'price-desc':
+          return b.price - a.price;
+        case 'name':
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [products, searchTerm, selectedCategory, selectedSubcategory, selectedTerceraCategoria, categories, sortBy]);
+
+  const ofertas = useMemo(
+    () => products.filter((p) => {
+      // Verificar si hay categoría asignada
+      if (!p.category) return false;
+      
+      // Verificar categoría "oferta" o "ofertas" 
+      const isOfertaCategory = 
+        p.category?.toLowerCase() === "oferta" || 
+        p.category?.toLowerCase() === "ofertas";
+      
+      // Verificar nombre contiene "oferta"
+      const hasOfertaInName = p.name?.toLowerCase().includes("oferta");
+      
+      // También verificar si el producto tiene un campo de descuento o está marcado como oferta
+      const isMarkedAsOffer = p.isOffer === true || (p.discount && p.discount > 0);
+      
+      return isOfertaCategory || hasOfertaInName || isMarkedAsOffer;
+    }),
+    [products]
+  );
+
+  const categoryImages: Record<string, string> = {
+    Bebidas: "https://images.unsplash.com/photo-1514361892635-cebb9b6c3e53?auto=format&fit=facearea&w=96&q=80",
+    Snacks: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=facearea&w=96&q=80",
+    Dulces: "https://images.unsplash.com/photo-1502741338009-cac2772e18bc?auto=format&fit=facearea&w=96&q=80",
+    Lácteos: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=facearea&w=96&q=80",
+    Panadería: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=facearea&w=96&q=80",
+    Despensa: "https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=facearea&w=96&q=80",
+    Aseo: "https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&fit=facearea&w=96&q=80",
+    Combos: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?auto=format&fit=facearea&w=96&q=80",
+    Todos: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=facearea&w=96&q=80"
+  };
+
+  return (
+    <section id="productos" className="py-10 md:py-16 bg-white">
+      <div className="w-full px-2 md:px-4">
+        {/* Header centrado y organizado */}
+        <div className="flex items-center mb-8 gap-4 flex-wrap justify-between">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2">
+              {selectedCategory === 'Todos' ? "Nuestros Productos" : selectedCategory}
+            </h2>
+            <p className="text-slate-600 max-w-2xl">
+              {selectedCategory === 'Todos' 
+                ? "Explora todos nuestros productos de alta calidad al mejor precio." 
+                : `Explora nuestra selección de productos de ${selectedCategory}.`}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+            {/* Buscador */}
+            <div className="relative">
+              <Input
+                placeholder="Buscar productos..."
+                className="pl-10 w-[250px] md:w-[300px] border-slate-300"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <Search className="absolute left-3 top-2.5 text-slate-400 h-5 w-5" />
+            </div>
+            
+            {/* Ordenar por */}
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[150px] md:w-[180px] border-slate-300 focus:border-slate-400">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Nombre A-Z</SelectItem>
+                <SelectItem value="price-asc">Menor precio</SelectItem>
+                <SelectItem value="price-desc">Mayor precio</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Botón de WhatsApp y aviso de domicilio gratis */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-center mb-8">
+          <Button 
+            className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2 py-6 px-6 rounded-xl text-lg transition-all shadow-md hover:shadow-lg"
+            onClick={() => window.open('https://wa.me/573105960129', '_blank')}
+          >
+            <MessageCircle className="h-6 w-6" />
+            <span>Escríbenos para hacer tu pedido</span>
+          </Button>
+          
+          <div className="bg-blue-50 border border-blue-100 px-6 py-4 rounded-xl flex items-center gap-3">
+            <div className="bg-blue-100 p-2 rounded-full">
+              <Flame className="h-6 w-6 text-blue-600" />
+            </div>
+            <p className="text-blue-800 font-medium">¡Domicilio gratis en compras superiores a $60.000!</p>
+          </div>
+        </div>
+
+        {/* CategoryBar - Usar una barra de desplazamiento horizontal en móviles con carga progresiva */}
+        <div className="flex flex-col w-full">
+          {/* Categorías principales */}
+          <div className="flex overflow-x-auto pb-4 gap-4 sm:gap-6 md:gap-8 mb-6 justify-start md:justify-center">
+            {categories
+              // Filtrar solo categorías principales para el selector principal (sin parentId)
+              .filter(cat => cat.name === "Todos" || !cat.parentId)
+              // Mostrar solo un número limitado de categorías principales
+              .slice(0, visibleCategories.main)
+              .map((cat) => (
+                <button
+                  key={cat.name}
+                  onClick={() => {
+                    setSelectedCategory(cat.name);
+                    // Resetear la subcategoría cuando se cambia la categoría principal
+                    setSelectedSubcategory('Todas');
+                    // Expandir las subcategorías de esta categoría
+                    toggleSubcategoriesVisibility(cat.id || cat.name);
+                  }}
+                  className={`flex-shrink-0 flex flex-row items-center bg-transparent px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 rounded-xl transition-all hover:bg-slate-50 focus:outline-none
+                    ${selectedCategory === cat.name ? "ring-2 ring-blue-400" : ""}
+                  `}
+                  style={{ minWidth: 120, maxWidth: 260 }}
+                >
+                  <img
+                    src={cat.image || categoryImages[cat.name] || "https://via.placeholder.com/80x80?text=?"}
+                    alt={cat.name}
+                    className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 object-cover mr-3 sm:mr-4 md:mr-6"
+                    loading="lazy"
+                  />
+                  <div>
+                    <h3 className="font-medium text-sm sm:text-base md:text-lg text-slate-800 mb-1 md:mb-2">
+                      {cat.name}
+                    </h3>
+                    <p className="text-xs md:text-sm text-slate-500">
+                      {products.filter(p => {
+                        if (cat.name === "Todos") return true;
+                        
+                        // Contar productos que pertenecen directamente a esta categoría
+                        // O que pertenecen a alguna de sus subcategorías
+                        const directMatch = p.category === cat.name || p.categoryName === cat.name;
+                        
+                        // También contar productos en subcategorías de esta categoría principal
+                        const subCategories = categories.filter(sc => sc.parentId && 
+                                                                (sc.parentName === cat.name || sc.parentName === cat.id));
+                        const inSubCategory = subCategories.some(sc => 
+                          p.subcategory === sc.id || p.subcategoryName === sc.name
+                        );
+                        
+                        return directMatch || inSubCategory;
+                      }).length} productos
+                    </p>
+                  </div>
+                </button>
+              ))}
+              
+            {/* Botón "Ver más categorías" si hay más categorías principales */}
+            {categories.filter(cat => cat.name === "Todos" || !cat.parentId).length > visibleCategories.main && (
+              <button
+                onClick={loadMoreMainCategories}
+                className="flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 px-4 py-4 rounded-xl transition-all min-w-[120px]"
+              >
+                <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center mb-2">
+                  <ChevronDown className="h-6 w-6 text-slate-600" />
+                </div>
+                <span className="text-sm font-medium text-slate-700">Ver más</span>
+              </button>
+            )}
+          </div>
+          
+          {/* Mostrar subcategorías para la categoría seleccionada */}
+          {selectedCategory !== 'Todos' && (
+            <div className="mb-10 px-2">
+              <div className="flex items-center mb-2">
+                <h3 className="text-lg font-medium text-slate-700 mr-2">Subcategorías de {selectedCategory}</h3>
+                <button 
+                  onClick={() => toggleSubcategoriesVisibility(
+                    categories.find(c => c.name === selectedCategory)?.id || selectedCategory
+                  )}
+                  className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  {visibleCategories.sub[
+                    categories.find(c => c.name === selectedCategory)?.id || selectedCategory
+                  ] === -1 ? 'Mostrar menos' : 'Ver todas'}
+                </button>
+              </div>
+              
+              <div className="flex flex-wrap gap-3 mb-2">
+                {/* Mostrar subcategorías con botones interactivos */}
+                {subcategories.length > 1 ? (
+                  <>
+                    {subcategories
+                      .slice(0, visibleCategories.sub[
+                        categories.find(c => c.name === selectedCategory)?.id || selectedCategory
+                      ] === -1 ? 
+                        subcategories.length : // Si está expandido, mostrar todas 
+                        visibleCategories.sub[
+                          categories.find(c => c.name === selectedCategory)?.id || selectedCategory
+                        ] || 5 // Si no, mostrar 5 o el número especificado
+                      )
+                      .map((subcat) => (
+                        <button
+                          key={subcat.id}
+                          onClick={() => {
+                            setSelectedSubcategory(subcat.name);
+                            setSelectedTerceraCategoria('Todas');
+                            // Si se selecciona "Todas", resetear tercera categoría
+                            if (subcat.name === "Todas") {
+                              setSelectedTerceraCategoria('Todas');
+                            } else {
+                              // Expandir terceras categorías de esta subcategoría
+                              toggleThirdCategoriesVisibility(subcat.id || subcat.name);
+                            }
+                          }}
+                          className={`p-3 text-center rounded-lg border transition-all
+                            ${selectedSubcategory === subcat.name 
+                              ? "bg-blue-50 border-blue-200 text-blue-700"
+                              : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"}
+                          `}
+                        >
+                          {subcat.name}
+                        </button>
+                      ))}
+                    
+                    {/* Botón "Ver más" para subcategorías */}
+                    {subcategories.length > 5 && visibleCategories.sub[
+                      categories.find(c => c.name === selectedCategory)?.id || selectedCategory
+                    ] !== -1 && (
+                      <button
+                        onClick={() => loadMoreSubcategories(
+                          categories.find(c => c.name === selectedCategory)?.id || selectedCategory
+                        )}
+                        className="p-3 text-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      >
+                        Ver más
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="col-span-full text-center p-4 bg-slate-50 rounded-lg text-slate-600">
+                    Esta categoría no tiene subcategorías
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Mostrar terceras categorías si hay una subcategoría seleccionada */}
+          {selectedSubcategory !== 'Todas' && (
+            <div className="mb-10 px-2">
+              <div className="flex items-center mb-2">
+                <h3 className="text-lg font-medium text-slate-700">Categorías de {selectedSubcategory}</h3>
+                <button 
+                  onClick={() => toggleThirdCategoriesVisibility(
+                    categories.find(c => c.name === selectedSubcategory)?.id || selectedSubcategory
+                  )}
+                  className="ml-2 text-xs text-orange-600 hover:text-orange-800 transition-colors"
+                >
+                  {visibleCategories.third[
+                    categories.find(c => c.name === selectedSubcategory)?.id || selectedSubcategory
+                  ] === -1 ? 'Mostrar menos' : 'Ver todas'}
+                </button>
+              </div>
+              
+              <div className="flex flex-wrap gap-3 mb-2">
+                {/* Mostrar terceras categorías con botones interactivos */}
+                {tercerasCategorias.length > 1 ? (
+                  <>
+                    {tercerasCategorias
+                      .slice(0, visibleCategories.third[
+                        categories.find(c => c.name === selectedSubcategory)?.id || selectedSubcategory
+                      ] === -1 ? 
+                        tercerasCategorias.length : // Si está expandido, mostrar todas 
+                        visibleCategories.third[
+                          categories.find(c => c.name === selectedSubcategory)?.id || selectedSubcategory
+                        ] || 5 // Si no, mostrar 5 o el número especificado
+                      )
+                      .map((terceraCat) => (
+                        <button
+                          key={terceraCat.id}
+                          onClick={() => setSelectedTerceraCategoria(terceraCat.name)}
+                          className={`p-3 text-center rounded-lg border transition-all
+                            ${selectedTerceraCategoria === terceraCat.name 
+                              ? "bg-orange-50 border-orange-200 text-orange-700"
+                              : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"}
+                          `}
+                        >
+                          {terceraCat.name}
+                        </button>
+                      ))}
+                    
+                    {/* Botón "Ver más" para terceras categorías */}
+                    {tercerasCategorias.length > 5 && visibleCategories.third[
+                      categories.find(c => c.name === selectedSubcategory)?.id || selectedSubcategory
+                    ] !== -1 && (
+                      <button
+                        onClick={() => loadMoreThirdCategories(
+                          categories.find(c => c.name === selectedSubcategory)?.id || selectedSubcategory
+                        )}
+                        className="p-3 text-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      >
+                        Ver más
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="col-span-full text-center p-4 bg-slate-50 rounded-lg text-slate-600">
+                    Esta subcategoría no tiene categorías adicionales
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        
+          {/* Botón para limpiar filtros - Solo visible cuando hay filtros seleccionados */}
+          {(selectedCategory !== 'Todos' || searchTerm || selectedSubcategory !== 'Todas' || selectedTerceraCategoria !== 'Todas') && (
+            <Button 
+              variant="outline"
+              className="mb-6 border-dashed border-slate-300 text-slate-600 hover:text-slate-900 hover:border-slate-500"
+              onClick={() => {
+                setSelectedCategory('Todos');
+                setSelectedSubcategory('Todas');
+                setSelectedTerceraCategoria('Todas');
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+        
+        {/* Productos por categoría - Una fila para cada categoría principal */}
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-8 mb-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-slate-100 animate-pulse h-[200px] sm:h-[240px] md:h-[320px] rounded-xl shadow-lg w-full mx-auto"></div>
+            ))}
+          </div>
+        ) : searchTerm || selectedCategory !== 'Todos' ? (
+          // Si hay búsqueda o una categoría seleccionada, mostramos los resultados filtrados
+          <div className="mb-8">
+            <div className="mb-4 flex justify-between items-center">
+              <h2 className="text-xl font-medium text-slate-800">
+                {searchTerm ? `Resultados para "${searchTerm}"` : `Productos de ${selectedCategory}`}
+              </h2>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-8">
+              {filteredAndSortedProducts.length > 0 ? (
+                filteredAndSortedProducts.map(product => (
+                  <div key={product.id} className="w-full mx-auto">
+                    <ProductCard product={{...product, price: product.price, originalPrice: product.originalPrice}} />
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                    <Search className="h-12 w-12 text-slate-400" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-700 mb-4">No se encontraron productos</h3>
+                  <p className="text-slate-500 max-w-md mb-8">
+                    No hay productos que coincidan con tu búsqueda "{searchTerm}" 
+                    {selectedCategory !== 'Todos' && ` en la categoría ${selectedCategory}`}
+                    {selectedSubcategory !== 'Todas' && `, subcategoría ${selectedSubcategory}`}
+                    {selectedTerceraCategoria !== 'Todas' && `, tercera categoría ${selectedTerceraCategoria}`}.
+                  </p>
+                  <Button 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedCategory('Todos');
+                    }}
+                    variant="outline" 
+                    className="min-w-[180px]"
+                  >
+                    Ver todos los productos
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          // Si no hay filtros, mostrar productos por categoría
+          sortedMainCategories.map(cat => {
+            const categoryProducts = getProductsByCategory(cat.name);
+            
+            // Si la categoría no tiene productos, no la mostramos
+            if (categoryProducts.length === 0) return null;
+            
+            // Número de productos a mostrar
+            const productsToShow = Math.min(
+              visibleProductsPerCategory[cat.id || cat.name] || PRODUCTS_PER_ROW, 
+              categoryProducts.length
+            );
+            
+            return (
+              <div key={cat.name} className="mb-12">
+                <div className="mb-4 flex justify-between items-center">
+                  <h2 className="text-xl font-medium text-slate-800">{cat.name}</h2>
+                  <Button 
+                    variant="link" 
+                    className="text-blue-600 hover:text-blue-800"
+                    onClick={() => setSelectedCategory(cat.name)}
+                  >
+                    Ver todo
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-8">
+                  {categoryProducts.slice(0, productsToShow).map(product => (
+                    <div key={product.id} className="w-full mx-auto">
+                      <ProductCard product={{...product, price: product.price, originalPrice: product.originalPrice}} />
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Botón "Cargar más" si hay más productos en esta categoría */}
+                {categoryProducts.length > productsToShow && (
+                  <div className="flex justify-center mt-6">
+                    <Button
+                      variant="outline"
+                      className="min-w-[200px] border-slate-300"
+                      onClick={() => loadMoreProductsForCategory(cat.id || cat.name)}
+                      disabled={loadingMoreProducts[cat.id || cat.name]}
+                    >
+                      {loadingMoreProducts[cat.id || cat.name] ? 
+                        "Cargando..." : 
+                        `Cargar más productos (${productsToShow}/${categoryProducts.length})`}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+        
+        {/* Sección de ofertas */}
+        {ofertas.length > 0 && selectedCategory === 'Todos' && !searchTerm && (
+          <div className="mb-12">
+            <div className="mb-4 flex justify-between items-center">
+              <div className="flex items-center">
+                <Flame className="h-6 w-6 mr-2 text-red-500" />
+                <h2 className="text-xl font-medium text-slate-800">Ofertas especiales</h2>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-8">
+              {ofertas.slice(0, 8).map(product => (
+                <div key={product.id} className="w-full mx-auto">
+                  <ProductCard product={{...product, price: product.price, originalPrice: product.originalPrice}} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+export default ProductsSection;

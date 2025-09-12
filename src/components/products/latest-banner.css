@@ -1,0 +1,62 @@
+/* Estilos para el banner superior de Lo Nuevo */
+.latest-products-banner {
+  position: relative;
+  width: 100%;
+  height: auto;
+  margin-bottom: 0;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.full-width-banner {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 2rem 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.full-width-banner-img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  max-height: none;
+}
+
+/* Sobreescribimos las reglas generales para asegurar que la imagen se muestre completa */
+.latest-products-banner.full-width-banner img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  max-height: none;
+}
+
+.latest-products-title-container {
+  margin-top: 1rem;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+  .latest-products-banner {
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+  }
+  
+  .latest-products-banner img {
+    max-height: 150px;
+  }
+  
+  .latest-products-title-container {
+    margin-top: -1.5rem;
+  }
+}

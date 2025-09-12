@@ -1,0 +1,75 @@
+/* Unified Grid Layout Styling */
+
+.product-mosaic-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border: 0.5px solid #333333;
+  background-color: #444444;
+  padding: 0.5px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
+}
+
+/* Style for each product cell */
+.product-mosaic-item {
+  position: relative;
+  background-color: white;
+  border: 0.5px solid #333333;
+  margin: -0.5px 0 0 -0.5px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Enhanced image container */
+.product-mosaic-item .bg-transparent {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Adjust image sizing and position */
+.product-mosaic-item img {
+  max-height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+/* Hover effect that preserves the grid structure */
+.product-mosaic-item:hover {
+  z-index: 5;
+  transform: scale(1.02);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.product-mosaic-item:hover img {
+  transform: scale(1.1);
+}
+
+/* Responsive layout - adjust columns based on screen width */
+@media (max-width: 640px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+@media (min-width: 641px) and (max-width: 768px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1279px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

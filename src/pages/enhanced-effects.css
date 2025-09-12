@@ -1,0 +1,162 @@
+/* Efectos de fondo mejorados para AdvancedIndex */
+
+/* Efecto de malla de gradientes interactiva */
+.interactive-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: 50px 50px;
+  background-image: 
+    radial-gradient(circle, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+    linear-gradient(to right, rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+  pointer-events: none;
+  opacity: 0.5;
+  filter: blur(0.5px);
+  animation: gridFlow 20s linear infinite;
+  z-index: 0;
+}
+
+@keyframes gridFlow {
+  0% {
+    background-position: 0 0, 0 0, 0 0;
+  }
+  100% {
+    background-position: 50px 50px, 50px 0, 0 50px;
+  }
+}
+
+/* Efectos de partículas flotantes */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.particle-1 {
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0) 70%);
+  top: 10%;
+  left: 20%;
+  animation: floatParticle 15s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.particle-2 {
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0) 70%);
+  top: 50%;
+  right: 15%;
+  animation: floatParticle 18s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+.particle-3 {
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0) 70%);
+  bottom: 20%;
+  left: 30%;
+  animation: floatParticle 20s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+@keyframes floatParticle {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.5;
+  }
+  25% {
+    transform: translate(30px, -30px) scale(1.1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(0px, 50px) scale(1.2);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translate(-30px, -20px) scale(0.9);
+    opacity: 0.6;
+  }
+}
+
+/* Mejora para los efectos de glassmorphism */
+.glassmorphism-enhanced {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+}
+
+/* Fondos con degradados dinámicos */
+.dynamic-gradient {
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+.dynamic-gradient-blue {
+  background: linear-gradient(-45deg, #EFF6FF, #DBEAFE, #93C5FD, #60A5FA);
+}
+
+.dynamic-gradient-neutral {
+  background: linear-gradient(-45deg, #F9FAFB, #F3F4F6, #E5E7EB, #D1D5DB);
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Efectos de texto más pronunciados */
+.text-gradient-enhanced {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+  animation: textShine 5s linear infinite;
+}
+
+.text-gradient-primary {
+  background-image: linear-gradient(45deg, #3B82F6, #6366F1, #8B5CF6, #3B82F6);
+}
+
+.text-gradient-dark {
+  background-image: linear-gradient(45deg, #1E293B, #334155, #475569, #1E293B);
+}
+
+@keyframes textShine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Efecto sutil de desplazamiento de sombra */
+.hover-shadow-pulse:hover {
+  animation: shadowPulse 2s infinite;
+}
+
+@keyframes shadowPulse {
+  0% {
+    box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 5px 25px rgba(59, 130, 246, 0.5);
+  }
+  100% {
+    box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
+  }
+}

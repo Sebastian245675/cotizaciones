@@ -1,0 +1,278 @@
+import React, { useEffect, useState } from "react";
+import { db } from "@/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { useCategories } from "@/hooks/use-categories";
+import { TopPromoBar } from "@/components/layout/TopPromoBar";
+import { AdvancedHeader } from "@/components/layout/AdvancedHeader";
+
+const AboutUs = () => {
+  const { categories } = useCategories();
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [promoVisible, setPromoVisible] = useState(true);
+  const [customInfo, setCustomInfo] = useState(null);
+  const [infoEnabled, setInfoEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      setLoading(true);
+      const docRef = doc(db, "infoSections", "about");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomInfo(data.content || null);
+        setInfoEnabled(data.enabled ?? false);
+      }
+      setLoading(false);
+    };
+    fetchInfo();
+  }, []);
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#FF914D" }}>
+      {promoVisible && <TopPromoBar setPromoVisible={setPromoVisible} />}
+      <AdvancedHeader
+        categories={categories}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        promoVisible={promoVisible}
+      />
+      <main className="flex-1 flex flex-col">
+        <section className="flex-1 min-h-[calc(100vh-8rem)] w-full flex flex-col justify-center items-center" style={{ backgroundColor: "#FF914D" }}>
+          <div className="flex flex-col w-full items-center pt-40 pb-24 md:pt-56 md:pb-32">
+            <div className="w-full max-w-7xl mx-auto px-4">
+              <nav className="w-full text-sm text-white mb-6">
+                <a href="/" className="font-semibold text-white hover:underline">Inicio</a>
+                <span className="mx-2">&gt;</span>
+                <span className="text-white font-bold">Sobre Nosotros</span>
+              </nav>
+              <h1 className="text-5xl md:text-7xl font-serif font-bold text-white mb-8 tracking-tight w-full text-center">
+                Sobre Nosotros
+              </h1>
+              {loading ? (
+                <div className="text-center text-white">Cargando información...</div>
+              ) : infoEnabled && customInfo ? (
+                <div className="text-lg md:text-xl text-white mb-8 font-normal leading-relaxed w-full max-w-none whitespace-pre-line">
+                  {customInfo}
+                </div>
+              ) : (
+                <div className="flex flex-col md:flex-row gap-8">
+                  {/* Sidebar de sugerencias */}
+                  <div className="w-full md:w-64 flex-shrink-0 order-2 md:order-1">
+                    <div className="bg-white p-5 rounded-xl shadow-lg border border-slate-100 sticky top-24">
+                      <h2 className="text-xl font-bold mb-4 text-[#FF914D] flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                          <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                        </svg>
+                        Información Útil
+                      </h2>
+                      
+                      <div className="space-y-4">
+                        <div className="border-b pb-2">
+                          <h3 className="font-semibold text-slate-800 mb-1">Horario de Atención</h3>
+                          <p className="text-sm text-slate-600">Lunes a Viernes: 8:00 - 18:00</p>
+                          <p className="text-sm text-slate-600">Sábados: 8:00 - 13:00</p>
+                        </div>
+                        
+                        <div className="border-b pb-2">
+                          <h3 className="font-semibold text-slate-800 mb-1">Contacto Rápido</h3>
+                          <p className="text-sm text-slate-600">WhatsApp: +54 3873439775</p>
+                          <p className="text-sm text-slate-600">Email: info@regalaalgo.com</p>
+                        </div>
+                        
+                        <div className="border-b pb-2">
+                          <h3 className="font-semibold text-slate-800 mb-1">Servicios Destacados</h3>
+                          <ul className="text-sm text-slate-600 space-y-1">
+                            <li className="flex items-center">
+                              <svg className="w-4 h-4 mr-1 text-[#FF914D]" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
+                              Asesoría personalizada
+                            </li>
+                            <li className="flex items-center">
+                              <svg className="w-4 h-4 mr-1 text-[#FF914D]" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
+                              Presupuestos sin cargo
+                            </li>
+                            <li className="flex items-center">
+                              <svg className="w-4 h-4 mr-1 text-[#FF914D]" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
+                              Entrega a domicilio
+                            </li>
+                          </ul>
+                        </div>
+                        
+                        <div>
+                          <h3 className="font-semibold text-slate-800 mb-1">Enlaces Rápidos</h3>
+                          <ul className="text-sm space-y-1">
+                            <li>
+                              <a href="/productos" className="text-[#FF914D] hover:underline">Ver catálogo completo</a>
+                            </li>
+                            <li>
+                              <a href="/envios" className="text-[#FF914D] hover:underline">Política de envíos</a>
+                            </li>
+                            <li>
+                              <a href="/testimonios" className="text-[#FF914D] hover:underline">Testimonios de clientes</a>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Contenido principal */}
+                  <div className="flex-grow order-1 md:order-2">
+                    <div className="bg-white rounded-xl shadow-2xl p-8 md:p-12 overflow-hidden">
+                      {/* Hero image with overlay text */}
+                      <div className="relative rounded-xl overflow-hidden h-64 md:h-96 mb-12">
+                        <img 
+                          src="/principio3.jpg" 
+                          alt="Materiales eléctricos y de construcción" 
+                          className="w-full h-full object-cover brightness-75"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#FF914D]/90 to-transparent flex items-center">
+                          <div className="px-8 py-6 md:max-w-xl">
+                            <h2 className="text-4xl md:text-5xl font-serif font-bold text-white mb-4 drop-shadow-md">
+                              Soluciones Integrales
+                            </h2>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mission and Vision with staggered layout */}
+                      <div className="relative z-10">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-12 mb-12">
+                          {/* Mission column */}
+                          <div className="md:col-span-7 flex flex-col justify-center order-2 md:order-1">
+                            <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#FF914D] mb-6">Misión</h2>
+                            <p className="text-lg text-gray-700 mb-6 font-normal leading-relaxed">
+                              Ofrecer soluciones integrales en materiales eléctricos y de
+                              construcción, con productos de calidad, atención profesional y
+                              precios competitivos.
+                            </p>
+                          </div>
+                          <div className="md:col-span-5 order-1 md:order-2">
+                            <div className="rounded-xl overflow-hidden shadow-lg transform md:translate-y-4 h-60 md:h-72">
+                              <img 
+                                src="/principio1.jpg" 
+                                alt="Materiales eléctricos" 
+                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Vision column with reversed layout */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-12">
+                          <div className="md:col-span-5 order-1">
+                            <div className="rounded-xl overflow-hidden shadow-lg transform md:-translate-y-4 h-60 md:h-72">
+                              <img 
+                                src="/principio2.jpg" 
+                                alt="Materiales de construcción" 
+                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                              />
+                            </div>
+                          </div>
+                          <div className="md:col-span-7 flex flex-col justify-center order-2">
+                            <h2 className="text-3xl md:text-4xl font-serif font-bold text-[#FF914D] mb-6">Visión</h2>
+                            <p className="text-lg text-gray-700 mb-6 font-normal leading-relaxed">
+                              Ser la empresa líder en la región en provisión de materiales para
+                              obras, reconocida por su confiabilidad, innovación y compromiso
+                              con el cliente.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-16 border-t border-gray-200 pt-12">
+                        <div className="flex flex-col md:flex-row gap-8 items-center">
+                          <div className="md:w-1/2">
+                            <h3 className="text-2xl font-bold mb-6 text-[#FF914D] inline-flex items-center">
+                              <span className="text-3xl mr-2">📍</span> Nuestra Ubicación
+                            </h3>
+                            <p className="text-lg mb-6">Olavarría 610 (esquina San Luis), Salta, Argentina</p>
+                            <a href="https://maps.app.goo.gl/gonu6cj9cJnDfJBz5?g_st=aw" 
+                              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#FF914D] hover:bg-[#e87f3d] text-white rounded-md transition-colors shadow-lg hover:shadow-xl">
+                              <span>Cómo llegar</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-right" viewBox="0 0 16 16">
+                                <path fillRule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/>
+                              </svg>
+                            </a>
+                          </div>
+                          <div className="md:w-1/2 h-72 rounded-lg overflow-hidden shadow-lg">
+                            <div className="w-full h-full rounded-lg overflow-hidden relative bg-gray-200">
+                              {/* Placeholder for map - Would be ideal to replace with an actual embedded map */}
+                              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-50">
+                                <img 
+                                  src="/banner-ilumina-espacios.jpg" 
+                                  alt="Ubicación en mapa" 
+                                  className="w-full h-full object-cover opacity-90"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer className="bg-white py-12">
+        <div className="container">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-[#FF914D] rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">T</span>
+                </div>
+                <span className="text-lg font-bold text-[#FF914D]">REGALA ALGO</span>
+              </div>
+              <p className="text-gray-600 text-sm">
+                Tu proveedor de materiales eléctricos y de construcción de confianza.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-[#FF914D]">Productos</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>Materiales Eléctricos</li>
+                <li>Materiales de Construcción</li>
+                <li>Herramientas Profesionales</li>
+                <li>Iluminación</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-[#FF914D]">Servicios</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>Asesoría Técnica</li>
+                <li>Presupuestos</li>
+                <li>Entregas a Obra</li>
+                <li>Financiamiento</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-[#FF914D]">Contacto</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>📍 Olavarría 610 (esquina San Luis)</li>
+                <li>
+                  <a href="https://maps.app.goo.gl/gonu6cj9cJnDfJBz5?g_st=aw" 
+                     className="text-[#FF914D] hover:underline">
+                    Ver en el mapa
+                  </a>
+                </li>
+                <li>WhatsApp: +54 3873439775</li>
+                <li>Instagram: <a href="https://www.instagram.com/regala.algo?igsh=OWk2enhxYzg2eHVq" target="_blank" rel="noopener noreferrer" className="text-[#FF914D] hover:underline">regala.algo</a></li>
+                <li>Facebook: Regala Algo</li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 mt-8 pt-8 text-center text-sm text-gray-600">
+            <p>&copy; 2024 REGALA ALGO. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default AboutUs;

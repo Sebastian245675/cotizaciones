@@ -1,0 +1,708 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Botón de inicio de sesión mejorado -->
+    <template id="enhanced_login_button" inherit_id="portal.placeholder_user_sign_in">
+        <xpath expr="." position="inside">
+            <li t-nocache="true" t-nocache-_item_class="_item_class" t-nocache-_link_class="_link_class" groups="base.group_public" t-attf-class="#{_item_class} o_no_autohide_item">
+                <!-- Botón de inicio de sesión mejorado con estilo moderno -->
+                <a t-attf-href="/web/login" t-attf-class="#{_link_class} d-flex align-items-center" style="position: relative; padding: 8px 20px; margin-left: 10px; border-radius: 50px; background: linear-gradient(135deg, #FF914D, #FF7E33); color: white !important; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 10px rgba(255,145,77,0.2);">
+                    <i class="fa fa-user me-2" style="font-size: 0.9rem;"></i>
+                    <span>Iniciar sesión</span>
+                    <span t-if="request.session.profile_session" class="position-absolute" style="top: -4px; right: -4px; width: 10px; height: 10px; border-radius: 50%; background-color: #e91e63; box-shadow: 0 0 5px rgba(233,30,99,0.5);"></span>
+                </a>
+                
+                <!-- Script simplificado para animaciones básicas -->
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Seleccionar el botón de login (utilizando selector más genérico)
+                        var loginBtn = document.querySelector('a[href="/web/login"]');
+                        if (!loginBtn) return;
+                        
+                        // Animación al pasar el mouse
+                        loginBtn.addEventListener('mouseenter', function() {
+                            // Efecto 3D y sombra
+                            this.style.transform = 'translateY(-3px)';
+                            this.style.boxShadow = '0 8px 15px rgba(255,145,77,0.35)';
+                        });
+                        
+                        loginBtn.addEventListener('mouseleave', function() {
+                            // Restaurar estilo normal
+                            this.style.transform = 'translateY(0)';
+                            this.style.boxShadow = '0 4px 10px rgba(255,145,77,0.2)';
+                        });
+                        
+                        // Animar indicador de sesión si existe
+                        var sessionIndicator = loginBtn.querySelector('[class*="position-absolute"]');
+                        if (sessionIndicator) {
+                            function pulseIndicator() {
+                                sessionIndicator.style.transform = 'scale(1.2)';
+                                sessionIndicator.style.opacity = '1';
+                                sessionIndicator.style.transition = 'all 0.5s ease';
+                                
+                                setTimeout(function() {
+                                    sessionIndicator.style.transform = 'scale(1)';
+                                    sessionIndicator.style.opacity = '0.9';
+                                    sessionIndicator.style.transition = 'all 0.5s ease';
+                                }, 600);
+                            }
+                            
+                            // Iniciar la animación
+                            setInterval(pulseIndicator, 2000);
+                        }
+                    });
+                </script>
+            </li>
+        </xpath>
+    </template>
+    
+    <template id="auth_signup_login_premium" inherit_id="web.login">
+        <!-- Importar fuentes y estilos globales -->
+        <xpath expr="//head" position="inside">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&amp;display=swap"/>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+            <style>
+                /* Variables de diseño globales */
+                :root {
+                    --primary-color: #FF914D;
+                    --primary-gradient: linear-gradient(135deg, #FF914D 0%, #FF7E33 100%);
+                    --secondary-color: #4CAF50;
+                    --text-color: #333333;
+                    --text-muted: #6c757d;
+                    --border-radius-sm: 8px;
+                    --border-radius-md: 16px;
+                    --border-radius-lg: 24px;
+                    --shadow-sm: 0 5px 15px rgba(0,0,0,0.05);
+                    --shadow-md: 0 8px 25px rgba(0,0,0,0.08);
+                    --shadow-lg: 0 15px 35px rgba(0,0,0,0.1);
+                    --font-family: 'Poppins', sans-serif;
+                }
+                
+                /* Estilos generales de la página */
+                body {
+                    font-family: var(--font-family);
+                    background: linear-gradient(135deg, #f9f9f9 0%, #f3f3f3 100%);
+                    overflow-x: hidden;
+                    color: var(--text-color);
+                }
+                
+                /* Elementos decorativos del fondo */
+                body::before, 
+                body::after {
+                    content: '';
+                    position: fixed;
+                    pointer-events: none;
+                    z-index: -1;
+                }
+                
+                body::before {
+                    top: -100px;
+                    right: -100px;
+                    width: 600px;
+                    height: 600px;
+                    background: radial-gradient(circle, rgba(255,145,77,0.05) 0%, rgba(255,145,77,0) 70%);
+                    border-radius: 50%;
+                }
+                
+                body::after {
+                    bottom: -100px;
+                    left: -100px;
+                    width: 500px;
+                    height: 500px;
+                    background: radial-gradient(circle, rgba(255,145,77,0.03) 0%, rgba(255,145,77,0) 70%);
+                    border-radius: 50%;
+                }
+                
+                /* Decoración de patrones geométricos */
+                .pattern-dots {
+                    position: absolute;
+                    top: 20%;
+                    left: 10%;
+                    width: 180px;
+                    height: 180px;
+                    background-image: radial-gradient(var(--primary-color) 1px, transparent 1px);
+                    background-size: 10px 10px;
+                    opacity: 0.07;
+                    z-index: -1;
+                }
+                
+                .pattern-lines {
+                    position: absolute;
+                    bottom: 15%;
+                    right: 10%;
+                    width: 150px;
+                    height: 150px;
+                    background-image: repeating-linear-gradient(45deg, var(--primary-color), var(--primary-color) 1px, transparent 1px, transparent 10px);
+                    opacity: 0.05;
+                    z-index: -1;
+                }
+                
+                /* Estilos del contenedor principal */
+                .o_database_list {
+                    border-radius: var(--border-radius-lg);
+                    border: none;
+                    overflow: hidden;
+                    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.1);
+                    backdrop-filter: blur(10px);
+                    background: rgba(255,255,255,0.95);
+                }
+                
+                /* Cabecera de formulario */
+                .form-header {
+                    text-align: center;
+                    padding-bottom: 1.5rem;
+                    position: relative;
+                }
+                
+                .form-header::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 0;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 60px;
+                    height: 4px;
+                    background: var(--primary-gradient);
+                    border-radius: 2px;
+                }
+                
+                .form-icon {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 80px;
+                    height: 80px;
+                    border-radius: 50%;
+                    margin-bottom: 1.5rem;
+                    background: var(--primary-gradient);
+                    box-shadow: 0 10px 25px rgba(255,145,77,0.3);
+                    position: relative;
+                }
+                
+                .form-icon::before {
+                    content: '';
+                    position: absolute;
+                    top: -8px;
+                    left: -8px;
+                    right: -8px;
+                    bottom: -8px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, rgba(255,145,77,0.2) 0%, rgba(255,255,255,0) 50%, rgba(255,145,77,0.2) 100%);
+                    opacity: 0.6;
+                    animation: spin 10s linear infinite;
+                }
+                
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                
+                .form-icon i {
+                    font-size: 32px;
+                    color: white;
+                }
+                
+                /* Campos del formulario */
+                .field-container {
+                    position: relative;
+                    margin-bottom: 1.5rem;
+                }
+                
+                .field-container label {
+                    font-weight: 600;
+                    color: var(--text-color);
+                    margin-bottom: 8px;
+                    display: block;
+                    font-size: 0.95rem;
+                    transition: all 0.2s ease;
+                }
+                
+                .field-wrapper {
+                    position: relative;
+                    border-radius: var(--border-radius-md);
+                    overflow: hidden;
+                    box-shadow: var(--shadow-sm);
+                    transition: all 0.3s ease;
+                }
+                
+                .field-icon {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    bottom: 0;
+                    width: 48px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: rgba(0,0,0,0.02);
+                    border-right: 1px solid rgba(0,0,0,0.05);
+                    color: var(--text-muted);
+                }
+                
+                .field-container input {
+                    width: 100%;
+                    padding: 14px 14px 14px 55px;
+                    border: 1px solid rgba(0,0,0,0.08);
+                    border-radius: var(--border-radius-md);
+                    font-size: 1rem;
+                    transition: all 0.3s ease;
+                    color: var(--text-color);
+                    background-color: white;
+                }
+                
+                .field-container input:focus {
+                    outline: none;
+                    border-color: var(--primary-color);
+                    box-shadow: 0 0 0 3px rgba(255,145,77,0.1);
+                }
+                
+                .field-container input:focus + .field-icon {
+                    color: var(--primary-color);
+                }
+                
+                .field-container:focus-within label {
+                    color: var(--primary-color);
+                }
+                
+                .password-toggle {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    bottom: 0;
+                    width: 48px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                }
+                
+                .password-toggle:hover {
+                    color: var(--primary-color);
+                }
+                
+                /* Botones de acción */
+                .btn-primary {
+                    background: var(--primary-gradient);
+                    border: none;
+                    border-radius: var(--border-radius-md);
+                    padding: 14px 20px;
+                    font-weight: 600;
+                    color: white;
+                    box-shadow: 0 8px 20px rgba(255,145,77,0.25);
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    position: relative;
+                    overflow: hidden;
+                    z-index: 1;
+                }
+                
+                .btn-primary::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                    transition: all 0.6s ease;
+                    z-index: -1;
+                }
+                
+                .btn-primary:hover {
+                    transform: translateY(-3px);
+                    box-shadow: 0 12px 25px rgba(255,145,77,0.35);
+                }
+                
+                .btn-primary:hover::before {
+                    left: 100%;
+                }
+                
+                /* Links y opciones adicionales */
+                .extra-options {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 1.5rem;
+                    font-size: 0.9rem;
+                }
+                
+                .extra-options a {
+                    color: var(--primary-color);
+                    text-decoration: none;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                }
+                
+                .extra-options a:hover {
+                    color: var(--text-color);
+                }
+                
+                /* Checkbox personalizado */
+                .custom-control {
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                }
+                
+                .custom-checkbox {
+                    position: relative;
+                    margin-right: 8px;
+                    width: 20px;
+                    height: 20px;
+                }
+                
+                .custom-checkbox input {
+                    position: absolute;
+                    opacity: 0;
+                    cursor: pointer;
+                }
+                
+                .checkmark {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 20px;
+                    height: 20px;
+                    background-color: white;
+                    border: 1px solid rgba(0,0,0,0.1);
+                    border-radius: 4px;
+                    transition: all 0.2s ease;
+                }
+                
+                .custom-checkbox input:checked ~ .checkmark {
+                    background-color: var(--primary-color);
+                    border-color: var(--primary-color);
+                }
+                
+                .checkmark:after {
+                    content: "";
+                    position: absolute;
+                    display: none;
+                    left: 7px;
+                    top: 3px;
+                    width: 6px;
+                    height: 11px;
+                    border: solid white;
+                    border-width: 0 2px 2px 0;
+                    transform: rotate(45deg);
+                }
+                
+                .custom-checkbox input:checked ~ .checkmark:after {
+                    display: block;
+                }
+                
+                /* Animaciones para alertas */
+                .alert {
+                    border-radius: var(--border-radius-md);
+                    border: none;
+                    padding: 1rem;
+                    display: flex;
+                    align-items: flex-start;
+                    animation: fadeInDown 0.5s ease;
+                }
+                
+                .alert-danger {
+                    background-color: rgba(220,53,69,0.05);
+                    border-left: 4px solid #dc3545;
+                }
+                
+                .alert-success {
+                    background-color: rgba(40,167,69,0.05);
+                    border-left: 4px solid #28a745;
+                }
+                
+                .alert-icon {
+                    margin-right: 12px;
+                    font-size: 1.2rem;
+                }
+                
+                .alert-danger .alert-icon {
+                    color: #dc3545;
+                }
+                
+                .alert-success .alert-icon {
+                    color: #28a745;
+                }
+                
+                /* Separador con texto */
+                .separator {
+                    display: flex;
+                    align-items: center;
+                    text-align: center;
+                    margin: 1.5rem 0;
+                }
+                
+                .separator::before, 
+                .separator::after {
+                    content: '';
+                    flex: 1;
+                    border-bottom: 1px solid rgba(0,0,0,0.1);
+                }
+                
+                .separator::before {
+                    margin-right: 1rem;
+                }
+                
+                .separator::after {
+                    margin-left: 1rem;
+                }
+                
+                /* Enlaces de registro y opciones */
+                .signup-option {
+                    text-align: center;
+                    margin-top: 1.5rem;
+                    padding-top: 1.5rem;
+                    border-top: 1px solid rgba(0,0,0,0.05);
+                }
+                
+                .signup-option p {
+                    color: var(--text-muted);
+                    margin-bottom: 0.5rem;
+                }
+                
+                .signup-option a {
+                    color: var(--primary-color);
+                    font-weight: 600;
+                    text-decoration: none;
+                    transition: all 0.2s ease;
+                }
+                
+                .signup-option a:hover {
+                    color: var(--text-color);
+                }
+                
+                /* Selector de base de datos */
+                select.form-control {
+                    appearance: none;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+                    background-repeat: no-repeat;
+                    background-position: right 15px center;
+                    padding-right: 40px !important;
+                }
+                
+                /* Media queries para responsividad */
+                @media (max-width: 767px) {
+                    .container {
+                        padding-left: 15px;
+                        padding-right: 15px;
+                    }
+                    
+                    .form-icon {
+                        width: 60px;
+                        height: 60px;
+                    }
+                    
+                    .form-icon i {
+                        font-size: 24px;
+                    }
+                }
+                
+                /* Animaciones adicionales */
+                @keyframes fadeInDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); }
+                }
+                
+                .pulse-animation {
+                    animation: pulse 2s infinite;
+                }
+            </style>
+        </xpath>
+        
+        <!-- Reemplazar el contenedor principal -->
+        <xpath expr="//div[hasclass('container')]" position="attributes">
+            <attribute name="style">max-width: 460px; padding: 60px 15px;</attribute>
+        </xpath>
+        
+        <!-- Añadir elementos decorativos -->
+        <xpath expr="//main" position="before">
+            <div class="pattern-dots"></div>
+            <div class="pattern-lines"></div>
+        </xpath>
+        
+        <!-- Reemplazar la tarjeta de login -->
+        <xpath expr="//div[hasclass('card')]" position="attributes">
+            <attribute name="style">border-radius: 24px; border: none; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.08), 0 0 0 1px rgba(255,255,255,0.1);</attribute>
+        </xpath>
+        
+        <!-- Reemplazar el contenido de la tarjeta -->
+        <xpath expr="//div[hasclass('card-body')]" position="replace">
+            <div class="card-body p-4">
+                <!-- Cabecera del formulario -->
+                <div class="form-header mb-5">
+                    <div class="form-icon animate__animated animate__fadeIn">
+                        <i class="fa fa-user-circle"></i>
+                    </div>
+                    <h2 class="animate__animated animate__fadeInUp" style="font-weight: 700; margin-bottom: 10px;">¡Bienvenido de nuevo!</h2>
+                    <p class="text-muted animate__animated animate__fadeInUp" style="animation-delay: 0.1s;">Accede a tu cuenta para continuar</p>
+                </div>
+                
+                <!-- Alertas y mensajes -->
+                <div t-if="error" class="alert alert-danger mb-4" role="alert">
+                    <i class="fa fa-exclamation-circle alert-icon"></i>
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 2px;">Error de inicio de sesión</div>
+                        <div style="color: var(--text-muted);"><t t-esc="error"/></div>
+                    </div>
+                </div>
+                <div t-if="message" class="alert alert-success mb-4" role="alert">
+                    <i class="fa fa-check-circle alert-icon"></i>
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 2px;">¡Éxito!</div>
+                        <div style="color: var(--text-muted);"><t t-esc="message"/></div>
+                    </div>
+                </div>
+                
+                <!-- Formulario de login -->
+                <form t-if="not message" t-attf-action="/web/login" method="post" class="animate__animated animate__fadeIn" style="animation-delay: 0.2s;">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    
+                    <!-- Selector de base de datos -->
+                    <div t-if="databases and len(databases) &gt; 1" class="field-container">
+                        <label for="db">Base de datos</label>
+                        <div class="field-wrapper">
+                            <div class="field-icon">
+                                <i class="fa fa-database"></i>
+                            </div>
+                            <select id="db" name="db" class="form-control">
+                                <option value="" t-if="not request.db">Seleccionar base de datos</option>
+                                <t t-foreach="databases" t-as="db">
+                                    <option t-if="db == request.db" t-att-value="db" selected="selected"><t t-esc="db"/></option>
+                                    <option t-else="" t-att-value="db"><t t-esc="db"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Campo de correo/login -->
+                    <div class="field-container">
+                        <label for="login">Correo electrónico</label>
+                        <div class="field-wrapper">
+                            <div class="field-icon">
+                                <i class="fa fa-envelope"></i>
+                            </div>
+                            <input id="login" type="text" name="login" t-att-value="login" placeholder="ejemplo@correo.com" required="required" autocomplete="username" autocapitalize="off"/>
+                        </div>
+                    </div>
+                    
+                    <!-- Campo de contraseña -->
+                    <div class="field-container">
+                        <label for="password">Contraseña</label>
+                        <div class="field-wrapper">
+                            <div class="field-icon">
+                                <i class="fa fa-lock"></i>
+                            </div>
+                            <input id="password" type="password" name="password" placeholder="••••••••" required="required" autocomplete="current-password"/>
+                            <div class="password-toggle" onclick="togglePasswordVisibility()">
+                                <i id="passwordToggleIcon" class="fa fa-eye"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Opciones adicionales -->
+                    <div class="extra-options">
+                        <label class="custom-control">
+                            <div class="custom-checkbox">
+                                <input type="checkbox" id="remember" name="remember"/>
+                                <span class="checkmark"></span>
+                            </div>
+                            Recordarme
+                        </label>
+                        <a t-if="reset_password_enabled" t-attf-href="/web/reset_password">¿Olvidaste tu contraseña?</a>
+                    </div>
+                    
+                    <!-- Botón de inicio de sesión -->
+                    <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center">
+                        <i class="fa fa-sign-in-alt me-2"></i>
+                        <span>Iniciar Sesión</span>
+                    </button>
+                    
+                    <!-- Opciones de registro -->
+                    <div t-if="signup_enabled" class="signup-option">
+                        <p>¿No tienes una cuenta?</p>
+                        <a t-attf-href="/web/signup" class="btn btn-outline-secondary w-100">
+                            <i class="fa fa-user-plus me-2"></i> Crear una cuenta
+                        </a>
+                    </div>
+                </form>
+                
+                <!-- Script para funcionalidades del formulario -->
+                <script>
+                    // Función para mostrar/ocultar contraseña
+                    function togglePasswordVisibility() {
+                        var passwordField = document.getElementById('password');
+                        var toggleIcon = document.getElementById('passwordToggleIcon');
+                        
+                        if (passwordField.type === 'password') {
+                            passwordField.type = 'text';
+                            toggleIcon.classList.remove('fa-eye');
+                            toggleIcon.classList.add('fa-eye-slash');
+                        } else {
+                            passwordField.type = 'password';
+                            toggleIcon.classList.remove('fa-eye-slash');
+                            toggleIcon.classList.add('fa-eye');
+                        }
+                    }
+                    
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Focus automático en el primer campo
+                        var firstInput = document.querySelector('form input:not([type=hidden])');
+                        if (firstInput) {
+                            firstInput.focus();
+                        }
+                        
+                        // Efectos de hover en botón
+                        var submitBtn = document.querySelector('button[type="submit"]');
+                        if (submitBtn) {
+                            submitBtn.addEventListener('mouseenter', function() {
+                                this.style.transform = 'translateY(-3px)';
+                                this.style.boxShadow = '0 12px 25px rgba(255,145,77,0.35)';
+                            });
+                            
+                            submitBtn.addEventListener('mouseleave', function() {
+                                this.style.transform = '';
+                                this.style.boxShadow = '0 8px 20px rgba(255,145,77,0.25)';
+                            });
+                        }
+                        
+                        // Efectos en campos de formulario
+                        var formFields = document.querySelectorAll('.field-wrapper');
+                        formFields.forEach(function(field) {
+                            var input = field.querySelector('input, select');
+                            if (!input) return;
+                            
+                            input.addEventListener('focus', function() {
+                                field.style.boxShadow = '0 0 0 3px rgba(255,145,77,0.1)';
+                                field.querySelector('.field-icon').style.color = '#FF914D';
+                            });
+                            
+                            input.addEventListener('blur', function() {
+                                field.style.boxShadow = '';
+                                if (!this.value) {
+                                    field.querySelector('.field-icon').style.color = '';
+                                }
+                            });
+                            
+                            // Establecer color de icono si hay valor preestablecido
+                            if (input.value) {
+                                field.querySelector('.field-icon').style.color = '#FF914D';
+                            }
+                        });
+                    });
+                </script>
+            </div>
+        </xpath>
+    </template>
+</odoo>

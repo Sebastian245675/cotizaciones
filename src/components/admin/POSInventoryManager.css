@@ -1,0 +1,317 @@
+/* Estilos Odoo - Paleta de colores neutral y profesional */
+
+/* Variables de colores Odoo */
+:root {
+  --odoo-primary: #714B67;
+  --odoo-primary-light: #8E6B88;
+  --odoo-secondary: #017E84;
+  --odoo-success: #00A04A;
+  --odoo-warning: #F0AD4E;
+  --odoo-danger: #D9534F;
+  --odoo-info: #5BC0DE;
+  --odoo-light: #F8F9FA;
+  --odoo-dark: #212529;
+  --odoo-gray-100: #F8F9FA;
+  --odoo-gray-200: #E9ECEF;
+  --odoo-gray-300: #DEE2E6;
+  --odoo-gray-400: #CED4DA;
+  --odoo-gray-500: #ADB5BD;
+  --odoo-gray-600: #6C757D;
+  --odoo-gray-700: #495057;
+  --odoo-gray-800: #343A40;
+  --odoo-gray-900: #212529;
+}
+
+/* Transiciones suaves para todos los elementos */
+.inventory-container * {
+  transition: all 0.15s ease-in-out;
+}
+
+/* Efectos hover mejorados para las cards - Estilo Odoo neutro */
+.inventory-stats-card {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--odoo-gray-300);
+}
+
+.inventory-stats-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Header estilo Odoo - Sin gradientes llamativos */
+.inventory-header {
+  background: var(--odoo-primary);
+  color: white;
+  border-bottom: 2px solid var(--odoo-primary-light);
+}
+
+/* Estilos para la tabla estilo Odoo */
+.inventory-table {
+  background: white;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--odoo-gray-300);
+}
+
+.inventory-table thead {
+  background: var(--odoo-gray-100);
+}
+
+.inventory-table th {
+  color: var(--odoo-gray-700);
+  font-weight: 600;
+  text-transform: none;
+  font-size: 0.875rem;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--odoo-gray-300);
+}
+
+.inventory-table tr:hover {
+  background-color: var(--odoo-gray-100);
+}
+
+.inventory-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--odoo-gray-200);
+  color: var(--odoo-gray-800);
+}
+
+/* Badges con estilo Odoo neutro */
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  border: 1px solid;
+}
+
+.status-badge.stock-ok {
+  background: #DFF0D8;
+  color: var(--odoo-success);
+  border-color: var(--odoo-success);
+}
+
+.status-badge.stock-low {
+  background: #FCF8E3;
+  color: #8A6D3B;
+  border-color: var(--odoo-warning);
+}
+
+.status-badge.stock-out {
+  background: #F2DEDE;
+  color: var(--odoo-danger);
+  border-color: var(--odoo-danger);
+}
+
+/* Botones de acción estilo Odoo */
+.action-button {
+  padding: 6px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--odoo-gray-400);
+  background: white;
+  transition: all 0.15s ease;
+  color: var(--odoo-gray-600);
+}
+
+.action-button:hover {
+  background: var(--odoo-gray-100);
+  border-color: var(--odoo-gray-500);
+  color: var(--odoo-gray-800);
+}
+
+.action-button.edit:hover {
+  background: #E3F2FD;
+  border-color: var(--odoo-info);
+  color: var(--odoo-info);
+}
+
+.action-button.delete:hover {
+  background: #FFEBEE;
+  border-color: var(--odoo-danger);
+  color: var(--odoo-danger);
+}
+
+/* Filtros con estilo Odoo */
+.filter-section {
+  background: var(--odoo-gray-100);
+  border: 1px solid var(--odoo-gray-300);
+  border-radius: 3px;
+  padding: 16px;
+}
+
+/* Cards de métricas estilo Odoo */
+.metric-card {
+  position: relative;
+  background: white;
+  border: 1px solid var(--odoo-gray-300);
+  border-radius: 3px;
+}
+
+.metric-card.total {
+  border-left: 4px solid var(--odoo-primary);
+}
+
+.metric-card.warning {
+  border-left: 4px solid var(--odoo-warning);
+}
+
+.metric-card.danger {
+  border-left: 4px solid var(--odoo-danger);
+}
+
+.metric-card.success {
+  border-left: 4px solid var(--odoo-success);
+}
+
+/* Gráficos de progreso estilo Odoo */
+.progress-bar {
+  height: 4px;
+  background: var(--odoo-gray-300);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--odoo-success);
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
+}
+
+/* Alertas estilo Odoo */
+.alert-card {
+  border: 1px solid var(--odoo-gray-300);
+  background: white;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.alert-card.warning {
+  border-left: 4px solid var(--odoo-warning);
+  background: #FFFBF0;
+}
+
+.alert-card.success {
+  border-left: 4px solid var(--odoo-success);
+  background: #F0F9FF;
+}
+
+.alert-card.info {
+  border-left: 4px solid var(--odoo-info);
+  background: #F0F9FF;
+}
+
+/* Tabs estilo Odoo */
+.inventory-tabs {
+  background: white;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--odoo-gray-300);
+}
+
+.inventory-tab-trigger {
+  position: relative;
+  padding: 12px 20px;
+  color: var(--odoo-gray-600);
+  font-weight: 500;
+  transition: all 0.15s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.inventory-tab-trigger[data-state="active"] {
+  color: var(--odoo-primary);
+  background: var(--odoo-gray-100);
+  border-bottom-color: var(--odoo-primary);
+}
+
+/* Acciones rápidas estilo Odoo */
+.quick-action-button {
+  background: white;
+  border: 1px solid var(--odoo-gray-300);
+  border-radius: 3px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.quick-action-button:hover {
+  border-color: var(--odoo-gray-400);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: var(--odoo-gray-50);
+}
+
+/* Paginación estilo Odoo */
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid var(--odoo-gray-300);
+  background: var(--odoo-gray-100);
+}
+
+.pagination-info {
+  color: var(--odoo-gray-600);
+  font-size: 0.875rem;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.pagination-button {
+  padding: 6px 12px;
+  border: 1px solid var(--odoo-gray-400);
+  background: white;
+  border-radius: 3px;
+  color: var(--odoo-gray-700);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.875rem;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background: var(--odoo-gray-100);
+  border-color: var(--odoo-gray-500);
+}
+
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-button.active {
+  background: var(--odoo-primary);
+  color: white;
+  border-color: var(--odoo-primary);
+}
+
+/* Responsive design mejorado */
+@media (max-width: 768px) {
+  .inventory-table {
+    font-size: 0.875rem;
+  }
+  
+  .inventory-table th,
+  .inventory-table td {
+    padding: 8px 12px;
+  }
+  
+  .metric-card {
+    margin-bottom: 12px;
+  }
+  
+  .quick-action-button {
+    padding: 12px;
+  }
+  
+  .pagination-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

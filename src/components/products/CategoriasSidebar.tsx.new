@@ -1,0 +1,267 @@
+import React, { useState, useMemo } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useCategories } from '@/hooks/use-categories';
+import type { Category } from '@/hooks/use-categories';
+
+interface CategoriasSidebarProps {
+  selectedCategory: string;
+  setSelectedCategory: (category: string) => void;
+  selectedSubcategory: string;
+  setSelectedSubcategory: (subcategory: string) => void;
+  selectedTerceraCategoria: string;
+  setSelectedTerceraCategoria: (terceraCategoria: string) => void;
+}
+
+// Componente para una sola categoría principal con sus subcategorías
+const CategoriaConSubcategorias: React.FC<{
+  categoria: Category;
+  selectedCategory: string;
+  selectedSubcategory: string;
+  selectedTerceraCategoria: string;
+  setSelectedCategory: (category: string) => void;
+  setSelectedSubcategory: (subcategory: string) => void;
+  setSelectedTerceraCategoria: (terceraCategoria: string) => void;
+  subcategorias: Category[];
+}> = ({
+  categoria,
+  selectedCategory,
+  selectedSubcategory,
+  selectedTerceraCategoria,
+  setSelectedCategory,
+  setSelectedSubcategory,
+  setSelectedTerceraCategoria,
+  subcategorias,
+}) => {
+  // Siempre mostrar expandido
+  const { categoriesData } = useCategories();
+  
+  // Manejador para seleccionar esta categoría
+  const seleccionarCategoria = () => {
+    setSelectedCategory(categoria.name);
+    setSelectedSubcategory('Todas');
+    setSelectedTerceraCategoria('Todas');
+    
+    // Log para debug
+    console.log(`Seleccionando categoría: ${categoria.name}, resetear subcategorías y terceras categorías a 'Todas'`);
+    
+    // Asegurar desplazamiento hacia la sección de productos
+    setTimeout(() => {
+      const productosSection = document.getElementById('productos');
+      if (productosSection) {
+        productosSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 200);
+  };
+
+  return (
+    <div className="mb-1">
+      {/* Botón de categoría principal */}
+      <div className="flex items-center">
+        <button
+          onClick={seleccionarCategoria}
+          className={`flex-grow text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center font-bold ${
+            selectedCategory === categoria.name
+              ? "bg-slate-100 font-medium text-blue-600 border-l-2 border-blue-500"
+              : "hover:bg-slate-50 text-slate-700"
+          }`}
+        >
+          {categoria.name}
+        </button>
+      </div>
+
+      {/* Subcategorías - siempre visibles */}
+      {subcategorias.length > 0 && (
+        <div className="ml-3 mt-1 pl-2 border-l border-slate-200 space-y-1">
+          {/* Opción "Todas" para subcategorías */}
+          <button
+            onClick={() => {
+              setSelectedCategory(categoria.name);
+              setSelectedSubcategory('Todas');
+              setSelectedTerceraCategoria('Todas');
+              
+              // Log para debug
+              console.log(`Seleccionando "Todas" las subcategorías de ${categoria.name}`);
+              
+              // Asegurar desplazamiento hacia la sección de productos
+              setTimeout(() => {
+                const productosSection = document.getElementById('productos');
+                if (productosSection) {
+                  productosSection.scrollIntoView({ behavior: 'smooth' });
+                }
+              }, 200);
+            }}
+            className={`w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors ${
+              selectedCategory === categoria.name && selectedSubcategory === 'Todas'
+                ? "bg-blue-50 text-blue-600 font-medium"
+                : "hover:bg-slate-50 text-slate-600"
+            }`}
+          >
+            Todas las subcategorías
+          </button>
+
+          {/* Lista de subcategorías */}
+          {subcategorias.map(subcategoria => {
+            // Buscar terceras categorías para esta subcategoría
+            const tercerasCategorias = categoriesData.filter(
+              cat => cat.parentId === subcategoria.id
+            );
+            
+            return (
+              <div key={subcategoria.id} className="mb-1">
+                <div className="flex items-center">
+                  <button
+                    onClick={() => {
+                      setSelectedCategory(categoria.name);
+                      setSelectedSubcategory(subcategoria.name);
+                      setSelectedTerceraCategoria('Todas');
+                      
+                      // Log para debug
+                      console.log(`Seleccionando subcategoría: ${subcategoria.name} de categoría: ${categoria.name}`);
+                      
+                      // Asegurar desplazamiento hacia la sección de productos
+                      setTimeout(() => {
+                        const productosSection = document.getElementById('productos');
+                        if (productosSection) {
+                          productosSection.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }, 200);
+                    }}
+                    className={`flex-grow text-left px-2 py-1.5 rounded-md text-xs transition-colors ${
+                      selectedCategory === categoria.name && selectedSubcategory === subcategoria.name
+                        ? "bg-blue-50 text-blue-600 font-medium"
+                        : "hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    {subcategoria.name}
+                  </button>
+                </div>
+                
+                {/* Terceras categorías - siempre visibles */}
+                {tercerasCategorias.length > 0 && (
+                  <div className="ml-2 mt-1 pl-2 border-l border-slate-200 space-y-1">
+                    {/* Opción "Todas" para terceras categorías */}
+                    <button
+                      onClick={() => {
+                        setSelectedCategory(categoria.name);
+                        setSelectedSubcategory(subcategoria.name);
+                        setSelectedTerceraCategoria('Todas');
+                        
+                        // Log para debug
+                        console.log(`Seleccionando "Todas" las terceras categorías de subcategoría: ${subcategoria.name}`);
+                        
+                        // Asegurar desplazamiento hacia la sección de productos
+                        setTimeout(() => {
+                          const productosSection = document.getElementById('productos');
+                          if (productosSection) {
+                            productosSection.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }, 200);
+                      }}
+                      className={`w-full text-left px-2 py-1 rounded-md text-xs transition-colors ${
+                        selectedCategory === categoria.name && 
+                        selectedSubcategory === subcategoria.name && 
+                        selectedTerceraCategoria === 'Todas'
+                          ? "bg-orange-50 text-orange-600 font-medium"
+                          : "hover:bg-slate-50 text-slate-500"
+                      }`}
+                    >
+                      Todas las opciones
+                    </button>
+                    
+                    {/* Lista de terceras categorías */}
+                    {tercerasCategorias.map(tercera => (
+                      <button
+                        key={tercera.id}
+                        onClick={() => {
+                          setSelectedCategory(categoria.name);
+                          setSelectedSubcategory(subcategoria.name);
+                          setSelectedTerceraCategoria(tercera.name);
+                          
+                          // Log para debug
+                          console.log(`Seleccionando tercera categoría: ${tercera.name} de subcategoría: ${subcategoria.name}`);
+                          
+                          // Asegurar desplazamiento hacia la sección de productos
+                          setTimeout(() => {
+                            const productosSection = document.getElementById('productos');
+                            if (productosSection) {
+                              productosSection.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }, 200);
+                        }}
+                        className={`w-full text-left px-2 py-1 rounded-md text-xs transition-colors ${
+                          selectedCategory === categoria.name && 
+                          selectedSubcategory === subcategoria.name && 
+                          selectedTerceraCategoria === tercera.name
+                            ? "bg-orange-50 text-orange-600 font-medium"
+                            : "hover:bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        {tercera.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Componente principal del sidebar de categorías
+export const CategoriasSidebar: React.FC<CategoriasSidebarProps> = ({
+  selectedCategory,
+  setSelectedCategory,
+  selectedSubcategory,
+  setSelectedSubcategory,
+  selectedTerceraCategoria,
+  setSelectedTerceraCategoria,
+}) => {
+  const { categoriesData } = useCategories();
+  
+  // Obtener categorías principales
+  const categoriasPrincipales = useMemo(() => {
+    return categoriesData.filter(cat => 
+      cat.isMain && cat.name !== "Todos" && cat.name !== "Ofertas"
+    );
+  }, [categoriesData]);
+  
+  // Organizar subcategorías por categoría principal
+  const subcategoriasPorCategoria = useMemo(() => {
+    const result: Record<string, Category[]> = {};
+    
+    categoriasPrincipales.forEach(cat => {
+      // Buscar subcategorías que tengan esta categoría como padre
+      const subcats = categoriesData.filter(subcat => 
+        (subcat.parentName === cat.name) || 
+        (subcat.parentId === cat.id && cat.id)
+      );
+      
+      result[cat.name] = subcats;
+    });
+    
+    return result;
+  }, [categoriesData, categoriasPrincipales]);
+  
+  return (
+    <div className="space-y-1">
+      {categoriasPrincipales.map(categoria => (
+        <CategoriaConSubcategorias
+          key={categoria.id}
+          categoria={categoria}
+          selectedCategory={selectedCategory}
+          selectedSubcategory={selectedSubcategory}
+          selectedTerceraCategoria={selectedTerceraCategoria}
+          setSelectedCategory={setSelectedCategory}
+          setSelectedSubcategory={setSelectedSubcategory}
+          setSelectedTerceraCategoria={setSelectedTerceraCategoria}
+          subcategorias={subcategoriasPorCategoria[categoria.name] || []}
+        />
+      ))}
+    </div>
+  );
+};
+
+export default CategoriasSidebar;

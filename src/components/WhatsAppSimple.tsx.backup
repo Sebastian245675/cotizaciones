@@ -1,0 +1,2671 @@
+import React, { useState, useEffect, useRef } from 'react';
+import io, { Socket } from 'socket.io-client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
+import {
+  MessageCircle,
+  Phone,
+  Send,
+  QrCode,
+  Plus,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  WifiOff,
+  Smartphone,
+  MessageSquare,
+  Bot,
+  Target,
+  TrendingUp,
+  Activity,
+  Bell,
+  Zap,
+  Play,
+  Pause,
+  Settings,
+  Brain,
+  TestTube,
+  Save,
+  Trash2,
+  Edit,
+  Clock,
+  Facebook
+} from 'lucide-react';
+
+const WHATSAPP_API_URL = 'http://localhost:3001/api/whatsapp';
+
+interface WhatsAppInstance {
+  instanceId: string;
+  status: 'connected' | 'disconnected' | 'qr_ready' | 'error';
+  phoneNumber?: string;
+  qr?: string;
+}
+
+interface Chat {
+  id: string;
+  instance_id: string;
+  phone_number: string;
+  contact_name?: string;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
+}
+
+interface Message {
+  id: string;
+  from_number: string;
+  to_number: string;
+  message_text: string;
+  timestamp: string;
+  is_from_me: boolean;
+}
+
+interface FacebookInstance {
+  instanceId: string;
+  status: 'connected' | 'disconnected' | 'error' | 'connecting';
+  username?: string;
+}
+
+interface FacebookChat {
+  id: string;
+  instance_id: string;
+  chat_id: string;
+  contact_name?: string;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
+}
+
+interface FacebookMessage {
+  id: string;
+  chat_id: string;
+  message_text: string;
+  timestamp: string;
+  is_from_me: boolean;
+  sender_name?: string;
+}
+
+interface UnifiedChat {
+  id: string;
+  platform: 'whatsapp' | 'facebook';
+  instance_id: string;
+  identifier: string; // phone_number para WhatsApp, chat_id para Facebook
+  contact_name?: string;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
+  originalChat: Chat | FacebookChat;
+}
+
+const WhatsAppIntegration: React.FC = () => {
+  const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
+  const [selectedInstance, setSelectedInstance] = useState<string>('');
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [selectedQR, setSelectedQR] = useState<string>('');
+  const [serviceStatus, setServiceStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  // Estados para Facebook
+  const [facebookInstances, setFacebookInstances] = useState<FacebookInstance[]>([]);
+  const [selectedFacebookInstance, setSelectedFacebookInstance] = useState<string>('');
+  const [facebookChats, setFacebookChats] = useState<FacebookChat[]>([]);
+  const [selectedFacebookChat, setSelectedFacebookChat] = useState<FacebookChat | null>(null);
+  const [facebookMessages, setFacebookMessages] = useState<FacebookMessage[]>([]);
+  const [newFacebookMessage, setNewFacebookMessage] = useState('');
+  const [showFacebookLoginDialog, setShowFacebookLoginDialog] = useState(false);
+  const [facebookCredentials, setFacebookCredentials] = useState({
+    username: '',
+    password: ''
+  });
+
+  // Estado para vista de chats
+  const [unifiedChatsView, setUnifiedChatsView] = useState(true);
+
+  // Estados para IA Avanzada
+  const [aiAgents, setAiAgents] = useState<any[]>([]);
+  const [advancedFlows, setAdvancedFlows] = useState<any[]>([]);
+  const [showAIAgentDialog, setShowAIAgentDialog] = useState(false);
+  const [showAdvancedFlowDialog, setShowAdvancedFlowDialog] = useState(false);
+  const [aiAgentForm, setAiAgentForm] = useState({
+    name: '',
+    provider: 'openai',
+    apiKey: '',
+    model: 'gpt-3.5-turbo',
+    systemPrompt: 'Eres un asistente de atención al cliente profesional y amigable.',
+    temperature: 0.7,
+    maxTokens: 300
+  });
+  const [advancedFlowForm, setAdvancedFlowForm] = useState({
+    name: '',
+    description: '',
+    triggerType: 'keyword',
+    triggerValue: '',
+    aiAgentId: '',
+    steps: []
+  });
+  const [testingAgent, setTestingAgent] = useState(false);
+  const [testResult, setTestResult] = useState('');
+
+  // WebSocket connection
+  const socketRef = useRef<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const facebookMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Estados para automatización básica
+  const [basicFlows, setBasicFlows] = useState<any[]>([]);
+  const [showBasicFlowDialog, setShowBasicFlowDialog] = useState(false);
+  const [basicFlowForm, setBasicFlowForm] = useState({
+    name: '',
+    description: '',
+    triggers: [''],
+    responses: [''],
+    delay: 0,
+    active: true
+  });
+
+  // Función para cargar flujos básicos desde el backend
+  const loadBasicFlows = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/whatsapp/flows');
+      const data = await response.json();
+      if (data.flows) {
+        // Filtrar solo flujos simples (sin IA)
+        const simpleFlows = data.flows.filter((flow: any) => !flow.ai_config);
+        setBasicFlows(simpleFlows);
+      }
+    } catch (error) {
+      console.error('Error cargando flujos:', error);
+    }
+  };
+
+  // Función para guardar flujo básico
+  const saveBasicFlow = async (flow: any) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/whatsapp/flows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: flow.name,
+          description: flow.description,
+          triggerKeywords: flow.triggers,
+          steps: flow.responses.map((response: string, index: number) => ({
+            type: 'message',
+            content: response,
+            delay: index > 0 ? flow.delay : 0
+          }))
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        loadBasicFlows(); // Recargar flujos
+        return true;
+      }
+    } catch (error) {
+      console.error('Error guardando flujo:', error);
+    }
+    return false;
+  };
+
+  // Función para toggle activar/desactivar flujo
+  const toggleBasicFlow = async (flowId: string, currentActive: boolean) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/whatsapp/flows/${flowId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          is_active: !currentActive
+        })
+      });
+      
+      if (response.ok) {
+        loadBasicFlows(); // Recargar flujos
+        return true;
+      }
+    } catch (error) {
+      console.error('Error actualizando flujo:', error);
+    }
+    return false;
+  };
+
+  // Función para eliminar flujo
+  const deleteBasicFlow = async (flowId: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/whatsapp/flows/${flowId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        loadBasicFlows(); // Recargar flujos
+        return true;
+      }
+    } catch (error) {
+      console.error('Error eliminando flujo:', error);
+    }
+    return false;
+  };
+
+  // Check service status and setup WebSocket
+  useEffect(() => {
+    checkServiceStatus();
+    const interval = setInterval(checkServiceStatus, 5000);
+    
+    // Cargar flujos básicos al inicializar
+    loadBasicFlows();
+    
+    // Configurar WebSocket
+    setupWebSocket();
+    
+    return () => {
+      clearInterval(interval);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
+
+  // Setup WebSocket connection
+  const setupWebSocket = () => {
+    socketRef.current = io('http://localhost:3001');
+    
+    socketRef.current.on('connect', () => {
+      console.log('🔌 WebSocket conectado');
+      setIsConnected(true);
+    });
+
+    socketRef.current.on('disconnect', () => {
+      console.log('❌ WebSocket desconectado');
+      setIsConnected(false);
+    });
+
+    // Escuchar nuevos mensajes
+    socketRef.current.on('new_message', (data) => {
+      console.log('📨 Nuevo mensaje:', data);
+      
+      // Siempre actualizar la lista de chats cuando llegue un mensaje
+      if (data.instanceId === selectedInstance) {
+        // Actualización más eficiente: solo actualizar el chat específico
+        setChats(prevChats => {
+          return prevChats.map(chat => {
+            const phoneWithoutCountry = chat.phone_number.replace(/^\+\d+/, '');
+            const dataPhoneWithoutCountry = data.fromNumber.replace(/^\+\d+/, '');
+            
+            if (phoneWithoutCountry === dataPhoneWithoutCountry || data.fromNumber === chat.phone_number) {
+              return {
+                ...chat,
+                last_message: data.text,
+                last_message_time: data.timestamp,
+                unread_count: selectedChat?.phone_number === chat.phone_number ? 0 : (chat.unread_count || 0) + 1
+              };
+            }
+            return chat;
+          });
+        });
+      }
+      
+      // Solo agregar el mensaje si es del chat seleccionado
+      if (selectedChat && data.instanceId === selectedInstance) {
+        const phoneWithoutCountry = selectedChat.phone_number.replace(/^\+\d+/, '');
+        const dataPhoneWithoutCountry = data.fromNumber.replace(/^\+\d+/, '');
+        
+        if (phoneWithoutCountry === dataPhoneWithoutCountry || data.fromNumber === selectedChat.phone_number) {
+          const newMessage = {
+            id: data.messageId,
+            instance_id: data.instanceId,
+            chat_id: `${data.fromNumber}@s.whatsapp.net`,
+            from_number: data.fromNumber,
+            to_number: 'self',
+            message_text: data.text,
+            message_type: 'text',
+            timestamp: data.timestamp,
+            is_from_me: data.isFromMe,
+            status: 'received'
+          };
+          
+          setMessages(prevMessages => {
+            // Evitar duplicados
+            if (prevMessages.some(msg => msg.id === newMessage.id)) {
+              return prevMessages;
+            }
+            return [...prevMessages, newMessage];
+          });
+        }
+      }
+    });
+
+    // Escuchar mensajes enviados
+    socketRef.current.on('message_sent', (data) => {
+      console.log('📤 Mensaje enviado:', data);
+      
+      // Actualizar la lista de chats cuando se envíe un mensaje
+      if (data.instanceId === selectedInstance) {
+        setChats(prevChats => {
+          return prevChats.map(chat => {
+            if (chat.phone_number === data.toNumber) {
+              return {
+                ...chat,
+                last_message: data.text,
+                last_message_time: data.timestamp || new Date().toISOString()
+              };
+            }
+            return chat;
+          });
+        });
+      }
+      
+      if (selectedChat && data.instanceId === selectedInstance) {
+        const newMessage = {
+          id: data.messageId,
+          instance_id: data.instanceId,
+          chat_id: `${selectedChat.phone_number}@s.whatsapp.net`,
+          from_number: 'self',
+          to_number: selectedChat.phone_number,
+          message_text: data.text,
+          message_type: 'text',
+          timestamp: data.timestamp || new Date().toISOString(),
+          is_from_me: true,
+          status: 'sent'
+        };
+        
+        setMessages(prevMessages => {
+          // Evitar duplicados
+          if (prevMessages.some(msg => msg.id === newMessage.id)) {
+            return prevMessages;
+          }
+          return [...prevMessages, newMessage];
+        });
+      }
+    });
+
+    // Escuchar mensajes de Facebook
+    socketRef.current.on('facebook_message', (data) => {
+      console.log('📨 Mensaje de Facebook:', data);
+      
+      // Actualizar chats de Facebook
+      if (data.instanceId === selectedFacebookInstance) {
+        setFacebookChats(prevChats => {
+          return prevChats.map(chat => {
+            if (chat.chat_id === data.fromId) {
+              return {
+                ...chat,
+                last_message: data.text,
+                last_message_time: data.timestamp,
+                unread_count: selectedFacebookChat?.chat_id === chat.chat_id ? 0 : (chat.unread_count || 0) + 1
+              };
+            }
+            return chat;
+          });
+        });
+      }
+      
+      // Agregar mensaje al chat seleccionado
+      if (selectedFacebookChat && data.instanceId === selectedFacebookInstance && data.fromId === selectedFacebookChat.chat_id) {
+        const newMessage: FacebookMessage = {
+          id: data.messageId,
+          chat_id: data.fromId,
+          message_text: data.text,
+          timestamp: data.timestamp,
+          is_from_me: false,
+          sender_name: data.senderName || 'Unknown'
+        };
+        
+        setFacebookMessages(prevMessages => {
+          if (prevMessages.some(msg => msg.id === newMessage.id)) {
+            return prevMessages;
+          }
+          return [...prevMessages, newMessage];
+        });
+      }
+    });
+
+    // Escuchar mensajes enviados de Facebook
+    socketRef.current.on('facebook_message_sent', (data) => {
+      console.log('📤 Mensaje de Facebook enviado:', data);
+      
+      if (selectedFacebookChat && data.instanceId === selectedFacebookInstance && data.chatId === selectedFacebookChat.chat_id) {
+        const newMessage: FacebookMessage = {
+          id: data.messageId,
+          chat_id: data.chatId,
+          message_text: data.text,
+          timestamp: data.timestamp || new Date().toISOString(),
+          is_from_me: true
+        };
+        
+        setFacebookMessages(prevMessages => {
+          if (prevMessages.some(msg => msg.id === newMessage.id)) {
+            return prevMessages;
+          }
+          return [...prevMessages, newMessage];
+        });
+      }
+    });
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    facebookMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [facebookMessages]);
+
+  useEffect(() => {
+    if (serviceStatus === 'online') {
+      loadInstances();
+      loadFacebookInstances();
+    }
+  }, [serviceStatus]);
+
+  useEffect(() => {
+    if (selectedInstance) {
+      loadChats(selectedInstance);
+    }
+  }, [selectedInstance]);
+
+  useEffect(() => {
+    if (selectedFacebookInstance) {
+      loadFacebookChats(selectedFacebookInstance);
+    }
+  }, [selectedFacebookInstance]);
+
+  useEffect(() => {
+    if (selectedChat && selectedInstance) {
+      loadMessages(selectedInstance, selectedChat.phone_number);
+    }
+  }, [selectedChat, selectedInstance]);
+
+  useEffect(() => {
+    if (selectedFacebookChat && selectedFacebookInstance) {
+      loadFacebookMessages(selectedFacebookInstance, selectedFacebookChat.chat_id);
+    }
+  }, [selectedFacebookChat, selectedFacebookInstance]);
+
+  const checkServiceStatus = async () => {
+    try {
+      const response = await fetch(`${WHATSAPP_API_URL}/health`);
+      if (response.ok) {
+        setServiceStatus('online');
+      } else {
+        setServiceStatus('offline');
+      }
+    } catch (error) {
+      setServiceStatus('offline');
+    }
+  };
+
+  const loadInstances = async () => {
+    try {
+      const response = await fetch(`${WHATSAPP_API_URL}/instances`);
+      if (response.ok) {
+        const data = await response.json();
+        setInstances(data.instances || []);
+        
+        if (data.instances?.length > 0 && !selectedInstance) {
+          setSelectedInstance(data.instances[0].instanceId);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading instances:', error);
+    }
+  };
+
+  const createInstance = async () => {
+    try {
+      if (instances.length >= 3) {
+        alert('Máximo 3 instancias permitidas');
+        return;
+      }
+
+      setLoading(true);
+      const response = await fetch(`${WHATSAPP_API_URL}/instances`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionName: `session_${Date.now()}` })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          await loadInstances();
+          setSelectedInstance(data.instanceId);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating instance:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadChats = async (instanceId: string) => {
+    try {
+      const response = await fetch(`${WHATSAPP_API_URL}/chats/${instanceId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setChats(data.chats || []);
+      }
+    } catch (error) {
+      console.error('Error loading chats:', error);
+    }
+  };
+
+  const loadMessages = async (instanceId: string, phoneNumber: string) => {
+    try {
+      const response = await fetch(`${WHATSAPP_API_URL}/messages/${instanceId}/${phoneNumber}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedChat || !selectedInstance) return;
+
+    try {
+      const response = await fetch(`${WHATSAPP_API_URL}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instanceId: selectedInstance,
+          phoneNumber: selectedChat.phone_number,
+          message: newMessage
+        })
+      });
+
+      if (response.ok) {
+        setNewMessage('');
+        // No necesitamos recargar mensajes, el WebSocket se encarga
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  const selectChat = (chat: Chat) => {
+    setSelectedChat(chat);
+    
+    // Marcar mensajes como leídos (resetear contador)
+    setChats(prevChats => {
+      return prevChats.map(c => 
+        c.id === chat.id ? { ...c, unread_count: 0 } : c
+      );
+    });
+    
+    // Cargar mensajes del chat seleccionado
+    loadMessages(selectedInstance, chat.phone_number);
+  };
+
+  const disconnectInstance = async (instanceId: string) => {
+    try {
+      const response = await fetch(`${WHATSAPP_API_URL}/disconnect/${instanceId}`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        await loadInstances();
+        if (selectedInstance === instanceId) {
+          setSelectedInstance('');
+          setChats([]);
+          setSelectedChat(null);
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error disconnecting instance:', error);
+    }
+  };
+
+  const getQRCode = async (instanceId: string) => {
+    try {
+      const response = await fetch(`${WHATSAPP_API_URL}/qr/${instanceId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.qr) {
+          setSelectedQR(data.qr);
+          setShowQRDialog(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error getting QR code:', error);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const config = {
+      connected: { variant: "default", icon: CheckCircle2, text: "Conectado", color: "text-green-600" },
+      disconnected: { variant: "secondary", icon: WifiOff, text: "Desconectado", color: "text-gray-600" },
+      qr_ready: { variant: "outline", icon: QrCode, text: "Escaneando QR", color: "text-blue-600" },
+      error: { variant: "destructive", icon: AlertCircle, text: "Error", color: "text-red-600" }
+    }[status] || { variant: "secondary", icon: WifiOff, text: "Desconocido", color: "text-gray-600" };
+
+    const IconComponent = config.icon;
+
+    return (
+      <Badge variant={config.variant as any} className="flex items-center gap-1">
+        <IconComponent className="w-3 h-3" />
+        {config.text}
+      </Badge>
+    );
+  };
+
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // ============ FUNCIONES DE FACEBOOK ============
+
+  const loadFacebookInstances = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/facebook/instances');
+      if (response.ok) {
+        const data = await response.json();
+        setFacebookInstances(data.instances || []);
+        
+        if (data.instances?.length > 0 && !selectedFacebookInstance) {
+          setSelectedFacebookInstance(data.instances[0].instanceId);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading Facebook instances:', error);
+    }
+  };
+
+  const createFacebookInstance = async () => {
+    if (!facebookCredentials.username || !facebookCredentials.password) {
+      alert('Por favor ingresa usuario y contraseña');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3001/api/facebook/instances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: facebookCredentials.username, // El backend espera 'email'
+          password: facebookCredentials.password
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setShowFacebookLoginDialog(false);
+          setFacebookCredentials({ username: '', password: '' });
+          await loadFacebookInstances();
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('Facebook instance creation error:', errorData);
+        alert(errorData.error || 'Error creando instancia de Facebook');
+      }
+    } catch (error) {
+      console.error('Error creating Facebook instance:', error);
+      alert('Error creando instancia de Facebook: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFacebookChats = async (instanceId: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/facebook/chats/${instanceId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFacebookChats(data.chats || []);
+      }
+    } catch (error) {
+      console.error('Error loading Facebook chats:', error);
+    }
+  };
+
+  const loadFacebookMessages = async (instanceId: string, chatId: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/facebook/messages/${instanceId}/${encodeURIComponent(chatId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFacebookMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error('Error loading Facebook messages:', error);
+    }
+  };
+
+  const sendFacebookMessage = async () => {
+    if (!newFacebookMessage.trim() || !selectedFacebookChat || !selectedFacebookInstance) return;
+
+    try {
+      const response = await fetch('http://localhost:3001/api/facebook/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instanceId: selectedFacebookInstance,
+          chatId: selectedFacebookChat.chat_id,
+          message: newFacebookMessage
+        })
+      });
+
+      if (response.ok) {
+        setNewFacebookMessage('');
+        // El WebSocket se encarga de actualizar los mensajes
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Error enviando mensaje');
+      }
+    } catch (error) {
+      console.error('Error sending Facebook message:', error);
+    }
+  };
+
+  const selectFacebookChat = (chat: FacebookChat) => {
+    setSelectedFacebookChat(chat);
+    
+    // Marcar mensajes como leídos
+    setFacebookChats(prevChats => {
+      return prevChats.map(c => 
+        c.id === chat.id ? { ...c, unread_count: 0 } : c
+      );
+    });
+    
+    // Cargar mensajes del chat seleccionado
+    loadFacebookMessages(selectedFacebookInstance, chat.chat_id);
+  };
+
+  const disconnectFacebookInstance = async (instanceId: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/facebook/disconnect/${instanceId}`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        await loadFacebookInstances();
+        if (selectedFacebookInstance === instanceId) {
+          setSelectedFacebookInstance('');
+          setFacebookChats([]);
+          setSelectedFacebookChat(null);
+          setFacebookMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error disconnecting Facebook instance:', error);
+    }
+  };
+
+  const getFacebookStatusBadge = (status: string) => {
+    const config = {
+      connected: { variant: "default", icon: CheckCircle2, text: "Conectado", color: "text-green-600" },
+      disconnected: { variant: "secondary", icon: WifiOff, text: "Desconectado", color: "text-gray-600" },
+      connecting: { variant: "outline", icon: RefreshCw, text: "Conectando", color: "text-blue-600" },
+      error: { variant: "destructive", icon: AlertCircle, text: "Error", color: "text-red-600" }
+    }[status] || { variant: "secondary", icon: WifiOff, text: "Desconocido", color: "text-gray-600" };
+
+    const IconComponent = config.icon;
+
+    return (
+      <Badge variant={config.variant as any} className="flex items-center gap-1">
+        <IconComponent className="w-3 h-3" />
+        {config.text}
+      </Badge>
+    );
+  };
+
+  // ============ FIN FUNCIONES DE FACEBOOK ============
+
+  // ============ FUNCIONES DE CHATS UNIFICADOS ============
+
+  const createUnifiedChats = (): UnifiedChat[] => {
+    const unified: UnifiedChat[] = [];
+
+    // Agregar chats de WhatsApp
+    chats.forEach(chat => {
+      unified.push({
+        id: `wa_${chat.id}`,
+        platform: 'whatsapp',
+        instance_id: chat.instance_id,
+        identifier: chat.phone_number,
+        contact_name: chat.contact_name,
+        last_message: chat.last_message,
+        last_message_time: chat.last_message_time,
+        unread_count: chat.unread_count,
+        originalChat: chat
+      });
+    });
+
+    // Agregar chats de Facebook
+    facebookChats.forEach(chat => {
+      unified.push({
+        id: `fb_${chat.id}`,
+        platform: 'facebook',
+        instance_id: chat.instance_id,
+        identifier: chat.chat_id,
+        contact_name: chat.contact_name,
+        last_message: chat.last_message,
+        last_message_time: chat.last_message_time,
+        unread_count: chat.unread_count,
+        originalChat: chat
+      });
+    });
+
+    // Ordenar por última actividad
+    return unified.sort((a, b) => 
+      new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime()
+    );
+  };
+
+  const selectUnifiedChat = (unifiedChat: UnifiedChat) => {
+    if (unifiedChat.platform === 'whatsapp') {
+      selectChat(unifiedChat.originalChat as Chat);
+      setSelectedFacebookChat(null);
+    } else {
+      selectFacebookChat(unifiedChat.originalChat as FacebookChat);
+      setSelectedChat(null);
+    }
+  };
+
+  const getUnifiedChatIcon = (platform: string) => {
+    return platform === 'whatsapp' ? Phone : Facebook;
+  };
+
+  const getUnifiedChatBadgeColor = (platform: string) => {
+    return platform === 'whatsapp' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+  };
+
+  // ============ FIN FUNCIONES DE CHATS UNIFICADOS ============
+
+  if (serviceStatus === 'checking') {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <h3 className="text-lg font-medium">Verificando servicio WhatsApp...</h3>
+          <p className="text-gray-500">Conectando con el servidor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (serviceStatus === 'offline') {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Servicio WhatsApp Desconectado</h3>
+              <p className="text-gray-600 mb-4">
+                El servicio WhatsApp no está ejecutándose. Por favor, inicia el servicio.
+              </p>
+              <Alert className="mb-4">
+                <AlertDescription>
+                  Ejecuta el comando: <code className="bg-gray-100 px-2 py-1 rounded">cd whatsapp-service && node index.js</code>
+                </AlertDescription>
+              </Alert>
+              <Button onClick={checkServiceStatus} className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Reintentar Conexión
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 p-2 rounded-lg">
+              <MessageCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">WhatsApp Business</h1>
+              <p className="text-sm text-gray-500">
+                Sistema avanzado de automatización - {instances.filter(i => i.status === 'connected').length} instancias activas
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-green-600">
+              Servicio Online
+            </Badge>
+            <Badge 
+              variant="outline" 
+              className={isConnected ? "text-green-600" : "text-red-600"}
+            >
+              {isConnected ? "🔌 WebSocket Conectado" : "❌ WebSocket Desconectado"}
+            </Badge>
+            <Button
+              onClick={createInstance}
+              disabled={instances.length >= 3 || loading}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Instancia ({instances.length}/3)
+            </Button>
+            
+            <Button variant="outline" onClick={loadInstances}>
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar - Instance Management */}
+        <div className="w-80 bg-white border-r flex flex-col">
+          <div className="p-4 border-b">
+            <h2 className="font-semibold text-gray-900 mb-3">Instancias WhatsApp</h2>
+            
+            <div className="space-y-2">
+              {instances.map((instance) => (
+                <div
+                  key={instance.instanceId}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    selectedInstance === instance.instanceId
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-gray-50 hover:bg-gray-100'
+                  }`}
+                  onClick={() => setSelectedInstance(instance.instanceId)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-gray-500" />
+                      <span className="font-medium text-sm">
+                        {instance.phoneNumber || instance.instanceId.slice(-8)}
+                      </span>
+                    </div>
+                    {getStatusBadge(instance.status)}
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    {instance.status === 'qr_ready' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          getQRCode(instance.instanceId);
+                        }}
+                      >
+                        <QrCode className="w-3 h-3 mr-1" />
+                        Ver QR
+                      </Button>
+                    )}
+                    
+                    {instance.status === 'connected' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          disconnectInstance(instance.instanceId);
+                        }}
+                      >
+                        <WifiOff className="w-3 h-3 mr-1" />
+                        Desconectar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Facebook Instances Section */}
+          <div className="p-4 border-b bg-blue-50">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Facebook className="w-4 h-4 text-blue-600" />
+                Facebook Messenger
+              </h2>
+              <Button
+                size="sm"
+                onClick={() => setShowFacebookLoginDialog(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Conectar
+              </Button>
+            </div>
+            
+            <div className="space-y-2">
+              {facebookInstances.map((instance) => (
+                <div
+                  key={instance.instanceId}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    selectedFacebookInstance === instance.instanceId
+                      ? 'bg-blue-100 border-blue-300'
+                      : 'bg-white hover:bg-blue-50'
+                  }`}
+                  onClick={() => setSelectedFacebookInstance(instance.instanceId)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{instance.instanceId}</p>
+                      {instance.username && (
+                        <p className="text-xs text-gray-600">{instance.username}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getFacebookStatusBadge(instance.status)}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          disconnectFacebookInstance(instance.instanceId);
+                        }}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-600"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {facebookInstances.length === 0 && (
+                <div className="text-center py-4">
+                  <Facebook className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                  <p className="text-blue-600 text-sm">No hay instancias de Facebook</p>
+                  <p className="text-xs text-gray-600">Conecta tu cuenta para empezar</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Facebook Chat List */}
+          {selectedFacebookInstance && (
+            <div className="p-4 border-b">
+              <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                <Facebook className="w-4 h-4 text-blue-600" />
+                Facebook Chats ({facebookChats.length})
+              </h3>
+            </div>
+          )}
+
+          {/* Combined Chat List */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-gray-900">
+                {unifiedChatsView ? 'Todos los Chats' : 'WhatsApp Chats'} 
+                ({unifiedChatsView ? createUnifiedChats().length : chats.length})
+              </h3>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="unified-view" className="text-sm">
+                  Vista Unificada
+                </Label>
+                <Switch
+                  id="unified-view"
+                  checked={unifiedChatsView}
+                  onCheckedChange={setUnifiedChatsView}
+                />
+              </div>
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-2">
+              {unifiedChatsView ? (
+                /* Vista Unificada */
+                <>
+                  {createUnifiedChats().map((unifiedChat) => {
+                    const IconComponent = getUnifiedChatIcon(unifiedChat.platform);
+                    const isSelected = unifiedChat.platform === 'whatsapp' 
+                      ? selectedChat?.id === unifiedChat.originalChat.id
+                      : selectedFacebookChat?.id === unifiedChat.originalChat.id;
+                    
+                    return (
+                      <div
+                        key={unifiedChat.id}
+                        className={`p-3 rounded-lg cursor-pointer mb-2 transition-colors ${
+                          isSelected
+                            ? unifiedChat.platform === 'whatsapp' 
+                              ? 'bg-green-50 border-green-200 border'
+                              : 'bg-blue-50 border-blue-200 border'
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => selectUnifiedChat(unifiedChat)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              unifiedChat.platform === 'whatsapp' ? 'bg-green-100' : 'bg-blue-100'
+                            }`}>
+                              <IconComponent className={`w-4 h-4 ${
+                                unifiedChat.platform === 'whatsapp' ? 'text-green-600' : 'text-blue-600'
+                              }`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-sm text-gray-900 truncate">
+                                  {unifiedChat.contact_name || unifiedChat.identifier}
+                                </p>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${getUnifiedChatBadgeColor(unifiedChat.platform)}`}
+                                >
+                                  {unifiedChat.platform === 'whatsapp' ? 'WA' : 'FB'}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-gray-500 truncate">
+                                {unifiedChat.last_message}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {formatTime(unifiedChat.last_message_time)}
+                            </p>
+                            {unifiedChat.unread_count > 0 && (
+                              <Badge 
+                                variant="default" 
+                                className={`text-xs ${getUnifiedChatBadgeColor(unifiedChat.platform)}`}
+                              >
+                                {unifiedChat.unread_count}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {createUnifiedChats().length === 0 && (
+                    <div className="text-center py-8">
+                      <MessageCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">No hay chats disponibles</p>
+                      <p className="text-xs text-gray-400">Conecta WhatsApp o Facebook para ver conversaciones</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Vista Separada */
+                <>
+                  {/* WhatsApp Chats */}
+                  {chats.map((chat) => (
+                    <div
+                      key={chat.id}
+                      className={`p-3 rounded-lg cursor-pointer mb-2 transition-colors ${
+                        selectedChat?.id === chat.id
+                          ? 'bg-green-50 border-green-200 border'
+                          : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => selectChat(chat)}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <Phone className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-gray-900 truncate">
+                              {chat.contact_name || chat.phone_number}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {chat.last_message}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">
+                            {formatTime(chat.last_message_time)}
+                          </p>
+                          {chat.unread_count > 0 && (
+                            <Badge variant="default" className="text-xs bg-green-100 text-green-800">
+                              {chat.unread_count}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {chats.length === 0 && selectedInstance && (
+                    <div className="text-center py-8">
+                      <MessageCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">No hay chats de WhatsApp disponibles</p>
+                    </div>
+                  )}
+
+                  {/* Facebook Chats */}
+                  {selectedFacebookInstance && facebookChats.length > 0 && (
+                    <div className="border-t pt-4 mt-4">
+                      <h4 className="font-medium text-sm text-blue-600 mb-2 flex items-center gap-2">
+                        <Facebook className="w-3 h-3" />
+                        Facebook Chats
+                      </h4>
+                    </div>
+                  )}
+                  
+                  {selectedFacebookInstance && facebookChats.map((chat) => (
+                    <div
+                      key={chat.id}
+                      className={`p-3 rounded-lg cursor-pointer mb-2 transition-colors ${
+                        selectedFacebookChat?.id === chat.id
+                          ? 'bg-blue-50 border-blue-200 border'
+                          : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => selectFacebookChat(chat)}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Facebook className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-gray-900 truncate">
+                              {chat.contact_name || chat.chat_id}
+                            </p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {chat.last_message}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">
+                            {formatTime(chat.last_message_time)}
+                          </p>
+                          {chat.unread_count > 0 && (
+                            <Badge variant="default" className="text-xs bg-blue-100 text-blue-800">
+                              {chat.unread_count}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {selectedFacebookInstance && facebookChats.length === 0 && (
+                    <div className="text-center py-8">
+                      <Facebook className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">No hay chats de Facebook disponibles</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col">
+          <Tabs defaultValue="chat" className="flex-1 flex flex-col">
+            <TabsList className="grid w-full grid-cols-6 mx-4 mt-4">
+              <TabsTrigger value="chat" className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Chat
+              </TabsTrigger>
+              <TabsTrigger value="facebook" className="flex items-center gap-2">
+                <Facebook className="w-4 h-4" />
+                Facebook
+              </TabsTrigger>
+              <TabsTrigger value="automation" className="flex items-center gap-2">
+                <Bot className="w-4 h-4" />
+                Automatización
+              </TabsTrigger>
+              <TabsTrigger value="advanced" className="flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                Avanzada IA
+              </TabsTrigger>
+              <TabsTrigger value="campaigns" className="flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                Campañas
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Analíticas
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Chat Tab */}
+            <TabsContent value="chat" className="flex-1 flex flex-col m-4 mt-0">
+              {(selectedChat || selectedFacebookChat) ? (
+                <Card className="flex-1 flex flex-col">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {selectedChat ? (
+                          <>
+                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                              <Phone className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <CardTitle className="text-lg">
+                                  {selectedChat.contact_name || selectedChat.phone_number}
+                                </CardTitle>
+                                <Badge variant="outline" className="bg-green-100 text-green-800">
+                                  WhatsApp
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-500">
+                                {selectedChat.phone_number}
+                              </p>
+                            </div>
+                          </>
+                        ) : selectedFacebookChat ? (
+                          <>
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                              <Facebook className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <CardTitle className="text-lg">
+                                  {selectedFacebookChat.contact_name || selectedFacebookChat.chat_id}
+                                </CardTitle>
+                                <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                                  Facebook Messenger
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-500">
+                                {selectedFacebookChat.chat_id}
+                              </p>
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="flex-1 flex flex-col p-0">
+                    <ScrollArea className="flex-1 p-4">
+                      <div className="flex flex-col space-y-4">
+                        {selectedChat ? (
+                          /* Mensajes de WhatsApp */
+                          messages.map((message) => (
+                            <div
+                              key={message.id}
+                              className={`flex w-full ${message.is_from_me ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                  message.is_from_me
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-gray-100 text-gray-900'
+                                }`}
+                              >
+                                <p className="text-sm whitespace-pre-wrap break-words">
+                                  {message.message_text}
+                                </p>
+                                <p className={`text-xs mt-1 ${
+                                  message.is_from_me ? 'text-green-100' : 'text-gray-500'
+                                }`}>
+                                  {formatTime(message.timestamp)}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : selectedFacebookChat ? (
+                          /* Mensajes de Facebook */
+                          facebookMessages.map((message) => (
+                            <div
+                              key={message.id}
+                              className={`flex w-full ${message.is_from_me ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                  message.is_from_me
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-100 text-gray-900'
+                                }`}
+                              >
+                                {!message.is_from_me && message.sender_name && (
+                                  <p className="text-xs font-medium text-blue-600 mb-1">
+                                    {message.sender_name}
+                                  </p>
+                                )}
+                                <p className="text-sm whitespace-pre-wrap break-words">
+                                  {message.message_text}
+                                </p>
+                                <p className={`text-xs mt-1 ${
+                                  message.is_from_me ? 'text-blue-100' : 'text-gray-500'
+                                }`}>
+                                  {formatTime(message.timestamp)}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : null}
+                        <div ref={selectedChat ? messagesEndRef : facebookMessagesEndRef} />
+                      </div>
+                    </ScrollArea>
+
+                    <div className="p-4 border-t">
+                      <div className="flex gap-2">
+                        {selectedChat ? (
+                          <>
+                            <Input
+                              placeholder="Escribe un mensaje de WhatsApp..."
+                              value={newMessage}
+                              onChange={(e) => setNewMessage(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                              className="flex-1"
+                            />
+                            <Button onClick={sendMessage} disabled={!newMessage.trim()} className="bg-green-600 hover:bg-green-700">
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : selectedFacebookChat ? (
+                          <>
+                            <Input
+                              placeholder="Escribe un mensaje de Facebook..."
+                              value={newFacebookMessage}
+                              onChange={(e) => setNewFacebookMessage(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendFacebookMessage()}
+                              className="flex-1"
+                            />
+                            <Button onClick={sendFacebookMessage} disabled={!newFacebookMessage.trim()} className="bg-blue-600 hover:bg-blue-700">
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      Selecciona un chat
+                    </h3>
+                    <p className="text-gray-500">
+                      Elige una conversación de WhatsApp o Facebook Messenger para comenzar a chatear
+                    </p>
+                    <div className="flex items-center justify-center gap-4 mt-4">
+                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                        <Phone className="w-3 h-3 mr-1" />
+                        WhatsApp
+                      </Badge>
+                      <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                        <Facebook className="w-3 h-3 mr-1" />
+                        Facebook
+                      </Badge>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* Facebook Messenger Tab */}
+            <TabsContent value="facebook" className="flex-1 flex flex-col m-4 mt-0">
+              {selectedFacebookChat ? (
+                <div className="flex-1 flex">
+                  {/* Facebook Chat List */}
+                  <div className="w-80 border-r border-gray-200 bg-white rounded-l-lg overflow-hidden">
+                    <div className="p-4 border-b bg-blue-50">
+                      <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                        <Facebook className="w-5 h-5 text-blue-600" />
+                        Facebook Chats
+                      </h3>
+                      {selectedFacebookInstance && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          Instancia: {selectedFacebookInstance}
+                        </p>
+                      )}
+                    </div>
+                    <ScrollArea className="flex-1">
+                      <div className="p-2 space-y-1">
+                        {facebookChats.map((chat) => (
+                          <div
+                            key={chat.id}
+                            onClick={() => selectFacebookChat(chat)}
+                            className={`p-3 rounded-md cursor-pointer transition-all duration-200 ${
+                              selectedFacebookChat?.id === chat.id
+                                ? 'bg-blue-100 border border-blue-200'
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-medium text-sm truncate">
+                                    {chat.contact_name || chat.chat_id}
+                                  </h4>
+                                  {chat.unread_count > 0 && (
+                                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                      {chat.unread_count}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-600 truncate">
+                                  {chat.last_message}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {formatTime(chat.last_message_time)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  {/* Facebook Message Area */}
+                  <div className="flex-1 flex flex-col bg-white rounded-r-lg overflow-hidden">
+                    {/* Chat Header */}
+                    <div className="p-4 border-b bg-blue-50 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                        <Facebook className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-800">
+                          {selectedFacebookChat.contact_name || selectedFacebookChat.chat_id}
+                        </h3>
+                        <p className="text-xs text-gray-600">Facebook Messenger</p>
+                      </div>
+                    </div>
+
+                    {/* Messages Area */}
+                    <ScrollArea className="flex-1 p-4">
+                      <div className="space-y-4 mb-4">
+                        {facebookMessages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`flex ${message.is_from_me ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-2 rounded-lg shadow-sm ${
+                                message.is_from_me
+                                  ? 'bg-blue-600 text-white ml-auto'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {!message.is_from_me && message.sender_name && (
+                                <p className="text-xs font-medium text-gray-600 mb-1">
+                                  {message.sender_name}
+                                </p>
+                              )}
+                              <p className="text-sm whitespace-pre-wrap break-words">
+                                {message.message_text}
+                              </p>
+                              <p className={`text-xs mt-1 ${
+                                message.is_from_me ? 'text-blue-100' : 'text-gray-500'
+                              }`}>
+                                {formatTime(message.timestamp)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                        <div ref={facebookMessagesEndRef} />
+                      </div>
+                    </ScrollArea>
+
+                    {/* Message Input */}
+                    <div className="p-4 border-t bg-gray-50">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newFacebookMessage}
+                          onChange={(e) => setNewFacebookMessage(e.target.value)}
+                          placeholder="Escribe tu mensaje..."
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              sendFacebookMessage();
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button 
+                          onClick={sendFacebookMessage}
+                          disabled={!newFacebookMessage.trim()}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Card className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <Facebook className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      Selecciona un chat de Facebook
+                    </h3>
+                    <p className="text-gray-500">
+                      Elige una conversación para comenzar a chatear en Facebook Messenger
+                    </p>
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* Pestaña de Automatización Básica */}
+            <TabsContent value="automation" className="flex-1 m-4 mt-0">
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                      <Bot className="w-6 h-6 text-blue-600" />
+                      Automatización Simple
+                    </h2>
+                    <p className="text-gray-600">
+                      Crea respuestas automáticas simples sin IA
+                    </p>
+                  </div>
+                  <Button onClick={() => setShowBasicFlowDialog(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nuevo Flujo
+                  </Button>
+                </div>
+
+                {/* Lista de flujos básicos */}
+                <div className="grid gap-4">
+                  {basicFlows.map((flow) => (
+                    <Card key={flow.id}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <CardTitle className="text-lg">{flow.name}</CardTitle>
+                              <Badge variant={flow.is_active ? "default" : "secondary"}>
+                                {flow.is_active ? "Activo" : "Inactivo"}
+                              </Badge>
+                            </div>
+                            <p className="text-gray-600 text-sm">{flow.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleBasicFlow(flow.id, flow.is_active)}
+                            >
+                              {flow.is_active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deleteBasicFlow(flow.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {/* Triggers */}
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">Palabras que activan:</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {JSON.parse(flow.trigger_keywords || '[]').map((trigger: string, index: number) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  "{trigger}"
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Responses */}
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">Respuestas:</h4>
+                            <div className="space-y-1">
+                              {JSON.parse(flow.steps || '[]').map((step: any, index: number) => (
+                                <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                                  {index + 1}. {step.content}
+                                  {step.delay > 0 && (
+                                    <span className="text-gray-500 ml-2">(espera {step.delay}s)</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {basicFlows.length === 0 && (
+                    <Card>
+                      <CardContent className="flex items-center justify-center h-48">
+                        <div className="text-center">
+                          <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-gray-600 mb-2">
+                            No hay flujos configurados
+                          </h3>
+                          <p className="text-gray-500 mb-4">
+                            Crea tu primer flujo de automatización
+                          </p>
+                          <Button onClick={() => setShowBasicFlowDialog(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Crear primer flujo
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Ejemplos de uso */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">💡 Ejemplos de flujos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="bg-blue-50 p-3 rounded">
+                        <h4 className="font-medium text-blue-800">Saludo</h4>
+                        <p className="text-blue-600 text-xs mt-1">
+                          Triggers: "hola", "buenos días"<br/>
+                          Respuesta: "¡Hola! ¿En qué puedo ayudarte?"
+                        </p>
+                      </div>
+                      <div className="bg-green-50 p-3 rounded">
+                        <h4 className="font-medium text-green-800">Horarios</h4>
+                        <p className="text-green-600 text-xs mt-1">
+                          Triggers: "horario", "abierto"<br/>
+                          Respuesta: "Abrimos de 9am a 6pm"
+                        </p>
+                      </div>
+                      <div className="bg-purple-50 p-3 rounded">
+                        <h4 className="font-medium text-purple-800">Precios</h4>
+                        <p className="text-purple-600 text-xs mt-1">
+                          Triggers: "precio", "costo"<br/>
+                          Respuesta: "Te envío nuestra lista de precios"
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Nueva pestaña de IA Avanzada */}
+            <TabsContent value="advanced" className="flex-1 m-4 mt-0">
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                      <Brain className="w-6 h-6 text-blue-600" />
+                      Automatización IA Avanzada
+                    </h2>
+                    <p className="text-gray-600">
+                      Configure agentes de IA y flujos inteligentes de automatización
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tabs internos para IA */}
+                <Tabs defaultValue="agents" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="agents" className="flex items-center gap-2">
+                      <Bot className="w-4 h-4" />
+                      Agentes IA
+                    </TabsTrigger>
+                    <TabsTrigger value="flows" className="flex items-center gap-2">
+                      <Zap className="w-4 h-4" />
+                      Flujos Avanzados
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Pestaña de Agentes IA */}
+                  <TabsContent value="agents" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-lg font-medium">Agentes de IA</h3>
+                        <p className="text-gray-600">Configura APIs de diferentes proveedores de IA</p>
+                      </div>
+                      <Button onClick={() => setShowAIAgentDialog(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nuevo Agente
+                      </Button>
+                    </div>
+
+                    {/* Lista de agentes */}
+                    <div className="grid gap-4">
+                      {aiAgents.map((agent) => (
+                        <Card key={agent.id}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Brain className="w-5 h-5 text-blue-600" />
+                                <div>
+                                  <CardTitle className="text-lg">{agent.name}</CardTitle>
+                                  <Badge variant="outline">{agent.provider}</Badge>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button variant="outline" size="sm">
+                                  <TestTube className="w-4 h-4" />
+                                </Button>
+                                <Button variant="outline" size="sm">
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-500">Modelo:</span>
+                                  <span className="ml-2 font-medium">{agent.model}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Temperatura:</span>
+                                  <span className="ml-2 font-medium">{agent.temperature}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-gray-500 text-sm">Prompt del Sistema:</span>
+                                <p className="text-sm mt-1 bg-gray-50 p-2 rounded">
+                                  {agent.systemPrompt}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+
+                      {aiAgents.length === 0 && (
+                        <Card>
+                          <CardContent className="flex items-center justify-center h-32">
+                            <div className="text-center">
+                              <Brain className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                              <p className="text-gray-500">No hay agentes configurados</p>
+                              <p className="text-sm text-gray-400">Crea tu primer agente de IA</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Pestaña de Flujos Avanzados */}
+                  <TabsContent value="flows" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-lg font-medium">Flujos Avanzados</h3>
+                        <p className="text-gray-600">Crea flujos de automatización con IA</p>
+                      </div>
+                      <Button onClick={() => setShowAdvancedFlowDialog(true)} disabled={aiAgents.length === 0}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nuevo Flujo
+                      </Button>
+                    </div>
+
+                    {/* Lista de flujos avanzados */}
+                    <div className="grid gap-4">
+                      {advancedFlows.map((flow) => (
+                        <Card key={flow.id}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <CardTitle className="text-lg">{flow.name}</CardTitle>
+                                <p className="text-gray-600 text-sm">{flow.description}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={flow.active ? "default" : "secondary"}>
+                                  {flow.active ? "Activo" : "Inactivo"}
+                                </Badge>
+                                <Button variant="outline" size="sm">
+                                  <Settings className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex items-center gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-500">Trigger:</span>
+                                <span className="ml-2 font-medium">{flow.triggerType}: {flow.triggerValue}</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Agente:</span>
+                                <span className="ml-2 font-medium">
+                                  {aiAgents.find(a => a.id === flow.aiAgentId)?.name || 'Sin asignar'}
+                                </span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+
+                      {advancedFlows.length === 0 && (
+                        <Card>
+                          <CardContent className="flex items-center justify-center h-32">
+                            <div className="text-center">
+                              <Zap className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                              <p className="text-gray-500">No hay flujos avanzados</p>
+                              <p className="text-sm text-gray-400">
+                                {aiAgents.length === 0 ? 'Primero crea un agente de IA' : 'Crea tu primer flujo avanzado'}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="campaigns" className="flex-1 m-4 mt-0">
+              <Card className="h-full flex items-center justify-center">
+                <div className="text-center">
+                  <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Campañas de Marketing
+                  </h3>
+                  <p className="text-gray-500">
+                    Funcionalidad en desarrollo
+                  </p>
+                </div>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="flex-1 m-4 mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Instancias Activas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <Activity className="w-8 h-8 text-green-600" />
+                      <div className="ml-4">
+                        <p className="text-2xl font-bold">
+                          {instances.filter(i => i.status === 'connected').length}
+                        </p>
+                        <p className="text-xs text-gray-500">de {instances.length} total</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Chats Totales</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <MessageSquare className="w-8 h-8 text-blue-600" />
+                      <div className="ml-4">
+                        <p className="text-2xl font-bold">{chats.length}</p>
+                        <p className="text-xs text-gray-500">conversaciones</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Mensajes No Leídos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <Bell className="w-8 h-8 text-orange-600" />
+                      <div className="ml-4">
+                        <p className="text-2xl font-bold">
+                          {chats.reduce((sum, chat) => sum + chat.unread_count, 0)}
+                        </p>
+                        <p className="text-xs text-gray-500">pendientes</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* QR Code Dialog */}
+      <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Escanea el código QR</DialogTitle>
+            <DialogDescription>
+              Usa WhatsApp en tu teléfono para escanear este código
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center p-4">
+            {selectedQR && (
+              <img 
+                src={selectedQR} 
+                alt="QR Code" 
+                className="w-64 h-64 border rounded-lg"
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowQRDialog(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Facebook Login Dialog */}
+      <Dialog open={showFacebookLoginDialog} onOpenChange={setShowFacebookLoginDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Facebook className="w-5 h-5 text-blue-600" />
+              Conectar Facebook Messenger
+            </DialogTitle>
+            <DialogDescription>
+              Ingresa tus credenciales de Facebook para conectar Messenger
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="facebook-username">Usuario o Email</Label>
+              <Input
+                id="facebook-username"
+                type="text"
+                placeholder="tu@email.com o nombre_usuario"
+                value={facebookCredentials.username}
+                onChange={(e) => setFacebookCredentials(prev => ({
+                  ...prev,
+                  username: e.target.value
+                }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="facebook-password">Contraseña</Label>
+              <Input
+                id="facebook-password"
+                type="password"
+                placeholder="Tu contraseña de Facebook"
+                value={facebookCredentials.password}
+                onChange={(e) => setFacebookCredentials(prev => ({
+                  ...prev,
+                  password: e.target.value
+                }))}
+              />
+            </div>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Tus credenciales se almacenan de forma segura y cifrada. Se usan únicamente para automatizar el acceso a Facebook Messenger.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowFacebookLoginDialog(false);
+                setFacebookCredentials({ username: '', password: '' });
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={createFacebookInstance}
+              disabled={loading || !facebookCredentials.username || !facebookCredentials.password}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Conectando...
+                </>
+              ) : (
+                <>
+                  <Facebook className="w-4 h-4 mr-2" />
+                  Conectar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear agente IA */}
+      <Dialog open={showAIAgentDialog} onOpenChange={setShowAIAgentDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5" />
+              Configurar Agente de IA
+            </DialogTitle>
+            <DialogDescription>
+              Configure la API de IA y el comportamiento del agente
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre del Agente</Label>
+              <Input
+                value={aiAgentForm.name}
+                onChange={(e) => setAiAgentForm({...aiAgentForm, name: e.target.value})}
+                placeholder="Ej: Asistente de Ventas"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Proveedor de IA</Label>
+                <Select 
+                  value={aiAgentForm.provider} 
+                  onValueChange={(value) => setAiAgentForm({...aiAgentForm, provider: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                    <SelectItem value="anthropic">Anthropic</SelectItem>
+                    <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="custom">API Personalizada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Modelo</Label>
+                <Input
+                  value={aiAgentForm.model}
+                  onChange={(e) => setAiAgentForm({...aiAgentForm, model: e.target.value})}
+                  placeholder="gpt-3.5-turbo"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>API Key</Label>
+              <Input
+                type="password"
+                value={aiAgentForm.apiKey}
+                onChange={(e) => setAiAgentForm({...aiAgentForm, apiKey: e.target.value})}
+                placeholder="Ingresa tu API key"
+              />
+            </div>
+
+            <div>
+              <Label>Prompt del Sistema</Label>
+              <Textarea
+                value={aiAgentForm.systemPrompt}
+                onChange={(e) => setAiAgentForm({...aiAgentForm, systemPrompt: e.target.value})}
+                placeholder="Define el comportamiento del agente..."
+                rows={4}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Temperatura ({aiAgentForm.temperature})</Label>
+                <Input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={aiAgentForm.temperature}
+                  onChange={(e) => setAiAgentForm({...aiAgentForm, temperature: parseFloat(e.target.value)})}
+                />
+              </div>
+
+              <div>
+                <Label>Máx. Tokens</Label>
+                <Input
+                  type="number"
+                  value={aiAgentForm.maxTokens}
+                  onChange={(e) => setAiAgentForm({...aiAgentForm, maxTokens: parseInt(e.target.value)})}
+                  min="1"
+                  max="4000"
+                />
+              </div>
+            </div>
+
+            {testResult && (
+              <Alert>
+                <AlertDescription>{testResult}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTestingAgent(true);
+                // Simular prueba
+                setTimeout(() => {
+                  setTestResult(`✅ Agente "${aiAgentForm.name}" probado exitosamente`);
+                  setTestingAgent(false);
+                }, 2000);
+              }}
+              disabled={!aiAgentForm.apiKey || testingAgent}
+            >
+              <TestTube className="w-4 h-4 mr-2" />
+              {testingAgent ? 'Probando...' : 'Probar'}
+            </Button>
+            <Button variant="outline" onClick={() => setShowAIAgentDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => {
+              // Simular guardar agente
+              const newAgent = {
+                id: Date.now().toString(),
+                ...aiAgentForm
+              };
+              setAiAgents([...aiAgents, newAgent]);
+              setShowAIAgentDialog(false);
+              setAiAgentForm({
+                name: '',
+                provider: 'openai',
+                apiKey: '',
+                model: 'gpt-3.5-turbo',
+                systemPrompt: 'Eres un asistente de atención al cliente profesional y amigable.',
+                temperature: 0.7,
+                maxTokens: 300
+              });
+              setTestResult('');
+            }}>
+              <Save className="w-4 h-4 mr-2" />
+              Guardar Agente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear flujo avanzado */}
+      <Dialog open={showAdvancedFlowDialog} onOpenChange={setShowAdvancedFlowDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5" />
+              Crear Flujo Avanzado
+            </DialogTitle>
+            <DialogDescription>
+              Configure un flujo de automatización con IA
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre del Flujo</Label>
+              <Input
+                value={advancedFlowForm.name}
+                onChange={(e) => setAdvancedFlowForm({...advancedFlowForm, name: e.target.value})}
+                placeholder="Ej: Consultas de Productos"
+              />
+            </div>
+
+            <div>
+              <Label>Descripción</Label>
+              <Textarea
+                value={advancedFlowForm.description}
+                onChange={(e) => setAdvancedFlowForm({...advancedFlowForm, description: e.target.value})}
+                placeholder="Describe qué hace este flujo..."
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Tipo de Activador</Label>
+                <Select 
+                  value={advancedFlowForm.triggerType} 
+                  onValueChange={(value) => setAdvancedFlowForm({...advancedFlowForm, triggerType: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keyword">Palabra Clave</SelectItem>
+                    <SelectItem value="intent">Intención (IA)</SelectItem>
+                    <SelectItem value="pattern">Patrón de Texto</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Valor del Activador</Label>
+                <Input
+                  value={advancedFlowForm.triggerValue}
+                  onChange={(e) => setAdvancedFlowForm({...advancedFlowForm, triggerValue: e.target.value})}
+                  placeholder={advancedFlowForm.triggerType === 'keyword' ? 'precio, producto' : 
+                             advancedFlowForm.triggerType === 'intent' ? 'consulta_precio' : '.*precio.*'}
+                />
+              </div>
+
+              <div>
+                <Label>Agente de IA</Label>
+                <Select 
+                  value={advancedFlowForm.aiAgentId} 
+                  onValueChange={(value) => setAdvancedFlowForm({...advancedFlowForm, aiAgentId: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar agente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {aiAgents.map(agent => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.name} ({agent.provider})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">Configuración del Flujo</h4>
+              <p className="text-sm text-gray-600">
+                Este flujo se activará cuando detecte "{advancedFlowForm.triggerValue}" 
+                y procesará la respuesta con el agente de IA seleccionado.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAdvancedFlowDialog(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={() => {
+                // Simular guardar flujo
+                const newFlow = {
+                  id: Date.now().toString(),
+                  ...advancedFlowForm,
+                  active: true
+                };
+                setAdvancedFlows([...advancedFlows, newFlow]);
+                setShowAdvancedFlowDialog(false);
+                setAdvancedFlowForm({
+                  name: '',
+                  description: '',
+                  triggerType: 'keyword',
+                  triggerValue: '',
+                  aiAgentId: '',
+                  steps: []
+                });
+              }}
+              disabled={!advancedFlowForm.name || !advancedFlowForm.triggerValue || !advancedFlowForm.aiAgentId}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Crear Flujo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear flujo básico */}
+      <Dialog open={showBasicFlowDialog} onOpenChange={setShowBasicFlowDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="w-5 h-5" />
+              Crear Flujo de Automatización Simple
+            </DialogTitle>
+            <DialogDescription>
+              Configure respuestas automáticas simples que se activan por palabras clave
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Información básica */}
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label>Nombre del Flujo</Label>
+                <Input
+                  value={basicFlowForm.name}
+                  onChange={(e) => setBasicFlowForm({...basicFlowForm, name: e.target.value})}
+                  placeholder="Ej: Saludo de Bienvenida"
+                />
+              </div>
+              
+              <div>
+                <Label>Descripción</Label>
+                <Input
+                  value={basicFlowForm.description}
+                  onChange={(e) => setBasicFlowForm({...basicFlowForm, description: e.target.value})}
+                  placeholder="Describe qué hace este flujo"
+                />
+              </div>
+            </div>
+
+            {/* Palabras que activan */}
+            <div>
+              <Label className="flex items-center gap-2">
+                🔍 Palabras que Activan el Flujo
+                <span className="text-xs text-gray-500">(Una por línea)</span>
+              </Label>
+              <div className="space-y-2">
+                {basicFlowForm.triggers.map((trigger, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      value={trigger}
+                      onChange={(e) => {
+                        const newTriggers = [...basicFlowForm.triggers];
+                        newTriggers[index] = e.target.value;
+                        setBasicFlowForm({...basicFlowForm, triggers: newTriggers});
+                      }}
+                      placeholder="Ej: hola, buenos días, hey"
+                    />
+                    {basicFlowForm.triggers.length > 1 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newTriggers = basicFlowForm.triggers.filter((_, i) => i !== index);
+                          setBasicFlowForm({...basicFlowForm, triggers: newTriggers});
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setBasicFlowForm({
+                      ...basicFlowForm,
+                      triggers: [...basicFlowForm.triggers, '']
+                    });
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar Palabra
+                </Button>
+              </div>
+            </div>
+
+            {/* Respuestas */}
+            <div>
+              <Label className="flex items-center gap-2">
+                💬 Respuestas Automáticas
+                <span className="text-xs text-gray-500">(Se envían en orden)</span>
+              </Label>
+              <div className="space-y-2">
+                {basicFlowForm.responses.map((response, index) => (
+                  <div key={index} className="flex gap-2">
+                    <div className="flex-1">
+                      <Textarea
+                        value={response}
+                        onChange={(e) => {
+                          const newResponses = [...basicFlowForm.responses];
+                          newResponses[index] = e.target.value;
+                          setBasicFlowForm({...basicFlowForm, responses: newResponses});
+                        }}
+                        placeholder={`Respuesta ${index + 1}: Ej: ¡Hola! ¿En qué puedo ayudarte?`}
+                        rows={2}
+                      />
+                    </div>
+                    {basicFlowForm.responses.length > 1 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newResponses = basicFlowForm.responses.filter((_, i) => i !== index);
+                          setBasicFlowForm({...basicFlowForm, responses: newResponses});
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setBasicFlowForm({
+                      ...basicFlowForm,
+                      responses: [...basicFlowForm.responses, '']
+                    });
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar Respuesta
+                </Button>
+              </div>
+            </div>
+
+            {/* Configuraciones adicionales */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Demora entre mensajes (segundos)</Label>
+                <Input
+                  type="number"
+                  value={basicFlowForm.delay}
+                  onChange={(e) => setBasicFlowForm({...basicFlowForm, delay: parseInt(e.target.value) || 0})}
+                  min="0"
+                  max="60"
+                  placeholder="0"
+                />
+                <span className="text-xs text-gray-500">
+                  Tiempo de espera entre cada respuesta
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-6">
+                <Switch
+                  checked={basicFlowForm.active}
+                  onCheckedChange={(checked) => setBasicFlowForm({...basicFlowForm, active: checked})}
+                />
+                <Label>Activar flujo inmediatamente</Label>
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">Vista previa del flujo:</h4>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-gray-600">Cuando el usuario escriba:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {basicFlowForm.triggers.filter(t => t.trim()).map((trigger, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">"{trigger}"</Badge>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <span className="text-gray-600">El bot responderá:</span>
+                  <div className="mt-1 space-y-1">
+                    {basicFlowForm.responses.filter(r => r.trim()).map((response, i) => (
+                      <div key={i} className="bg-blue-100 p-2 rounded text-xs">
+                        {i + 1}. {response}
+                        {i < basicFlowForm.responses.filter(r => r.trim()).length - 1 && basicFlowForm.delay > 0 && (
+                          <span className="text-gray-500 ml-2">(espera {basicFlowForm.delay}s)</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBasicFlowDialog(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={async () => {
+                // Crear el flujo
+                const flowToSave = {
+                  name: basicFlowForm.name,
+                  description: basicFlowForm.description,
+                  triggers: basicFlowForm.triggers.filter(t => t.trim()),
+                  responses: basicFlowForm.responses.filter(r => r.trim()),
+                  delay: basicFlowForm.delay,
+                  active: basicFlowForm.active
+                };
+                
+                const success = await saveBasicFlow(flowToSave);
+                if (success) {
+                  setShowBasicFlowDialog(false);
+                  
+                  // Resetear formulario
+                  setBasicFlowForm({
+                    name: '',
+                    description: '',
+                    triggers: [''],
+                    responses: [''],
+                    delay: 0,
+                    active: true
+                  });
+                }
+              }}
+              disabled={
+                !basicFlowForm.name.trim() || 
+                !basicFlowForm.triggers.some(t => t.trim()) || 
+                !basicFlowForm.responses.some(r => r.trim())
+              }
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Crear Flujo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default WhatsAppIntegration;

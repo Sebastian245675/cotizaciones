@@ -1,0 +1,28 @@
+<t t-name="website.gracias-por-tu-testimonio">
+    <t t-call="website.layout">
+        <div id="wrap" class="oe_structure oe_empty">
+            <section class="s_title pt64 pb64 o_cc o_cc1 o_colored_level" data-snippet="s_title" data-name="Título">
+                <div class="container">
+                    <div class="text-center">
+                        <div class="p-5 mb-4" style="background-color: #F9F9F9; border-radius: 16px;">
+                            <div style="width: 80px; height: 80px; background-color: #FF914D; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 30px;">
+                                <i class="fa fa-check" style="color: white; font-size: 40px;"></i>
+                            </div>
+                            <h1 style="font-family: 'Poppins', sans-serif; margin-bottom: 1rem;">
+                                <span style="font-weight: 700;">
+                                    ¡Gracias por tu testimonio!
+                                </span>
+                            </h1>
+                            <p class="lead" style="font-family: 'Poppins', sans-serif; max-width: 700px; margin: 0 auto 30px;">
+                                Tu opinión es muy importante para nosotros y ayuda a otros clientes a conocer más sobre nuestros productos y servicios.
+                            </p>
+                            <a href="/" class="btn btn-primary btn-lg" style="background-color: #FF914D; border-color: #FF914D; border-radius: 50px; font-family: 'Poppins', sans-serif; font-weight: 600; padding: 12px 25px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+                                <i class="fa fa-home me-2"></i> Volver al inicio
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </t>
+</t>

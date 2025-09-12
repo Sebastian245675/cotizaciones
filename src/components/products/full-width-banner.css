@@ -1,0 +1,25 @@
+/* Estilos específicos para el banner de ancho completo */
+
+.full-width-banner-container {
+  width: 100%;
+  overflow: hidden;
+  margin-bottom: 2rem;
+  padding: 0;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.full-width-banner-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  max-height: 350px;
+}
+
+/* Aseguramos que el banner ocupe todo el ancho en diferentes dispositivos */
+@media (max-width: 768px) {
+  .full-width-banner-container {
+    margin-bottom: 1rem;
+  }
+}

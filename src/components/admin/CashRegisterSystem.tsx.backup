@@ -1,0 +1,3153 @@
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { toast } from '@/hooks/use-toast';
+import { cn } from "@/lib/utils";
+import { AdvancedCharts } from './AdvancedCharts';
+import { SpectacularEffects, useSoundEffects } from './SpectacularEffects';
+import { 
+  Calculator, DollarSign, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
+  CreditCard, Banknote, Receipt, FileText, Calendar, Clock, PieChart, BarChart3,
+  Target, AlertCircle, CheckCircle, RefreshCw, Download, PrinterIcon, Eye,
+  Building, ShoppingCart, Package, Users, Percent, Hash, Archive, Plus, Minus,
+  ChevronRight, ChevronDown, Filter, Search, SlidersHorizontal, Loader2,
+  Zap, Star, Award, Crown, Diamond, Sparkles, Flame, Activity, Radio,
+  Timer, Gauge, MapPin, Smartphone, Wifi, Battery, Signal, Mic2,
+  Rocket, Globe, Infinity, Layers, Maximize2, MousePointer, Move3D,
+  Volume2, VolumeX, Settings, Bell, BellRing, ChevronUp, PlayCircle,
+  StopCircle, PauseCircle, RotateCcw, Share2, Link2, Camera, Video,
+  Headphones, Coffee, Zap as Lightning, Sun, Moon, Cloud, Umbrella, Wind,
+  AlertTriangle
+} from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { collection, addDoc, getDocs, updateDoc, doc, getDoc, query, orderBy, where, limit, Timestamp, onSnapshot } from "firebase/firestore";
+import { db } from "@/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+// Interfaces exportables
+export interface CashMovement {
+  id: string;
+  type: 'sale_cash' | 'payment_cash' | 'entry' | 'exit' | 'return_cash' | 'credit_payment' | 'vault_deposit' | 'bank_transfer' | 'expense' | 'tip' | 'bonus';
+  amount: number;
+  description: string;
+  timestamp: Date;
+  userId: string;
+  reference?: string;
+  category?: string;
+  approved?: boolean;
+  urgent?: boolean;
+}
+
+// Interfaz para ventas del POS
+export interface POSSale {
+  id: string;
+  saleNumber: string;
+  customer: {
+    name: string;
+    phone?: string;
+    email?: string;
+    clientCode?: string;
+  };
+  items: Array<{
+    product: {
+      id: string;
+      name: string;
+      price: number;
+    };
+    quantity: number;
+    subtotal: number;
+  }>;
+  subtotal: number;
+  discounts: number;
+  tax: number;
+  total: number;
+  paymentMethod: 'cash' | 'card' | 'transfer' | 'mixed' | 'credit';
+  paymentDetails?: {
+    receivedAmount?: number;
+    cardAmount?: number;
+    transferAmount?: number;
+  };
+  status: string;
+  timestamp: Date;
+  cashier: string;
+  mode?: string;
+  notes?: string;
+  reportId?: string; // ID del reporte de caja al que pertenece esta venta
+}
+
+export interface SalesByDepartment {
+  department: string;
+  totalSales: number;
+  cashSales: number;
+  creditCardSales: number;
+  creditSales: number;
+  voucherSales: number;
+  returns: number;
+  profit: number;
+  transactions: number;
+  avgTicket: number;
+  topProduct: string;
+  growth: number;
+}
+
+export interface AdvancedMetrics {
+  efficiency: number;
+  cashFlow: number;
+  profitability: number;
+  customerSatisfaction: number;
+  operationalRisk: number;
+  salesVelocity: number;
+  inventoryTurn: number;
+  avgTransactionTime: number;
+}
+
+export interface AlertSystem {
+  id: string;
+  type: 'warning' | 'error' | 'info' | 'success';
+  title: string;
+  message: string;
+  timestamp: Date;
+  resolved: boolean;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface DailyCashReport {
+  id: string;
+  date: Date;
+  openingBalance: number;
+  closingBalance: number;
+  totalSales: number;
+  cashInBox: number;
+  
+  // Ventas en efectivo avanzadas
+  cashSales: number;
+  cashPayments: number;
+  cashEntries: number;
+  cashExits: number;
+  cashReturns: number;
+  vaultDeposits: number;
+  bankTransfers: number;
+  
+  // Ganancias detalladas
+  totalProfit: number;
+  grossProfit: number;
+  netProfit: number;
+  operationalCosts: number;
+  
+  // Ventas por método expandidas
+  creditCardSales: number;
+  creditSales: number;
+  voucherSales: number;
+  salesReturns: number;
+  digitalPayments: number;
+  
+  // Métricas avanzadas
+  metrics: AdvancedMetrics;
+  
+  // Datos expandidos
+  departmentSales: SalesByDepartment[];
+  cashOutflow: number;
+  taxes: number;
+  tips: number;
+  bonuses: number;
+  expenses: number;
+  
+  movements: CashMovement[];
+  alerts: AlertSystem[];
+  createdBy: string;
+  status: 'open' | 'closed' | 'review' | 'approved';
+  shiftStart?: Date;
+  shiftEnd?: Date;
+  cashierNotes: string;
+  managerApproval?: string;
+}
+
+// Componente de estadística animada
+const AnimatedStat: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  change?: number;
+  color: string;
+  gradient: string;
+  delay?: number;
+}> = ({ icon, label, value, change, color, gradient, delay = 0 }) => {
+  const [animatedValue, setAnimatedValue] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+  const numericValue = typeof value === 'string' ? parseFloat(value.replace(/[^\d.-]/g, '')) || 0 : value;
+
+  useEffect(() => {
+    setTimeout(() => setIsVisible(true), delay);
+    
+    if (isVisible && numericValue > 0) {
+      const duration = 2000;
+      const steps = 60;
+      const stepValue = numericValue / steps;
+      let currentStep = 0;
+
+      const timer = setInterval(() => {
+        currentStep++;
+        setAnimatedValue(Math.min(stepValue * currentStep, numericValue));
+        
+        if (currentStep >= steps) {
+          clearInterval(timer);
+        }
+      }, duration / steps);
+
+      return () => clearInterval(timer);
+    }
+  }, [isVisible, numericValue]);
+
+  return (
+    <div className={`transform transition-all duration-1000 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+      <Card className={`relative overflow-hidden border-0 shadow-xl bg-gradient-to-br ${gradient} hover:scale-105 transition-all duration-300 cursor-pointer group`}>
+        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <CardContent className="p-6 relative z-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className={`p-3 rounded-full bg-white/20 backdrop-blur-sm ${color} shadow-lg`}>
+              {React.cloneElement(icon as React.ReactElement, { className: "h-6 w-6 text-white" })}
+            </div>
+            {change !== undefined && (
+              <div className={`flex items-center space-x-1 ${change >= 0 ? 'text-green-100' : 'text-red-100'}`}>
+                {change >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                <span className="text-sm font-medium">{change > 0 ? '+' : ''}{change.toFixed(1)}%</span>
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white/80">{label}</p>
+            <p className="text-3xl font-bold text-white mt-1">
+              {typeof value === 'string' && value.startsWith('$') 
+                ? `$${Math.round(animatedValue).toLocaleString()}`
+                : typeof value === 'number' 
+                  ? Math.round(animatedValue).toLocaleString()
+                  : value
+              }
+            </p>
+          </div>
+          <div className="absolute -top-10 -right-10 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
+          <div className="absolute -bottom-5 -left-5 w-15 h-15 bg-white/5 rounded-full blur-lg"></div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Componente de gráfico circular animado
+const AnimatedCircularProgress: React.FC<{
+  percentage: number;
+  label: string;
+  color: string;
+  size?: number;
+}> = ({ percentage, label, color, size = 120 }) => {
+  const [animatedPercentage, setAnimatedPercentage] = useState(0);
+  const circumference = 2 * Math.PI * (size / 2 - 10);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimatedPercentage(percentage);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [percentage]);
+
+  return (
+    <div className="flex flex-col items-center space-y-2">
+      <div className="relative">
+        <svg width={size} height={size} className="transform -rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={size / 2 - 10}
+            stroke="currentColor"
+            strokeWidth="8"
+            fill="transparent"
+            className="text-gray-200"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={size / 2 - 10}
+            stroke="currentColor"
+            strokeWidth="8"
+            fill="transparent"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference - (animatedPercentage / 100) * circumference}
+            className={`${color} transition-all duration-1000 ease-out drop-shadow-lg`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-2xl font-bold text-gray-800">{Math.round(animatedPercentage)}%</span>
+        </div>
+      </div>
+      <span className="text-sm font-medium text-gray-600 text-center">{label}</span>
+    </div>
+  );
+};
+
+// Componente de alerta avanzada
+const AdvancedAlert: React.FC<{ alert: AlertSystem; onResolve: (id: string) => void }> = ({ alert, onResolve }) => {
+  const severityColors = {
+    low: 'bg-blue-50 border-blue-200 text-blue-800',
+    medium: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+    high: 'bg-orange-50 border-orange-200 text-orange-800',
+    critical: 'bg-red-50 border-red-200 text-red-800 animate-pulse'
+  };
+
+  const severityIcons = {
+    low: <Bell className="h-5 w-5" />,
+    medium: <AlertCircle className="h-5 w-5" />,
+    high: <Zap className="h-5 w-5" />,
+    critical: <Flame className="h-5 w-5" />
+  };
+
+  return (
+    <div className={`p-4 rounded-lg border-l-4 ${severityColors[alert.severity]} transition-all duration-300 hover:shadow-lg`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center space-x-3">
+          {severityIcons[alert.severity]}
+          <div>
+            <h4 className="font-semibold">{alert.title}</h4>
+            <p className="text-sm opacity-80">{alert.message}</p>
+            <p className="text-xs opacity-60 mt-1">{alert.timestamp.toLocaleString()}</p>
+          </div>
+        </div>
+        {!alert.resolved && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onResolve(alert.id)}
+            className="shrink-0"
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Resolver
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const CashRegisterSystem: React.FC = () => {
+  const [currentReport, setCurrentReport] = useState<DailyCashReport | null>(null);
+  const [reports, setReports] = useState<DailyCashReport[]>([]);
+  const [loadingReports, setLoadingReports] = useState(true);
+  const [isCreatingReport, setIsCreatingReport] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [liveMode, setLiveMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [daySales, setDaySales] = useState<POSSale[]>([]);
+  const [allSales, setAllSales] = useState<POSSale[]>([]);
+  const [loadingSales, setLoadingSales] = useState(false);
+  const [expandedSales, setExpandedSales] = useState<{[key: string]: boolean}>({});
+  const [salesFilter, setSalesFilter] = useState<'all' | 'today' | 'date'>('date');
+  const { user } = useAuth();
+
+  // Estados para efectos espectaculares
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const soundEffects = useSoundEffects();
+
+  // Estados para movimientos manuales con categorías
+  const [manualMovement, setManualMovement] = useState({
+    type: 'entry' as CashMovement['type'],
+    amount: 0,
+    description: '',
+    reference: '',
+    category: '',
+    urgent: false
+  });
+
+  // Categorías expandidas
+  const [departments] = useState([
+    'Electrónicos', 'Ropa', 'Alimentación', 'Hogar', 'Deportes', 
+    'Libros', 'Farmacia', 'Belleza', 'Juguetes', 'Automotriz', 
+    'Jardinería', 'Mascotas', 'Tecnología', 'Otros'
+  ]);
+
+  const movementCategories = [
+    'Operacional', 'Mantenimiento', 'Suministros', 'Servicios',
+    'Emergencia', 'Promocional', 'Administrativo', 'Personal'
+  ];
+
+  // Actualizar hora cada segundo
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Cargar reportes desde Firebase con actualización en tiempo real
+  useEffect(() => {
+    console.log('🔄 [INIT] Inicializando sistema de corte de caja...');
+    console.log('📅 [INIT] Fecha seleccionada:', selectedDate);
+    console.log('⚡ [INIT] Live mode:', liveMode);
+    
+    const initializeSystem = async () => {
+      if (!liveMode) {
+        await fetchReports();
+        await loadTodayReport();
+        await fetchDaySales(new Date(selectedDate));
+        
+        // Forzar sincronización inmediata después de cargar
+        setTimeout(async () => {
+          console.log('🔄 [INIT] Ejecutando sincronización forzada inicial...');
+          await loadTodayReport();
+        }, 2000);
+      } else {
+        // Modo en tiempo real
+        const unsubscribe = onSnapshot(
+          query(collection(db, "cash_reports"), orderBy("date", "desc")),
+          (snapshot) => {
+            const reportsData = snapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                ...data,
+                date: data.date?.toDate() || new Date(),
+                movements: data.movements || [],
+                alerts: data.alerts || []
+              } as DailyCashReport;
+            });
+            setReports(reportsData);
+            
+            // Encontrar reporte actual
+            const today = new Date(selectedDate);
+            const todayReport = reportsData.find(report => 
+              report.date.toDateString() === today.toDateString()
+            );
+            if (todayReport) {
+              setCurrentReport(todayReport);
+              
+              // Sincronizar ventas del POS en tiempo real
+              console.log('🔄 [LIVE MODE] Sincronizando ventas del POS...');
+              fetchRealSalesData(today).then(realSalesData => {
+                if (realSalesData.totalSales > 0) {
+                  console.log('📊 [LIVE MODE] Ventas encontradas, actualizando reporte...');
+                  // Actualizar el reporte con las ventas reales
+                  setCurrentReport(prev => prev ? {
+                    ...prev,
+                    totalSales: realSalesData.totalSales,
+                    cashSales: realSalesData.cashSales,
+                    creditCardSales: realSalesData.creditCardSales,
+                    creditSales: realSalesData.creditSales,
+                    digitalPayments: realSalesData.transferSales,
+                    cashInBox: prev.openingBalance + realSalesData.cashSales,
+                    movements: [
+                      ...prev.movements.filter(m => m.type !== 'sale_cash'),
+                      ...realSalesData.movements
+                    ]
+                  } : null);
+                }
+              }).catch(error => {
+                console.error('❌ [LIVE MODE] Error sincronizando ventas:', error);
+              });
+              
+              // Efectos de sonido y visuales
+              if (soundEnabled && todayReport.movements.length > (currentReport?.movements.length || 0)) {
+                playNotificationSound();
+              }
+            }
+          }
+        );
+        return () => unsubscribe();
+      }
+    };
+    
+    initializeSystem();
+  }, [selectedDate, liveMode, soundEnabled]);
+
+  // Forzar sincronización cuando cambie la fecha seleccionada
+  useEffect(() => {
+    console.log('📅 [DATE CHANGE] Fecha seleccionada cambió:', selectedDate);
+    
+    // Pequeño delay para asegurar que otros efectos se ejecuten primero
+    const syncTimer = setTimeout(async () => {
+      if (currentReport) {
+        console.log('🔄 [DATE CHANGE] Forzando sincronización de ventas...');
+        try {
+          await loadTodayReport();
+          console.log('✅ [DATE CHANGE] Sincronización completada');
+        } catch (error) {
+          console.error('❌ [DATE CHANGE] Error en sincronización:', error);
+        }
+      }
+    }, 1000);
+
+    return () => clearTimeout(syncTimer);
+  }, [selectedDate]);
+
+  // Auto-actualización de datos de ventas cada 30 segundos
+  useEffect(() => {
+    if (!autoRefresh || !currentReport) return;
+
+    console.log('🔄 Configurando auto-actualización de datos de ventas cada 10 segundos');
+    
+    const updateInterval = setInterval(async () => {
+      console.log('🔄 Actualizando datos de ventas automáticamente...');
+      await loadTodayReport();
+    }, 10000); // Cambiar a 10 segundos para más frecuencia
+
+    return () => {
+      console.log('🔄 Desactivando auto-actualización de datos de ventas');
+      clearInterval(updateInterval);
+    };
+  }, [autoRefresh, currentReport, selectedDate]);
+
+  // Sincronización inmediata cuando cambia currentReport
+  useEffect(() => {
+    if (!currentReport) return;
+
+    console.log('📊 [REPORT CHANGED] Reporte cargado, sincronizando ventas...');
+    
+    // Ejecutar sincronización inmediata
+    const syncTimer = setTimeout(async () => {
+      try {
+        const today = new Date(selectedDate);
+        const realSalesData = await fetchRealSalesData(today);
+        
+        if (realSalesData.totalSales > 0 || realSalesData.movements.length > 0) {
+          console.log('💰 [IMMEDIATE SYNC] Aplicando datos de ventas al reporte:', {
+            totalSales: realSalesData.totalSales,
+            cashSales: realSalesData.cashSales,
+            movimientos: realSalesData.movements.length
+          });
+          
+          // Actualizar el reporte con los datos reales
+          const updatedReport = {
+            ...currentReport,
+            totalSales: realSalesData.totalSales,
+            cashSales: realSalesData.cashSales,
+            creditCardSales: realSalesData.creditCardSales,
+            creditSales: realSalesData.creditSales,
+            digitalPayments: realSalesData.transferSales,
+            cashInBox: currentReport.openingBalance + realSalesData.cashSales,
+            movements: [
+              ...currentReport.movements.filter(m => m.type !== 'sale_cash'),
+              ...realSalesData.movements
+            ],
+            taxes: realSalesData.totalTax,
+            closingBalance: currentReport.openingBalance + realSalesData.cashSales + 
+                           (currentReport.cashEntries || 0) - (currentReport.cashExits || 0)
+          };
+
+          // Actualizar estado local inmediatamente
+          setCurrentReport(updatedReport);
+          
+          // Guardar en Firebase
+          try {
+            await updateDoc(doc(db, "cash_reports", currentReport.id), {
+              totalSales: updatedReport.totalSales,
+              cashSales: updatedReport.cashSales,
+              creditCardSales: updatedReport.creditCardSales,
+              creditSales: updatedReport.creditSales,
+              digitalPayments: updatedReport.digitalPayments,
+              cashInBox: updatedReport.cashInBox,
+              movements: updatedReport.movements.map(m => ({
+                ...m,
+                timestamp: Timestamp.fromDate(m.timestamp)
+              })),
+              taxes: updatedReport.taxes,
+              closingBalance: updatedReport.closingBalance,
+              lastUpdated: Timestamp.now()
+            });
+            console.log('✅ [IMMEDIATE SYNC] Reporte actualizado en Firebase');
+          } catch (updateError) {
+            console.error('❌ [IMMEDIATE SYNC] Error actualizando Firebase:', updateError);
+          }
+        }
+      } catch (error) {
+        console.error('❌ [IMMEDIATE SYNC] Error en sincronización:', error);
+      }
+    }, 1000);
+
+    return () => clearTimeout(syncTimer);
+  }, [currentReport?.id, selectedDate]);
+
+  // Listener automático para sincronizar ventas del POS con el corte de caja
+  useEffect(() => {
+    if (!currentReport || currentReport.status === 'closed') return;
+
+    console.log('🔄 Configurando sincronización automática de ventas...');
+    
+    const today = new Date(selectedDate);
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Listener para nuevas ventas del POS
+    const unsubscribe = onSnapshot(
+      query(
+        collection(db, 'pos_sales'),
+        where('timestamp', '>=', Timestamp.fromDate(startOfDay)),
+        where('timestamp', '<=', Timestamp.fromDate(endOfDay)),
+        orderBy('timestamp', 'desc')
+      ),
+      (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const saleData = change.doc.data();
+            const sale = {
+              id: change.doc.id,
+              ...saleData,
+              timestamp: saleData.timestamp?.toDate() || new Date(),
+            } as POSSale;
+            
+            console.log('💰 Nueva venta detectada - Sincronizando con corte de caja:', sale.saleNumber || sale.id);
+            
+            // Verificar si ya está registrada
+            const existingMovement = currentReport.movements.find(m => 
+              m.reference === (sale.saleNumber || sale.id) || m.id === `sale_${sale.id}`
+            );
+
+            if (!existingMovement) {
+              // Sincronizar automáticamente
+              await syncSaleWithCashRegister(sale);
+            }
+          }
+        });
+      },
+      (error) => {
+        console.error('❌ Error en listener de ventas:', error);
+      }
+    );
+
+    return () => {
+      console.log('🔄 Desactivando sincronización automática de ventas');
+      unsubscribe();
+    };
+  }, [currentReport, selectedDate]);
+
+  // Efecto para cargar ventas cuando cambie la fecha
+  useEffect(() => {
+    console.log('📅 Fecha seleccionada cambió a:', selectedDate);
+    // Solo cargar ventas filtradas si el filtro está en 'date'
+    if (salesFilter === 'date') {
+      fetchDaySales(new Date(selectedDate));
+    }
+  }, [selectedDate, salesFilter]);
+
+  // Efecto inicial para cargar todas las ventas
+  useEffect(() => {
+    console.log('🚀 Cargando ventas iniciales...');
+    fetchDaySales(); // Sin parámetro = todas las ventas
+  }, []);
+
+  // Función para sincronizar ventas en tiempo real
+  const syncSaleWithCashRegister = async (saleData: POSSale) => {
+    if (!currentReport || currentReport.status === 'closed') {
+      console.log('⚠️ No hay reporte de caja activo o está cerrado');
+      return;
+    }
+
+    try {
+      console.log('🔄 Sincronizando nueva venta con corte de caja:', saleData.saleNumber);
+
+      // Crear movimiento de efectivo si es pago en efectivo
+      let newMovement: CashMovement | null = null;
+      let cashAmount = 0;
+
+      switch (saleData.paymentMethod) {
+        case 'cash':
+          cashAmount = saleData.total;
+          newMovement = {
+            id: `sale_${saleData.id}`,
+            type: 'sale_cash',
+            amount: saleData.total,
+            description: `Venta ${saleData.saleNumber} - Cliente: ${saleData.customer?.name || 'N/A'}`,
+            timestamp: saleData.timestamp,
+            userId: saleData.cashier || 'POS',
+            reference: saleData.saleNumber,
+            category: 'ventas'
+          };
+          break;
+        case 'mixed':
+          const paymentDetails = saleData.paymentDetails || {};
+          cashAmount = paymentDetails.receivedAmount || 0;
+          if (cashAmount > 0) {
+            newMovement = {
+              id: `sale_cash_${saleData.id}`,
+              type: 'sale_cash',
+              amount: cashAmount,
+              description: `Venta Mixta ${saleData.saleNumber} (Efectivo) - Cliente: ${saleData.customer?.name || 'N/A'}`,
+              timestamp: saleData.timestamp,
+              userId: saleData.cashier || 'POS',
+              reference: saleData.saleNumber,
+              category: 'ventas'
+            };
+          }
+          break;
+      }
+
+      // Actualizar el reporte actual
+      const updatedReport = {
+        ...currentReport,
+        totalSales: currentReport.totalSales + saleData.total,
+        cashInBox: currentReport.cashInBox + cashAmount,
+        closingBalance: currentReport.closingBalance + cashAmount,
+        taxes: currentReport.taxes + (saleData.tax || 0),
+        movements: newMovement ? [...currentReport.movements, newMovement] : currentReport.movements
+      };
+
+      // Actualizar según método de pago
+      switch (saleData.paymentMethod) {
+        case 'cash':
+          updatedReport.cashSales += saleData.total;
+          break;
+        case 'card':
+          updatedReport.creditCardSales += saleData.total;
+          break;
+        case 'transfer':
+          updatedReport.digitalPayments += saleData.total;
+          break;
+        case 'credit':
+          updatedReport.creditSales += saleData.total;
+          break;
+        case 'mixed':
+          const details = saleData.paymentDetails || {};
+          updatedReport.cashSales += (details.receivedAmount || 0);
+          updatedReport.creditCardSales += (details.cardAmount || 0);
+          updatedReport.digitalPayments += (details.transferAmount || 0);
+          break;
+      }
+
+      // Guardar en Firebase
+      await updateDoc(doc(db, "cash_reports", currentReport.id), {
+        totalSales: updatedReport.totalSales,
+        cashSales: updatedReport.cashSales,
+        creditCardSales: updatedReport.creditCardSales,
+        creditSales: updatedReport.creditSales,
+        digitalPayments: updatedReport.digitalPayments,
+        cashInBox: updatedReport.cashInBox,
+        closingBalance: updatedReport.closingBalance,
+        taxes: updatedReport.taxes,
+        movements: updatedReport.movements.map(m => ({
+          ...m,
+          timestamp: Timestamp.fromDate(m.timestamp)
+        })),
+        lastUpdated: Timestamp.now()
+      });
+
+      // Actualizar estado local
+      setCurrentReport(updatedReport);
+
+      console.log('✅ Venta sincronizada con corte de caja exitosamente');
+
+      // Mostrar notificación
+      toast({
+        title: "💰 Venta registrada",
+        description: `Venta ${saleData.saleNumber} agregada al corte de caja - $${saleData.total.toLocaleString()}`,
+      });
+
+    } catch (error) {
+      console.error('❌ Error sincronizando venta con corte de caja:', error);
+    }
+  };
+
+  // Función para obtener ventas reales del día desde POS
+  // Función simple para sincronizar daySales con currentReport
+  const syncReportWithDaySales = async () => {
+    console.log('🔄 SINCRONIZACIÓN SIMPLE: daySales → currentReport');
+    
+    if (!currentReport) {
+      console.log('❌ No hay currentReport para actualizar');
+      return;
+    }
+
+    if (daySales.length === 0) {
+      console.log('⚠️ No hay daySales para sincronizar');
+      return;
+    }
+
+    try {
+      console.log('📊 daySales encontradas:', daySales.length);
+      console.log('💰 Total en daySales:', daySales.reduce((sum, sale) => sum + sale.total, 0));
+
+      // Calcular totales desde daySales
+      const totalSales = daySales.reduce((sum, sale) => sum + sale.total, 0);
+      let cashSales = 0;
+      let creditCardSales = 0;
+      let creditSales = 0;
+      let transferSales = 0;
+
+      daySales.forEach(sale => {
+        switch (sale.paymentMethod) {
+          case 'cash':
+            cashSales += sale.total;
+            break;
+          case 'card':
+            creditCardSales += sale.total;
+            break;
+          case 'credit':
+            creditSales += sale.total;
+            break;
+          case 'transfer':
+            transferSales += sale.total;
+            break;
+          case 'mixed':
+            // Para pagos mixtos, dividir según paymentDetails
+            const details = sale.paymentDetails || {};
+            cashSales += details.receivedAmount || 0;
+            creditCardSales += details.cardAmount || 0;
+            transferSales += details.transferAmount || 0;
+            break;
+        }
+      });
+
+      console.log('💰 Totales calculados:', {
+        totalSales,
+        cashSales,
+        creditCardSales,
+        creditSales,
+        transferSales
+      });
+
+      // Actualizar currentReport
+      const updatedReport = {
+        ...currentReport,
+        totalSales,
+        cashSales,
+        creditCardSales,
+        creditSales,
+        digitalPayments: transferSales,
+        cashInBox: currentReport.openingBalance + cashSales,
+        closingBalance: currentReport.openingBalance + cashSales,
+        lastUpdated: new Date()
+      };
+
+      console.log('📋 Actualizando currentReport...');
+      setCurrentReport(updatedReport);
+
+      // Actualizar en Firebase
+      const reportRef = doc(db, 'cash_reports', currentReport.id);
+      await updateDoc(reportRef, {
+        totalSales,
+        cashSales,
+        creditCardSales,
+        creditSales,
+        digitalPayments: transferSales,
+        cashInBox: updatedReport.cashInBox,
+        closingBalance: updatedReport.closingBalance,
+        lastUpdated: Timestamp.now()
+      });
+
+      console.log('✅ Sincronización completada exitosamente');
+      
+      toast({
+        title: "✅ Sincronización completada",
+        description: `Se sincronizaron ${daySales.length} ventas por un total de $${totalSales.toLocaleString()}`,
+      });
+
+    } catch (error) {
+      console.error('❌ Error en sincronización simple:', error);
+      toast({
+        title: "❌ Error de sincronización",
+        description: "No se pudo sincronizar las ventas con el reporte",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Función para forzar sincronización manual inmediata
+  const forceSyncSales = async () => {
+    console.log('🔄 FORZANDO SINCRONIZACIÓN MANUAL...');
+    
+    if (!currentReport) {
+      console.log('⚠️ No hay reporte activo');
+      return;
+    }
+
+    try {
+      // Usar las ventas ya cargadas en daySales
+      console.log('📋 Usando ventas del día ya cargadas:', daySales.length);
+      
+      if (daySales.length === 0) {
+        console.log('⚠️ No hay ventas para sincronizar');
+        return;
+      }
+
+      // Calcular totales desde daySales
+      const totalSales = daySales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const cashSales = daySales.filter(s => s.paymentMethod === 'cash' || s.paymentMethod === 'efectivo').reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const cardSales = daySales.filter(s => s.paymentMethod === 'card' || s.paymentMethod === 'tarjeta').reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const creditSales = daySales.filter(s => s.paymentMethod === 'credit' || s.paymentMethod === 'credito').reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const digitalSales = daySales.filter(s => s.paymentMethod === 'digital').reduce((sum, sale) => sum + (sale.total || 0), 0);
+
+      console.log('💰 Totales calculados:', { totalSales, cashSales, cardSales, creditSales, digitalSales });
+
+      // Actualizar el reporte actual
+      const updatedReport = {
+        ...currentReport,
+        totalSales,
+        cashSales,
+        cardSales: cardSales,
+        creditSales,
+        digitalSales,
+        cashInBox: currentReport.openingBalance + cashSales - currentReport.cashExits,
+        updatedAt: new Date()
+      };
+
+      // Guardar en Firebase
+      await updateDoc(doc(db, 'cash_reports', currentReport.id), {
+        totalSales,
+        cashSales,
+        cardSales,
+        creditSales,
+        digitalSales,
+        cashInBox: currentReport.openingBalance + cashSales - currentReport.cashExits,
+        updatedAt: serverTimestamp()
+      });
+
+      // Actualizar estado local
+      setCurrentReport(updatedReport);
+      
+      console.log('✅ Sincronización completada exitosamente');
+      showSuccessNotification();
+    } catch (error) {
+      console.error('❌ Error en sincronización manual:', error);
+    }
+  };
+
+  // Función para obtener datos reales de ventas
+  const fetchRealSalesData = async (date: Date) => {
+    try {
+      // Normalizar fecha para búsqueda (eliminar tiempo)
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      console.log('🔍 Buscando ventas para:', date.toLocaleDateString(), 'Rango:', startOfDay, 'a', endOfDay);
+
+      const salesQuery = query(
+        collection(db, 'pos_sales'),
+        where('timestamp', '>=', Timestamp.fromDate(startOfDay)),
+        where('timestamp', '<=', Timestamp.fromDate(endOfDay)),
+        orderBy('timestamp', 'desc')
+      );
+
+      const salesSnapshot = await getDocs(salesQuery);
+      const salesData = salesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+        } as POSSale;
+      });
+
+      console.log('📊 Ventas encontradas:', salesData.length);
+
+      // Calcular totales
+      const totals = {
+        totalSales: 0,
+        cashSales: 0,
+        cardSales: 0,
+        creditSales: 0,
+        digitalSales: 0,
+        salesCount: salesData.length,
+        movements: [] as CashMovement[]
+      };
+
+      salesData.forEach(sale => {
+        const saleTotal = sale.total || 0;
+        totals.totalSales += saleTotal;
+
+        switch (sale.paymentMethod) {
+          case 'cash':
+            totals.cashSales += saleTotal;
+            break;
+          case 'card':
+            totals.cardSales += saleTotal;
+            break;
+          case 'credit':
+            totals.creditSales += saleTotal;
+            break;
+          case 'transfer':
+            totals.digitalSales += saleTotal;
+            break;
+        }
+      });
+
+      return totals;
+    } catch (error) {
+      console.error('❌ Error obteniendo datos de ventas:', error);
+      return {
+        totalSales: 0,
+        cashSales: 0,
+        cardSales: 0,
+        creditSales: 0,
+        digitalSales: 0,
+        salesCount: 0,
+        movements: []
+      };
+    }
+  };
+
+  // Funciones auxiliares para formateo y utilidades  
+  const formatCurrency = (value: number | undefined): string => {
+    return (value || 0).toLocaleString();
+  };
+
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Obtener métricas avanzadas para dashboard
+  const getCurrentAdvancedMetrics = useMemo(() => {
+    if (!currentReport) return null;
+
+    const totalIncome = currentReport.totalSales + currentReport.cashEntries;
+    const totalOutflow = currentReport.cashExits + currentReport.cashReturns + currentReport.expenses;
+    const netFlow = totalIncome - totalOutflow;
+    const expectedBalance = currentReport.openingBalance + netFlow;
+    const updatedMetrics = calculateAdvancedMetrics(currentReport);
+
+    return {
+      netFlow,
+      expectedBalance,
+      variance: currentReport.cashInBox - expectedBalance,
+      efficiency: updatedMetrics.efficiency,
+      totalTransactions: currentReport.movements.length,
+      avgTransactionValue: currentReport.totalSales / Math.max(1, currentReport.movements.length),
+      peakHour: getCurrentPeakHour(currentReport.movements),
+      ...updatedMetrics
+    };
+  }, [currentReport]);
+        const data = doc.data();
+        const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+        
+        return {
+          id: doc.id,
+          saleNumber: data.saleNumber,
+          total: data.total,
+          timestamp,
+        };
+      });
+
+      console.log(`📦 Total ventas para filtrar: ${allSales.length}`);
+
+      // Aplicar filtro
+      const targetYear = testDate.getFullYear();
+      const targetMonth = testDate.getMonth();
+      const targetDay = testDate.getDate();
+      
+      const filteredSales = allSales.filter(sale => {
+        const saleDate = sale.timestamp;
+        const match = saleDate.getFullYear() === targetYear && 
+                     saleDate.getMonth() === targetMonth && 
+                     saleDate.getDate() === targetDay;
+        
+        console.log(`🔍 Filtro: ${sale.saleNumber} - ${saleDate.toLocaleDateString('es-ES')} vs ${testDate.toLocaleDateString('es-ES')} = ${match}`);
+        return match;
+      });
+
+      console.log(`✅ Ventas filtradas para ${testDate.toLocaleDateString('es-ES')}: ${filteredSales.length}`);
+      
+    } catch (error) {
+      console.error('❌ Error en diagnóstico profundo:', error);
+    }
+  };
+    console.log('🔬 INICIANDO DIAGNÓSTICO COMPLETO DE VENTAS...');
+    
+    try {
+      // 1. Verificar conexión a Firebase
+      console.log('🔗 Verificando conexión a Firebase...');
+      
+      // 2. Verificar si hay ventas en la BD
+      const salesSnapshot = await getDocs(
+        query(collection(db, 'pos_sales'), orderBy('timestamp', 'desc'), limit(10))
+      );
+      
+      console.log('📊 RESULTADO: Ventas en BD:', salesSnapshot.docs.length);
+      
+      if (salesSnapshot.docs.length > 0) {
+        console.log('📋 DETALLES DE VENTAS ENCONTRADAS:');
+        const salesData = salesSnapshot.docs.map((doc, index) => {
+          const data = doc.data();
+          const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+          const saleInfo = {
+            num: index + 1,
+            id: doc.id,
+            saleNumber: data.saleNumber,
+            total: data.total,
+            fecha: timestamp.toLocaleDateString(),
+            fechaISO: timestamp.toISOString().split('T')[0],
+            paymentMethod: data.paymentMethod,
+            reportId: data.reportId || 'Sin asignar',
+            customer: data.customer?.name || 'Sin nombre'
+          };
+          console.log(`  ${saleInfo.num}. ${saleInfo.saleNumber} - $${saleInfo.total} - ${saleInfo.fecha} - Reporte: ${saleInfo.reportId}`);
+          return saleInfo;
+        });
+        
+        // 3. Verificar el reporte actual
+        console.log('📋 REPORTE ACTUAL:', {
+          existe: !!currentReport,
+          id: currentReport?.id,
+          fecha: currentReport?.date.toLocaleDateString(),
+          fechaISO: currentReport?.date.toISOString().split('T')[0],
+          status: currentReport?.status,
+          totalSales: currentReport?.totalSales,
+          cashSales: currentReport?.cashSales,
+          openingBalance: currentReport?.openingBalance
+        });
+        
+        // 4. Verificar fecha seleccionada
+        const fechaSeleccionada = new Date(selectedDate).toISOString().split('T')[0];
+        console.log('📅 FECHA SELECCIONADA:', fechaSeleccionada);
+        
+        // 5. Filtrar ventas que coincidan con la fecha
+        const ventasDelDia = salesData.filter(sale => sale.fechaISO === fechaSeleccionada);
+        console.log('🎯 VENTAS QUE COINCIDEN CON LA FECHA:', ventasDelDia.length);
+        ventasDelDia.forEach(sale => {
+          console.log(`  ✓ ${sale.saleNumber} - $${sale.total} - ${sale.paymentMethod}`);
+        });
+        
+        // 6. Probar fetchRealSalesData con la fecha actual
+        console.log('🧪 PROBANDO fetchRealSalesData...');
+        const today = new Date(selectedDate);
+        const realData = await fetchRealSalesData(today);
+        console.log('💰 RESULTADO DE fetchRealSalesData:', realData);
+        
+        // 7. Si hay datos y reporte, intentar actualización manual
+        if (realData.totalSales > 0 && currentReport) {
+          console.log('🔄 INTENTANDO ACTUALIZACIÓN MANUAL DEL REPORTE...');
+          
+          const updatedReport = {
+            ...currentReport,
+            totalSales: realData.totalSales,
+            cashSales: realData.cashSales,
+            creditCardSales: realData.creditCardSales,
+            creditSales: realData.creditSales,
+            digitalPayments: realData.transferSales,
+            movements: [...currentReport.movements, ...realData.movements],
+            cashInBox: currentReport.openingBalance + realData.cashSales,
+            closingBalance: currentReport.openingBalance + realData.cashSales
+          };
+          
+          console.log('📝 DATOS DE ACTUALIZACIÓN:', {
+            totalSalesAntes: currentReport.totalSales,
+            totalSalesDespues: updatedReport.totalSales,
+            cashSalesAntes: currentReport.cashSales,
+            cashSalesDespues: updatedReport.cashSales,
+            movimientosAntes: currentReport.movements.length,
+            movimientosDespues: updatedReport.movements.length
+          });
+          
+          setCurrentReport(updatedReport);
+          
+          // Guardar en Firebase
+          await updateDoc(doc(db, "cash_reports", currentReport.id), {
+            totalSales: updatedReport.totalSales,
+            cashSales: updatedReport.cashSales,
+            creditCardSales: updatedReport.creditCardSales,
+            creditSales: updatedReport.creditSales,
+            digitalPayments: updatedReport.digitalPayments,
+            cashInBox: updatedReport.cashInBox,
+            closingBalance: updatedReport.closingBalance,
+            movements: updatedReport.movements.map(m => ({
+              ...m,
+              timestamp: Timestamp.fromDate(m.timestamp)
+            })),
+            lastUpdated: Timestamp.now()
+          });
+          
+          console.log('✅ REPORTE ACTUALIZADO EXITOSAMENTE');
+          toast({
+            title: "✅ Diagnóstico Completado",
+            description: `Se encontraron ${realData.salesCount} ventas y se actualizó el reporte con $${realData.totalSales.toLocaleString()}`
+          });
+          
+        } else if (realData.totalSales === 0) {
+          console.log('⚠️ fetchRealSalesData no encontró ventas para procesar');
+          toast({
+            title: "⚠️ Sin ventas",
+            description: `Se encontraron ${salesData.length} ventas en BD pero ninguna coincide con la fecha ${fechaSeleccionada}`
+          });
+        } else {
+          console.log('⚠️ No hay reporte activo para actualizar');
+          toast({
+            title: "⚠️ Sin reporte",
+            description: "No hay un reporte de caja activo para actualizar"
+          });
+        }
+      } else {
+        console.log('⚠️ NO HAY VENTAS EN LA BASE DE DATOS');
+        toast({
+          title: "⚠️ Sin datos",
+          description: "No hay ventas en la base de datos"
+        });
+      }
+    } catch (error) {
+      console.error('❌ ERROR EN DIAGNÓSTICO:', error);
+      toast({
+        variant: "destructive",
+        title: "❌ Error",
+        description: `Error en diagnóstico: ${error.message}`
+      });
+    }
+  };
+
+  const fetchRealSalesData = async (date: Date) => {
+    try {
+      console.log('🔍 Buscando ventas del día:', date.toLocaleDateString('es-ES'));
+
+      // Obtener todas las ventas de la colección
+      const salesSnapshot = await getDocs(
+        query(collection(db, 'pos_sales'), orderBy('timestamp', 'desc'))
+      );
+      
+      console.log('📦 Total documentos encontrados:', salesSnapshot.docs.length);
+      
+      if (salesSnapshot.empty) {
+        console.log('⚠️ No hay ventas en la base de datos');
+        return {
+          totalSales: 0,
+          cashSales: 0,
+          creditCardSales: 0,
+          creditSales: 0,
+          transferSales: 0,
+          mixedSales: 0,
+          salesCount: 0,
+          totalTax: 0,
+          totalDiscounts: 0,
+          movements: []
+        };
+      }
+
+      // Mostrar información de debug de todas las ventas
+      console.log('� [DEBUG] Análisis de todas las ventas:');
+      salesSnapshot.docs.forEach((doc, index) => {
+        const data = doc.data();
+        const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+        
+        if (index < 5) { // Mostrar solo las primeras 5 para no saturar
+          console.log(`  [${index + 1}]`, {
+            id: doc.id,
+            saleNumber: data.saleNumber,
+            timestamp: timestamp.toISOString(),
+            date: timestamp.toDateString(),
+            total: data.total,
+            paymentMethod: data.paymentMethod,
+            reportId: data.reportId
+          });
+        }
+      });
+
+      // Procesar todas las ventas
+      const allSales = salesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+        
+        return {
+          id: doc.id,
+          ...data,
+          timestamp,
+        } as POSSale;
+      });
+
+      console.log('✅ Ventas procesadas:', allSales.length);
+
+      // Filtrar ventas por fecha usando rangos locales para ser tolerante con zona horaria
+      const targetYear = date.getFullYear();
+      const targetMonth = date.getMonth();
+      const targetDay = date.getDate();
+      
+      // Crear rango de fechas para el día completo en zona local
+      const startOfDay = new Date(targetYear, targetMonth, targetDay, 0, 0, 0, 0);
+      const endOfDay = new Date(targetYear, targetMonth, targetDay, 23, 59, 59, 999);
+      
+      console.log('📅 Rango de búsqueda:', {
+        inicio: startOfDay.toLocaleString('es-ES'),
+        fin: endOfDay.toLocaleString('es-ES'),
+        inicioUTC: startOfDay.toISOString(),
+        finUTC: endOfDay.toISOString()
+      });
+      
+      let salesData = allSales.filter(sale => {
+        const saleDate = sale.timestamp;
+        const saleTime = saleDate.getTime();
+        const startTime = startOfDay.getTime();
+        const endTime = endOfDay.getTime();
+        
+        const isInRange = saleTime >= startTime && saleTime <= endTime;
+        
+        if (!isInRange) {
+          // También verificar si coincide por componentes de fecha (backup por si hay problemas de milisegundos)
+          const dateMatch = saleDate.getFullYear() === targetYear && 
+                           saleDate.getMonth() === targetMonth && 
+                           saleDate.getDate() === targetDay;
+          
+          if (dateMatch && !isInRange) {
+            console.log('⚠️ Venta encontrada por fecha pero fuera de rango de tiempo:', {
+              venta: sale.saleNumber,
+              fecha: saleDate.toLocaleString('es-ES'),
+              timestamp: saleTime,
+              rango: `${startTime} - ${endTime}`
+            });
+          }
+          
+          return dateMatch; // Usar coincidencia de fecha como backup
+        }
+        
+        return isInRange;
+      });
+
+      console.log(`📊 Ventas del día ${date.toLocaleDateString('es-ES')}:`, salesData.length);
+      
+      // Si no hay ventas del día, buscar por reportId del turno actual
+      if (salesData.length === 0 && currentReport) {
+        console.log('🔄 Buscando ventas del turno:', currentReport.id);
+        salesData = allSales.filter(sale => sale.reportId === currentReport.id);
+        console.log(`📊 Ventas del turno:`, salesData.length);
+      }
+      
+      // Mostrar ventas encontradas para debug
+      if (salesData.length > 0) {
+        console.log('💰 Ventas encontradas:');
+        salesData.forEach((sale, index) => {
+          console.log(`  [${index + 1}] ${sale.saleNumber} - $${sale.total} - ${sale.paymentMethod} - ${sale.timestamp.toISOString()}`);
+        });
+      } else {
+        console.log('⚠️ No se encontraron ventas para procesar');
+        // Mostrar algunas ventas disponibles para debug
+        if (allSales.length > 0) {
+          console.log('� Ventas disponibles en BD:');
+          allSales.slice(0, 3).forEach((sale, index) => {
+            console.log(`  [${index + 1}] ${sale.saleNumber} - $${sale.total} - ${sale.timestamp.toISOString().split('T')[0]}`);
+          });
+        }
+      }
+
+      // Calcular totales por método de pago
+      const totals = {
+        totalSales: 0,
+        cashSales: 0,
+        creditCardSales: 0,
+        creditSales: 0,
+        transferSales: 0,
+        mixedSales: 0,
+        salesCount: salesData.length,
+        totalTax: 0,
+        totalDiscounts: 0,
+        movements: [] as CashMovement[]
+      };
+
+      // Procesar cada venta y sumar totales
+      salesData.forEach(sale => {
+        const saleTotal = sale.total || 0;
+        const saleTax = sale.tax || 0;
+        const saleDiscounts = sale.discounts || 0;
+
+        totals.totalSales += saleTotal;
+        totals.totalTax += saleTax;
+        totals.totalDiscounts += saleDiscounts;
+
+        // Clasificar por método de pago y crear movimientos
+        switch (sale.paymentMethod) {
+          case 'cash':
+            totals.cashSales += saleTotal;
+            totals.movements.push({
+              id: `sale_${sale.id}`,
+              type: 'sale_cash',
+              amount: saleTotal,
+              description: `Venta ${sale.saleNumber} - Cliente: ${sale.customer?.name || 'N/A'}`,
+              timestamp: sale.timestamp,
+              userId: sale.cashier || 'POS',
+              reference: sale.saleNumber,
+              category: 'ventas'
+            });
+            break;
+          case 'card':
+            totals.creditCardSales += saleTotal;
+            break;
+          case 'transfer':
+            totals.transferSales += saleTotal;
+            break;
+          case 'credit':
+            totals.creditSales += saleTotal;
+            break;
+          case 'mixed':
+            totals.mixedSales += saleTotal;
+            const paymentDetails = sale.paymentDetails || {};
+            const cashPart = paymentDetails.receivedAmount || 0;
+            const cardPart = paymentDetails.cardAmount || 0;
+            
+            totals.cashSales += cashPart;
+            totals.creditCardSales += cardPart;
+            
+            if (cashPart > 0) {
+              totals.movements.push({
+                id: `sale_cash_${sale.id}`,
+                type: 'sale_cash',
+                amount: cashPart,
+                description: `Venta Mixta ${sale.saleNumber} (Efectivo) - Cliente: ${sale.customer?.name || 'N/A'}`,
+                timestamp: sale.timestamp,
+                userId: sale.cashier || 'POS',
+                reference: sale.saleNumber,
+                category: 'ventas'
+              });
+            }
+            break;
+        }
+      });
+
+      // Mostrar resumen final
+      console.log('💰 RESUMEN CALCULADO:', {
+        ventas: salesData.length,
+        totalDinero: totals.totalSales,
+        efectivo: totals.cashSales,
+        tarjeta: totals.creditCardSales,
+        movimientos: totals.movements.length
+      });
+      
+      return totals;
+
+    } catch (error) {
+      console.error('❌ [CORTE DE CAJA] Error obteniendo ventas reales:', error);
+      return {
+        totalSales: 0,
+        cashSales: 0,
+        creditCardSales: 0,
+        creditSales: 0,
+        transferSales: 0,
+        mixedSales: 0,
+        salesCount: 0,
+        totalTax: 0,
+        totalDiscounts: 0,
+        movements: []
+      };
+    }
+  };
+
+  const fetchReports = async () => {
+    setLoadingReports(true);
+    try {
+      const querySnapshot = await getDocs(
+        query(collection(db, "cash_reports"), orderBy("date", "desc"))
+      );
+      const reportsData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: data.date?.toDate() || new Date(),
+          movements: data.movements || [],
+          alerts: data.alerts || []
+        } as DailyCashReport;
+      });
+      setReports(reportsData);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      toast({
+        variant: "destructive",
+        title: "Error de Conexión",
+        description: "No se pudieron cargar los reportes. Revise su conexión."
+      });
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const loadTodayReport = async () => {
+    const today = new Date(selectedDate);
+    today.setHours(0, 0, 0, 0);
+    
+    console.log('🔄 [LOAD REPORT] Cargando reporte del día:', {
+      selectedDate,
+      today: today.toISOString(),
+      todayString: today.toDateString()
+    });
+    
+    try {
+      const querySnapshot = await getDocs(
+        query(
+          collection(db, "cash_reports"),
+          where("date", ">=", today),
+          where("date", "<", new Date(today.getTime() + 24 * 60 * 60 * 1000))
+        )
+      );
+      
+      console.log('📊 [LOAD REPORT] Documentos encontrados:', querySnapshot.docs.length);
+      
+      if (!querySnapshot.empty) {
+        const reportData = querySnapshot.docs[0].data();
+        let currentReport = {
+          id: querySnapshot.docs[0].id,
+          ...reportData,
+          date: reportData.date?.toDate() || new Date(),
+          movements: reportData.movements || [],
+          alerts: reportData.alerts || []
+        } as DailyCashReport;
+
+        console.log('📋 [LOAD REPORT] Reporte encontrado:', {
+          id: currentReport.id,
+          openingBalance: currentReport.openingBalance,
+          totalSales: currentReport.totalSales,
+          cashSales: currentReport.cashSales,
+          movementsCount: currentReport.movements.length
+        });
+
+        // Obtener datos reales de ventas del día
+        console.log('🔄 Actualizando reporte con datos reales de ventas...');
+        const realSalesData = await fetchRealSalesData(today);
+        
+        // Actualizar el reporte con datos reales
+        const updatedReport = {
+          ...currentReport,
+          // Actualizar totales de ventas con datos reales
+          totalSales: realSalesData.totalSales,
+          cashSales: realSalesData.cashSales,
+          creditCardSales: realSalesData.creditCardSales,
+          creditSales: realSalesData.creditSales,
+          digitalPayments: realSalesData.transferSales,
+          
+          // Calcular caja total (balance inicial + entradas de efectivo)
+          cashInBox: currentReport.openingBalance + realSalesData.cashSales,
+          
+          // Combinar movimientos existentes con movimientos de ventas
+          movements: [
+            ...currentReport.movements.filter(m => m.type !== 'sale_cash'), // Remover movimientos de venta antiguos
+            ...realSalesData.movements // Agregar movimientos reales de ventas
+          ],
+          
+          // Actualizar métricas calculadas
+          taxes: realSalesData.totalTax,
+          
+          // Recalcular balance de cierre
+          closingBalance: currentReport.openingBalance + realSalesData.cashSales + 
+                         (currentReport.cashEntries || 0) - (currentReport.cashExits || 0)
+        };
+
+        console.log('🔄 [UPDATE REPORT] Reporte actualizado:', {
+          originalSales: currentReport.totalSales,
+          newSales: updatedReport.totalSales,
+          originalCashSales: currentReport.cashSales,
+          newCashSales: updatedReport.cashSales,
+          originalMovements: currentReport.movements.length,
+          newMovements: updatedReport.movements.length,
+          salesMovements: realSalesData.movements.length
+        });
+
+        // Guardar cambios en Firebase
+        try {
+          await updateDoc(doc(db, "cash_reports", currentReport.id), {
+            totalSales: updatedReport.totalSales,
+            cashSales: updatedReport.cashSales,
+            creditCardSales: updatedReport.creditCardSales,
+            creditSales: updatedReport.creditSales,
+            digitalPayments: updatedReport.digitalPayments,
+            cashInBox: updatedReport.cashInBox,
+            movements: updatedReport.movements.map(m => ({
+              ...m,
+              timestamp: Timestamp.fromDate(m.timestamp)
+            })),
+            taxes: updatedReport.taxes,
+            closingBalance: updatedReport.closingBalance,
+            lastUpdated: Timestamp.now()
+          });
+          
+          console.log('✅ Reporte actualizado con datos reales de ventas');
+          console.log('💾 [SAVE] Datos guardados en Firebase:', {
+            id: currentReport.id,
+            totalSales: updatedReport.totalSales,
+            cashSales: updatedReport.cashSales,
+            movementsCount: updatedReport.movements.length
+          });
+        } catch (updateError) {
+          console.error('⚠️ Error actualizando reporte:', updateError);
+        }
+
+        setCurrentReport(updatedReport);
+      } else {
+        console.log('⚠️ [LOAD REPORT] No se encontró reporte para el día seleccionado');
+        console.log('📅 Fecha buscada:', today.toISOString());
+        
+        // Mostrar todos los reportes disponibles para debug
+        try {
+          const allReportsSnapshot = await getDocs(
+            query(collection(db, "cash_reports"), orderBy("date", "desc"), limit(10))
+          );
+          
+          console.log('📋 Reportes disponibles en la BD:');
+          allReportsSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const reportDate = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+            console.log('  -', {
+              id: doc.id,
+              date: reportDate.toISOString(),
+              dateString: reportDate.toDateString(),
+              openingBalance: data.openingBalance
+            });
+          });
+        } catch (debugError) {
+          console.error('Error obteniendo reportes para debug:', debugError);
+        }
+        
+        setCurrentReport(null);
+      }
+    } catch (error) {
+      console.error("Error loading today's report:", error);
+    }
+  };
+
+  // Función para obtener TODAS las ventas
+  const fetchDaySales = async (filterDate?: Date) => {
+    setLoadingSales(true);
+    try {
+      console.log('🔍 Cargando ventas...', filterDate ? `para el día ${filterDate.toDateString()}` : 'TODAS las ventas');
+
+      // Función auxiliar para convertir diferentes formatos de timestamp
+      const parseTimestamp = (timestamp: any): Date => {
+        console.log('🔍 Parsing timestamp:', {
+          raw: timestamp,
+          type: typeof timestamp,
+          isDate: timestamp instanceof Date,
+          hasToDate: timestamp && typeof timestamp.toDate === 'function',
+          hasSeconds: timestamp && typeof timestamp === 'object' && timestamp.seconds,
+          constructor: timestamp?.constructor?.name
+        });
+
+        if (!timestamp) {
+          console.warn('⚠️ Timestamp is null/undefined, using current date');
+          return new Date();
+        }
+
+        // Si ya es una Date válida
+        if (timestamp instanceof Date && !isNaN(timestamp.getTime())) {
+          console.log('✅ Already a valid Date:', timestamp.toISOString());
+          return timestamp;
+        }
+
+        // Si es un Timestamp de Firebase
+        if (timestamp && typeof timestamp.toDate === 'function') {
+          try {
+            const date = timestamp.toDate();
+            console.log('✅ Firebase Timestamp converted:', date.toISOString());
+            return date;
+          } catch (error) {
+            console.error('❌ Error converting Firebase timestamp:', error);
+          }
+        }
+
+        // Si es un string
+        if (typeof timestamp === 'string') {
+          const parsed = new Date(timestamp);
+          if (!isNaN(parsed.getTime())) {
+            console.log('✅ String timestamp converted:', timestamp, '->', parsed.toISOString());
+            return parsed;
+          } else {
+            console.warn('⚠️ Invalid string timestamp:', timestamp);
+          }
+        }
+
+        // Si es un número (unix timestamp en segundos o milisegundos)
+        if (typeof timestamp === 'number') {
+          // Si parece ser en segundos (menor que año 2100 en milisegundos)
+          const date = timestamp < 4102444800000 ? new Date(timestamp * 1000) : new Date(timestamp);
+          console.log('✅ Number timestamp converted:', timestamp, '->', date.toISOString());
+          return date;
+        }
+
+        // Si es un objeto con seconds/nanoseconds (Firestore format)
+        if (timestamp && typeof timestamp === 'object' && typeof timestamp.seconds === 'number') {
+          const date = new Date(timestamp.seconds * 1000);
+          console.log('✅ Object timestamp converted:', timestamp, '->', date.toISOString());
+          return date;
+        }
+
+        console.warn('⚠️ Unable to parse timestamp, trying fallback:', timestamp);
+        // Último intento: convertir a string y parsearlo
+        try {
+          const fallbackDate = new Date(String(timestamp));
+          if (!isNaN(fallbackDate.getTime())) {
+            console.log('✅ Fallback conversion successful:', fallbackDate.toISOString());
+            return fallbackDate;
+          }
+        } catch (error) {
+          console.error('❌ Fallback conversion failed:', error);
+        }
+
+        console.warn('⚠️ All parsing attempts failed, using current date');
+        return new Date();
+      };
+
+      if (filterDate) {
+        // Obtener todas las ventas y filtrar en memoria para mayor confiabilidad
+        console.log('📅 Filtrando por fecha específica:', {
+          filterDate: filterDate,
+          filterDateString: filterDate.toDateString(),
+          filterDateISO: filterDate.toISOString()
+        });
+        
+        const allSalesSnapshot = await getDocs(collection(db, 'pos_sales'));
+        console.log(`📦 Total documentos obtenidos: ${allSalesSnapshot.docs.length}`);
+        
+        const allSalesWithTimestamps = allSalesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          const timestamp = parseTimestamp(data.timestamp);
+          
+          return {
+            id: doc.id,
+            ...data,
+            timestamp,
+            originalTimestamp: data.timestamp // Guardar el original para debug
+          } as POSSale & { originalTimestamp: any };
+        });
+
+        console.log('🔍 Todas las ventas con timestamps parseados:', 
+          allSalesWithTimestamps.map(sale => ({
+            id: sale.id,
+            saleNumber: sale.saleNumber,
+            originalTimestamp: sale.originalTimestamp,
+            parsedTimestamp: sale.timestamp.toISOString(),
+            dateString: sale.timestamp.toDateString(),
+            isoDateOnly: sale.timestamp.toISOString().split('T')[0] // Solo la fecha YYYY-MM-DD
+          }))
+        );
+
+        // Mostrar todas las fechas únicas disponibles
+        const uniqueDates = [...new Set(allSalesWithTimestamps.map(sale => 
+          sale.timestamp.toLocaleDateString('es-ES')
+        ))].sort();
+        console.log('📅 Fechas únicas disponibles en la BD:', uniqueDates);
+        console.log('🎯 Fecha que estás buscando:', filterDate.toLocaleDateString('es-ES'));
+        
+        const filteredSales = allSalesWithTimestamps.filter(sale => {
+          // Usar fechas locales para evitar problemas de zona horaria
+          const saleDate = new Date(sale.timestamp);
+          const filterLocalDate = new Date(filterDate);
+          
+          // Comparar año, mes y día directamente
+          const isSameDay = saleDate.getFullYear() === filterLocalDate.getFullYear() &&
+                           saleDate.getMonth() === filterLocalDate.getMonth() &&
+                           saleDate.getDate() === filterLocalDate.getDate();
+          
+          console.log(`📊 Comparando: ${sale.saleNumber} - ${saleDate.toLocaleDateString('es-ES')} vs ${filterLocalDate.toLocaleDateString('es-ES')} = ${isSameDay}`);
+          return isSameDay;
+        })
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Ordenar por más reciente
+
+        console.log(`📊 Ventas encontradas para ${filterDate.toDateString()}: ${filteredSales.length}`);
+        console.log('💰 Total del día:', filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0));
+        
+        setDaySales(filteredSales);
+        return filteredSales;
+
+      } else {
+        // Obtener TODAS las ventas sin filtro
+        console.log('🔍 Obteniendo todas las ventas de la base de datos...');
+        const allSalesSnapshot = await getDocs(collection(db, 'pos_sales'));
+
+      const allSalesData = allSalesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const timestamp = parseTimestamp(data.timestamp);
+        
+        console.log('📄 Procesando venta:', {
+          id: doc.id,
+          saleNumber: data.saleNumber,
+          timestampRaw: data.timestamp,
+          timestampParsed: timestamp.toISOString(),
+          customer: data.customer?.name,
+          total: data.total
+        });
+
+        return {
+          id: doc.id,
+          ...data,
+          timestamp,
+        } as POSSale;
+      });
+
+      console.log(`📊 Total de ventas encontradas: ${allSalesData.length}`);
+      console.log('� Total de todas las ventas:', allSalesData.reduce((sum, sale) => sum + (sale.total || 0), 0));
+
+      // Ordenar por timestamp descendente (más recientes primero)
+      allSalesData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+      console.log('✅ Mostrando TODAS las ventas ordenadas por fecha');
+      setDaySales(allSalesData);
+      return allSalesData;
+      }
+
+    } catch (error) {
+      console.error('❌ Error obteniendo todas las ventas:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudieron cargar las ventas"
+      });
+      return [];
+    } finally {
+      setLoadingSales(false);
+    }
+  };
+
+  // Funciones de sonido y efectos
+  const playNotificationSound = () => {
+    if (soundEnabled) {
+      soundEffects.playNotification();
+    }
+  };
+
+  const triggerSuccessEffect = () => {
+    setShowSuccess(true);
+    setShowCelebration(true);
+    if (soundEnabled) {
+      soundEffects.playSuccess();
+    }
+    setTimeout(() => {
+      setShowSuccess(false);
+      setShowCelebration(false);
+    }, 4000);
+  };
+
+  // Crear nuevo reporte con inicialización avanzada
+  const createNewReport = async (openingBalance: number) => {
+    const today = new Date(selectedDate);
+    
+    const defaultMetrics: AdvancedMetrics = {
+      efficiency: 85,
+      cashFlow: 0,
+      profitability: 0,
+      customerSatisfaction: 90,
+      operationalRisk: 15,
+      salesVelocity: 0,
+      inventoryTurn: 0,
+      avgTransactionTime: 2.5
+    };
+
+    const newReport: Omit<DailyCashReport, 'id'> = {
+      date: today,
+      openingBalance,
+      closingBalance: openingBalance,
+      totalSales: 0,
+      cashInBox: openingBalance,
+      
+      // Efectivo avanzado
+      cashSales: 0,
+      cashPayments: 0,
+      cashEntries: 0,
+      cashExits: 0,
+      cashReturns: 0,
+      vaultDeposits: 0,
+      bankTransfers: 0,
+      
+      // Ganancias detalladas
+      totalProfit: 0,
+      grossProfit: 0,
+      netProfit: 0,
+      operationalCosts: 0,
+      
+      // Métodos de pago expandidos
+      creditCardSales: 0,
+      creditSales: 0,
+      voucherSales: 0,
+      salesReturns: 0,
+      digitalPayments: 0,
+      
+      // Métricas avanzadas
+      metrics: defaultMetrics,
+      
+      // Departamentos con métricas avanzadas
+      departmentSales: departments.map(dept => ({
+        department: dept,
+        totalSales: 0,
+        cashSales: 0,
+        creditCardSales: 0,
+        creditSales: 0,
+        voucherSales: 0,
+        returns: 0,
+        profit: 0,
+        transactions: 0,
+        avgTicket: 0,
+        topProduct: '',
+        growth: 0
+      })),
+      
+      cashOutflow: 0,
+      taxes: 0,
+      tips: 0,
+      bonuses: 0,
+      expenses: 0,
+      
+      movements: [],
+      alerts: [],
+      createdBy: user?.email || 'unknown',
+      status: 'open',
+      shiftStart: new Date(),
+      cashierNotes: ''
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, "cash_reports"), {
+        ...newReport,
+        date: Timestamp.fromDate(today),
+        shiftStart: Timestamp.now()
+      });
+      
+      const createdReport = { id: docRef.id, ...newReport };
+      setCurrentReport(createdReport);
+      setReports([createdReport, ...reports]);
+      
+      // Efectos de éxito
+      triggerSuccessEffect();
+      
+      toast({
+        title: "🚀 Corte de Caja Iniciado",
+        description: `Sistema activado para ${today.toLocaleDateString()} con balance inicial de $${formatCurrency(openingBalance)}`,
+      });
+    } catch (error) {
+      console.error("Error creating report:", error);
+      toast({
+        variant: "destructive",
+        title: "❌ Error del Sistema",
+        description: "No se pudo inicializar el corte de caja. Verifique su conexión."
+      });
+    }
+  };
+
+  // Calcular métricas avanzadas
+  const calculateAdvancedMetrics = (report: DailyCashReport): AdvancedMetrics => {
+    const totalTransactions = report.movements.length;
+    const totalIncome = report.cashSales + report.creditCardSales + report.digitalPayments;
+    const totalExpenses = report.expenses + report.cashExits + report.taxes;
+    
+    // Calculate hours elapsed, defaulting to 8 hours if shiftStart is not available
+    const hoursElapsed = (() => {
+      if (!report.shiftStart) return 8;
+      
+      try {
+        const startDate = report.shiftStart instanceof Date 
+          ? report.shiftStart 
+          : new Date(report.shiftStart);
+        
+        if (isNaN(startDate.getTime())) return 8;
+        
+        return (new Date().getTime() - startDate.getTime()) / 1000 / 60 / 60;
+      } catch (error) {
+        console.warn('Error calculating hours elapsed:', error);
+        return 8;
+      }
+    })();
+    
+    return {
+      efficiency: Math.min(95, 60 + (totalTransactions * 2)),
+      cashFlow: totalIncome - totalExpenses,
+      profitability: totalIncome > 0 ? ((report.totalProfit / totalIncome) * 100) : 0,
+      customerSatisfaction: 88 + Math.random() * 8,
+      operationalRisk: Math.max(5, 30 - (totalTransactions * 0.5)),
+      salesVelocity: totalTransactions / Math.max(1, hoursElapsed),
+      inventoryTurn: report.departmentSales.reduce((sum, dept) => sum + dept.transactions, 0) / departments.length,
+      avgTransactionTime: 2.5 - (totalTransactions * 0.01)
+    };
+  };
+
+  // Helper function to safely format numbers
+  const formatCurrency = (value: number | undefined | null): string => {
+    return (value || 0).toLocaleString();
+  };
+
+  // Helper function to get peak hour
+  const getCurrentPeakHour = (movements: CashMovement[]): string => {
+    if (movements.length === 0) return "No hay datos";
+    
+    const hourCounts = movements.reduce((acc, movement) => {
+      const hour = new Date(movement.timestamp).getHours();
+      acc[hour] = (acc[hour] || 0) + 1;
+      return acc;
+    }, {} as Record<number, number>);
+
+    const peakHour = Object.entries(hourCounts).reduce((a, b) => 
+      hourCounts[Number(a[0])] > hourCounts[Number(b[0])] ? a : b
+    )[0];
+
+    return `${peakHour}:00 - ${parseInt(peakHour) + 1}:00`;
+  };
+
+  // Estadísticas del día con métricas avanzadas
+  const dayStats = useMemo(() => {
+    if (!currentReport) return null;
+
+    // El totalSales ya incluye todas las ventas del POS, no necesitamos sumar cashPayments y cashEntries
+    const totalIncome = currentReport.totalSales + currentReport.cashEntries;
+    const totalOutflow = currentReport.cashExits + currentReport.cashReturns + currentReport.expenses;
+    const netFlow = totalIncome - totalOutflow;
+    const expectedBalance = currentReport.openingBalance + netFlow;
+    const updatedMetrics = calculateAdvancedMetrics(currentReport);
+
+    return {
+      totalIncome,
+      totalOutflow,
+      netFlow,
+      expectedBalance,
+      variance: currentReport.cashInBox - expectedBalance,
+      metrics: updatedMetrics,
+      totalTransactions: currentReport.movements.length,
+      avgTransactionValue: currentReport.totalSales / Math.max(1, currentReport.movements.length),
+      peakHour: getCurrentPeakHour(currentReport.movements),
+      efficiency: updatedMetrics.efficiency
+    };
+  }, [currentReport]);
+
+  return (
+    <SpectacularEffects
+      showSuccess={showSuccess}
+      showCelebration={showCelebration}
+      showLoading={showLoading}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
+        {/* Efectos de fondo animados mejorados */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl animate-spin" style={{ animationDuration: '20s' }}></div>
+          
+          {/* Nuevos efectos de partículas */}
+          <div className="absolute top-10 left-10 w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
+          <div className="absolute top-20 right-20 w-1 h-1 bg-purple-500 rounded-full animate-ping delay-500"></div>
+          <div className="absolute bottom-20 left-20 w-3 h-3 bg-indigo-500 rounded-full animate-ping delay-1000"></div>
+        </div>
+
+        <div className="relative z-10 p-8 space-y-8">
+        {/* Header futurista */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center space-x-3 bg-white/80 backdrop-blur-lg rounded-full px-8 py-4 shadow-2xl border border-white/50">
+            <div className="flex items-center space-x-2">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-800">
+                  {currentTime.toLocaleTimeString('es-ES')}
+                </p>
+                <p className="text-xs text-gray-600">
+                  {currentTime.toLocaleDateString('es-ES')}
+                </p>
+              </div>
+              <div className={`w-3 h-3 rounded-full ${currentReport?.status === 'open' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            </div>
+          </div>
+
+          {/* Controles principales */}
+          <div className="flex flex-wrap justify-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="date" className="text-sm font-medium">Fecha:</Label>
+              <Input
+                id="date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-40 bg-white/80 backdrop-blur-sm border-white/50"
+              />
+            </div>
+            {!currentReport ? (
+              <Button
+                onClick={() => setIsCreatingReport(true)}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-xl"
+              >
+                <Rocket className="h-4 w-4 mr-2" />
+                Iniciar Corte
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
+                  <PrinterIcon className="h-4 w-4 mr-2" />
+                  Imprimir
+                </Button>
+                <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+                <Button 
+                  onClick={forceSyncSales}
+                  variant="outline" 
+                  className="bg-green-100 hover:bg-green-200 border-green-300"
+                >
+                  🔄 Sincronizar
+                </Button>
+                <Button 
+                  onClick={diagnoseSalesSync}
+                  variant="outline" 
+                  className="bg-yellow-100 hover:bg-yellow-200 border-yellow-300"
+                >
+                  🔬 Diagnóstico
+                </Button>
+                <Button 
+                  onClick={syncReportWithDaySales}
+                  variant="outline" 
+                  className="bg-purple-100 hover:bg-purple-200 border-purple-300"
+                >
+                  ⚡ Sync Simple
+                </Button>
+                {currentReport.status === 'open' && (
+                  <Button variant="destructive">
+                    <Archive className="h-4 w-4 mr-2" />
+                    Cerrar Corte
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Estadísticas principales con animación */}
+        {currentReport && dayStats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+            <AnimatedStat
+              icon={<DollarSign />}
+              label="Ventas Totales"
+              value={`$${formatCurrency(currentReport.totalSales)}`}
+              change={12.5}
+              color="text-green-600"
+              gradient="from-green-500 to-emerald-600"
+              delay={0}
+            />
+            
+            <AnimatedStat
+              icon={<Banknote />}
+              label="Dinero en Caja"
+              value={`$${formatCurrency(currentReport.cashInBox)}`}
+              change={8.3}
+              color="text-blue-600"
+              gradient="from-blue-500 to-cyan-600"
+              delay={200}
+            />
+            
+            <AnimatedStat
+              icon={<TrendingUp />}
+              label="Ganancias"
+              value={`$${formatCurrency(currentReport.totalProfit)}`}
+              change={15.2}
+              color="text-purple-600"
+              gradient="from-purple-500 to-violet-600"
+              delay={400}
+            />
+            
+            <AnimatedStat
+              icon={<Activity />}
+              label="Eficiencia"
+              value={`${dayStats.metrics.efficiency.toFixed(1)}%`}
+              change={5.1}
+              color="text-orange-600"
+              gradient="from-orange-500 to-amber-600"
+              delay={600}
+            />
+            
+            <AnimatedStat
+              icon={<Zap />}
+              label="Transacciones"
+              value={dayStats.totalTransactions}
+              change={22.1}
+              color="text-pink-600"
+              gradient="from-pink-500 to-rose-600"
+              delay={800}
+            />
+            
+            <AnimatedStat
+              icon={<Target />}
+              label="Ticket Promedio"
+              value={`$${dayStats.avgTransactionValue.toFixed(0)}`}
+              change={-3.2}
+              color="text-indigo-600"
+              gradient="from-indigo-500 to-blue-600"
+              delay={1000}
+            />
+          </div>
+        )}
+
+        {/* Panel principal con tabs mejoradas */}
+        {currentReport && (
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 overflow-hidden">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="bg-gradient-to-r from-slate-100 to-blue-100 p-1">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-transparent gap-1">
+                  <TabsTrigger 
+                    value="dashboard" 
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-lg rounded-xl transition-all duration-300"
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="analytics" 
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-lg rounded-xl transition-all duration-300"
+                  >
+                    <PieChart className="h-4 w-4 mr-2" />
+                    Análisis
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="movements" 
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-lg rounded-xl transition-all duration-300"
+                  >
+                    <ArrowUpCircle className="h-4 w-4 mr-2" />
+                    Movimientos
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="departments" 
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-lg rounded-xl transition-all duration-300"
+                  >
+                    <Building className="h-4 w-4 mr-2" />
+                    Departamentos
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="alerts" 
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-lg rounded-xl transition-all duration-300"
+                  >
+                    <Bell className="h-4 w-4 mr-2" />
+                    Alertas
+                    {currentReport.alerts.filter(a => !a.resolved).length > 0 && (
+                      <Badge className="ml-2 bg-red-500 text-white text-xs">
+                        {currentReport.alerts.filter(a => !a.resolved).length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              {/* Dashboard Tab */}
+              <TabsContent value="dashboard" className="p-8 space-y-8">
+                {/* Métricas circulares */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
+                  <AnimatedCircularProgress
+                    percentage={dayStats!.metrics.efficiency}
+                    label="Eficiencia Operacional"
+                    color="text-green-500"
+                  />
+                  <AnimatedCircularProgress
+                    percentage={dayStats!.metrics.profitability}
+                    label="Rentabilidad"
+                    color="text-blue-500"
+                  />
+                  <AnimatedCircularProgress
+                    percentage={dayStats!.metrics.customerSatisfaction}
+                    label="Satisfacción Cliente"
+                    color="text-purple-500"
+                  />
+                  <AnimatedCircularProgress
+                    percentage={100 - dayStats!.metrics.operationalRisk}
+                    label="Seguridad Operacional"
+                    color="text-orange-500"
+                  />
+                  <AnimatedCircularProgress
+                    percentage={Math.min(100, dayStats!.metrics.salesVelocity * 10)}
+                    label="Velocidad de Ventas"
+                    color="text-pink-500"
+                  />
+                  <AnimatedCircularProgress
+                    percentage={Math.min(100, dayStats!.metrics.inventoryTurn * 5)}
+                    label="Rotación Inventario"
+                    color="text-indigo-500"
+                  />
+                </div>
+
+                {/* Paneles informativos mejorados */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Panel de flujo de efectivo */}
+                  <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 shadow-xl">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-3">
+                        <div className="p-3 bg-green-500 rounded-full">
+                          <Banknote className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <span className="text-green-800">Control de Efectivo</span>
+                          <p className="text-sm text-green-600 font-normal">Monitoreo en tiempo real</p>
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center p-3 bg-white/50 rounded-xl">
+                          <span className="font-medium text-green-700">Balance Inicial:</span>
+                          <span className="font-bold text-green-800">${formatCurrency(currentReport.openingBalance)}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-white/50 rounded-xl">
+                          <span className="font-medium text-green-700">Entradas Totales:</span>
+                          <span className="font-bold text-green-800">+${formatCurrency(dayStats!.totalIncome)}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-white/50 rounded-xl">
+                          <span className="font-medium text-red-700">Salidas Totales:</span>
+                          <span className="font-bold text-red-800">-${formatCurrency(dayStats!.totalOutflow)}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl text-white">
+                          <span className="font-semibold">Balance Actual:</span>
+                          <span className="font-bold text-xl">${formatCurrency(currentReport.cashInBox)}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-6">
+                        <div className="flex justify-between text-sm text-green-700 mb-2">
+                          <span>Progreso del día</span>
+                          <span>{((dayStats!.totalIncome / Math.max(1, currentReport.openingBalance)) * 100).toFixed(1)}%</span>
+                        </div>
+                        <Progress 
+                          value={Math.min(100, (dayStats!.totalIncome / Math.max(1, currentReport.openingBalance)) * 100)} 
+                          className="h-3 bg-green-200"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Panel de métodos de pago */}
+                  <Card className="bg-gradient-to-br from-blue-50 to-cyan-100 border-blue-200 shadow-xl">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-3">
+                        <div className="p-3 bg-blue-500 rounded-full">
+                          <CreditCard className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <span className="text-blue-800">Métodos de Pago</span>
+                          <p className="text-sm text-blue-600 font-normal">Distribución de ventas</p>
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center p-3 bg-white/50 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <span className="font-medium text-blue-700">Efectivo:</span>
+                          </div>
+                          <span className="font-bold text-blue-800">${formatCurrency(currentReport.cashSales)}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-white/50 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                            <span className="font-medium text-blue-700">Tarjeta:</span>
+                          </div>
+                          <span className="font-bold text-blue-800">${formatCurrency(currentReport.creditCardSales)}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-white/50 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                            <span className="font-medium text-blue-700">Crédito:</span>
+                          </div>
+                          <span className="font-bold text-blue-800">${formatCurrency(currentReport.creditSales)}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-white/50 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                            <span className="font-medium text-blue-700">Digital:</span>
+                          </div>
+                          <span className="font-bold text-blue-800">${formatCurrency(currentReport.digitalPayments)}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-blue-200">
+                        <div className="flex justify-between items-center text-blue-800">
+                          <span className="font-semibold">Total Ventas:</span>
+                          <span className="font-bold text-xl">${formatCurrency(currentReport.totalSales)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              {/* Analytics Tab */}
+              <TabsContent value="analytics" className="p-8">
+                {currentReport && dayStats && (
+                  <AdvancedCharts 
+                    salesData={[
+                      { label: 'Hoy', value: currentReport.totalSales, color: 'bg-blue-500', trend: 12.5 },
+                      { label: 'Ayer', value: currentReport.totalSales * 0.8, color: 'bg-gray-400', trend: -5.2 },
+                      { label: 'Promedio', value: currentReport.totalSales * 0.9, color: 'bg-green-500', trend: 8.1 }
+                    ]}
+                    departmentData={currentReport.departmentSales.map((dept, index) => ({
+                      label: dept.department,
+                      value: dept.totalSales,
+                      color: [
+                        'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500',
+                        'bg-red-500', 'bg-indigo-500', 'bg-pink-500', 'bg-teal-500'
+                      ][index % 8],
+                      trend: Math.random() * 20 - 10
+                    }))}
+                    hourlyData={Array.from({ length: 12 }, (_, i) => ({
+                      label: `${i + 8}:00`,
+                      value: Math.floor(Math.random() * 5000),
+                      color: 'bg-blue-500',
+                      trend: Math.random() * 15 - 5
+                    }))}
+                    paymentMethods={[
+                      { label: 'Efectivo', value: currentReport.cashSales, color: 'bg-green-500' },
+                      { label: 'Tarjeta', value: currentReport.creditCardSales, color: 'bg-blue-500' },
+                      { label: 'Crédito', value: currentReport.creditSales, color: 'bg-purple-500' },
+                      { label: 'Digital', value: currentReport.digitalPayments, color: 'bg-yellow-500' }
+                    ]}
+                  />
+                )}
+              </TabsContent>
+
+              {/* Movements Tab */}
+              <TabsContent value="movements" className="p-8">
+                {/* Controles de filtro */}
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Filter className="h-5 w-5" />
+                      Filtros de Ventas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-4 items-end">
+                      <div className="flex-1 min-w-48">
+                        <Label htmlFor="filter-type">Filtrar por:</Label>
+                        <Select
+                          value={salesFilter}
+                          onValueChange={(value: 'all' | 'today' | 'date') => {
+                            setSalesFilter(value);
+                            if (value === 'all') {
+                              fetchDaySales();
+                            } else if (value === 'today') {
+                              fetchDaySales(new Date());
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar filtro" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todas las ventas</SelectItem>
+                            <SelectItem value="today">Solo hoy</SelectItem>
+                            <SelectItem value="date">Fecha específica</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {salesFilter === 'date' && (
+                        <div className="flex-1 min-w-48">
+                          <Label htmlFor="specific-date">Fecha:</Label>
+                          <Input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              setSelectedDate(newDate);
+                              if (newDate) {
+                                fetchDaySales(new Date(newDate));
+                              }
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={() => {
+                          if (salesFilter === 'all') {
+                            fetchDaySales();
+                          } else if (salesFilter === 'today') {
+                            fetchDaySales(new Date());
+                          } else if (salesFilter === 'date' && selectedDate) {
+                            fetchDaySales(new Date(selectedDate));
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700"
+                        disabled={loadingSales}
+                      >
+                        {loadingSales ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Cargando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Actualizar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                  {/* Resumen de movimientos */}
+                  <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-0 shadow-xl">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-blue-700">
+                        <ArrowUpCircle className="h-5 w-5" />
+                        Total Ventas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-blue-800">{daySales.length}</p>
+                        <p className="text-sm text-blue-600">Transacciones</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-0 shadow-xl">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-green-700">
+                        <DollarSign className="h-5 w-5" />
+                        Total Facturado
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-green-800">
+                          ${daySales.reduce((sum, sale) => sum + sale.total, 0).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-green-600">Todas las ventas</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-0 shadow-xl">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-purple-700">
+                        <Calculator className="h-5 w-5" />
+                        Ticket Promedio
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-purple-800">
+                          ${daySales.length > 0 ? Math.round(daySales.reduce((sum, sale) => sum + sale.total, 0) / daySales.length).toLocaleString() : '0'}
+                        </p>
+                        <p className="text-sm text-purple-600">Por venta</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Lista de ventas */}
+                <Card className="bg-white/90 backdrop-blur-xl shadow-2xl border-0">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xl">
+                        <Receipt className="h-6 w-6 text-blue-600" />
+                        Todas las Ventas del Sistema
+                        {loadingSales && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
+                        <Badge variant="outline" className="ml-2 bg-green-100 text-green-700">
+                          {daySales.length} ventas encontradas
+                        </Badge>
+                      </CardTitle>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => {
+                            console.log('🔍 Debug: Fecha seleccionada:', selectedDate);
+                            console.log('🔍 Debug: Fecha convertida:', new Date(selectedDate));
+                            fetchDaySales(new Date(selectedDate));
+                          }}
+                          variant="outline"
+                          size="sm"
+                          disabled={loadingSales}
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-2 ${loadingSales ? 'animate-spin' : ''}`} />
+                          Actualizar
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingSales ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      </div>
+                    ) : daySales.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Receipt className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                        <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay ventas en el sistema</h3>
+                        <p className="text-gray-500">Todas las ventas registradas aparecerán aquí</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {daySales.map((sale) => {
+                          const isExpanded = expandedSales[sale.id] || false;
+                          
+                          const toggleExpanded = () => {
+                            setExpandedSales(prev => ({
+                              ...prev,
+                              [sale.id]: !prev[sale.id]
+                            }));
+                          };
+                          
+                          return (
+                            <div key={sale.id} className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-100 hover:shadow-lg transition-all duration-300">
+                              {/* Header de la venta */}
+                              <div className="flex items-center justify-between p-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                                      {sale.saleNumber}
+                                    </Badge>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={
+                                        sale.paymentMethod === 'cash' ? 'bg-green-100 text-green-700 border-green-300' :
+                                        sale.paymentMethod === 'card' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                        sale.paymentMethod === 'transfer' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                        sale.paymentMethod === 'credit' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                        'bg-gray-100 text-gray-700 border-gray-300'
+                                      }
+                                    >
+                                      {sale.paymentMethod === 'cash' ? '💵 Efectivo' :
+                                       sale.paymentMethod === 'card' ? '💳 Tarjeta' :
+                                       sale.paymentMethod === 'transfer' ? '🏦 Transferencia' :
+                                       sale.paymentMethod === 'credit' ? '⏰ Crédito' : '🔄 Mixto'}
+                                    </Badge>
+                                    <span className="text-sm text-gray-500">
+                                      {sale.timestamp.toLocaleDateString('es-ES')} {sale.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <p className="font-semibold text-gray-800">{sale.customer?.name || 'Cliente'}</p>
+                                      <p className="text-sm text-gray-600">
+                                        {sale.items?.length || 0} producto(s)
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-gray-600">Cajero:</p>
+                                      <p className="font-medium text-gray-800">{sale.cashier || 'N/A'}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-3">
+                                  <div className="text-right">
+                                    <p className="text-2xl font-bold text-green-600">
+                                      ${sale.total.toLocaleString()}
+                                    </p>
+                                    <Badge variant={sale.status === 'completed' ? 'default' : 'secondary'} className="mt-1">
+                                      {sale.status === 'completed' ? '✅ Completada' :
+                                       sale.status === 'pending' ? '⏳ Pendiente' :
+                                       sale.status === 'cancelled' ? '❌ Cancelada' : '🔄 Reembolsada'}
+                                    </Badge>
+                                  </div>
+                                  
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={toggleExpanded}
+                                    className="ml-2"
+                                  >
+                                    {isExpanded ? (
+                                      <>
+                                        <ChevronUp className="h-4 w-4 mr-1" />
+                                        Ocultar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Eye className="h-4 w-4 mr-1" />
+                                        Ver productos
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Detalles expandibles de productos */}
+                              {isExpanded && (
+                                <div className="border-t border-blue-200 bg-white/50 p-4">
+                                  <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                    <Package className="h-4 w-4" />
+                                    Productos vendidos:
+                                  </h4>
+                                  
+                                  {sale.items && sale.items.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {sale.items.map((item, index) => (
+                                        <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                                          <div className="flex-1">
+                                            <p className="font-medium text-gray-800">
+                                              {item.product?.name || 'Producto sin nombre'}
+                                            </p>
+                                            <p className="text-sm text-gray-600">
+                                              Cantidad: {item.quantity} x ${item.product?.price?.toLocaleString() || '0'}
+                                            </p>
+                                            {(item as any).discount > 0 && (
+                                              <p className="text-sm text-orange-600">
+                                                Descuento: -{(item as any).discount}%
+                                              </p>
+                                            )}
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="font-bold text-gray-800">
+                                              ${item.subtotal?.toLocaleString() || '0'}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      
+                                      {/* Resumen de totales */}
+                                      <div className="border-t border-gray-200 pt-3 mt-3">
+                                        <div className="space-y-1 text-sm">
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Subtotal:</span>
+                                            <span>${(sale.subtotal || 0).toLocaleString()}</span>
+                                          </div>
+                                          {(sale.discounts || 0) > 0 && (
+                                            <div className="flex justify-between text-orange-600">
+                                              <span>Descuentos:</span>
+                                              <span>-${(sale.discounts || 0).toLocaleString()}</span>
+                                            </div>
+                                          )}
+                                          {(sale.tax || 0) > 0 && (
+                                            <div className="flex justify-between">
+                                              <span className="text-gray-600">IVA:</span>
+                                              <span>${(sale.tax || 0).toLocaleString()}</span>
+                                            </div>
+                                          )}
+                                          <div className="flex justify-between font-bold text-lg border-t border-gray-300 pt-2">
+                                            <span>Total:</span>
+                                            <span className="text-green-600">${sale.total.toLocaleString()}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-4 text-gray-500">
+                                      <Package className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                                      <p>No hay detalles de productos disponibles</p>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Información adicional */}
+                                  <div className="mt-4 pt-4 border-t border-gray-200">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                      <div>
+                                        <p className="text-gray-600">Cliente:</p>
+                                        <p className="font-medium">{sale.customer?.name || 'N/A'}</p>
+                                        {sale.customer?.phone && (
+                                          <p className="text-gray-500">📞 {sale.customer.phone}</p>
+                                        )}
+                                        {sale.customer?.email && (
+                                          <p className="text-gray-500">📧 {sale.customer.email}</p>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <p className="text-gray-600">Modo POS:</p>
+                                        <p className="font-medium">{sale.mode || 'N/A'}</p>
+                                        <p className="text-gray-600 mt-2">Estado:</p>
+                                        <p className="font-medium">{sale.status || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-gray-600">Vendedor:</p>
+                                        <p className="font-medium">{sale.cashier || 'N/A'}</p>
+                                        {sale.notes && (
+                                          <>
+                                            <p className="text-gray-600 mt-2">Notas:</p>
+                                            <p className="text-gray-500 text-xs">{sale.notes}</p>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Movimientos de Efectivo y Ventas */}
+                <Card className="bg-white/90 backdrop-blur-xl shadow-2xl border-0 mt-6">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xl">
+                        <ArrowUpCircle className="h-6 w-6 text-purple-600" />
+                        Historial de Movimientos
+                        <Badge variant="outline" className="ml-2 bg-purple-100 text-purple-700">
+                          {(currentReport.movements.length + daySales.length)} registros
+                        </Badge>
+                      </CardTitle>
+                      <Button
+                        onClick={() => {
+                          if (salesFilter === 'all') {
+                            fetchDaySales();
+                          } else if (salesFilter === 'today') {
+                            fetchDaySales(new Date());
+                          } else if (salesFilter === 'date' && selectedDate) {
+                            fetchDaySales(new Date(selectedDate));
+                          }
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                        disabled={loadingSales}
+                      >
+                        {loadingSales ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Actualizar
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {(currentReport.movements.length === 0 && daySales.length === 0) ? (
+                      <div className="text-center py-12">
+                        <ArrowUpCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                        <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay movimientos registrados para hoy</h3>
+                        <p className="text-gray-500">Las ventas y movimientos de caja aparecerán aquí automáticamente</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {/* Combinar movimientos de efectivo y ventas */}
+                        {[
+                          // Movimientos de efectivo tradicionales
+                          ...currentReport.movements.map(movement => ({
+                            type: 'movement' as const,
+                            data: movement,
+                            timestamp: movement.timestamp,
+                            id: movement.id
+                          })),
+                          // Ventas del POS como movimientos
+                          ...daySales.map(sale => ({
+                            type: 'sale' as const,
+                            data: sale,
+                            timestamp: sale.timestamp,
+                            id: `sale_${sale.id}`
+                          }))
+                        ]
+                          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                          .map((item) => {
+                            if (item.type === 'movement') {
+                              const movement = item.data as CashMovement;
+                              return (
+                                <div key={movement.id} className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-100 hover:shadow-lg transition-all duration-300 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <Badge 
+                                          variant="outline" 
+                                          className={
+                                            movement.type === 'sale_cash' ? 'bg-green-100 text-green-700 border-green-300' :
+                                            movement.type === 'entry' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                            movement.type === 'exit' ? 'bg-red-100 text-red-700 border-red-300' :
+                                            movement.type === 'return_cash' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                            'bg-gray-100 text-gray-700 border-gray-300'
+                                          }
+                                        >
+                                          {movement.type === 'sale_cash' ? '💰 Venta Efectivo' :
+                                           movement.type === 'entry' ? '⬆️ Entrada' :
+                                           movement.type === 'exit' ? '⬇️ Salida' :
+                                           movement.type === 'return_cash' ? '↩️ Devolución' :
+                                           movement.type === 'payment_cash' ? '💳 Pago Efectivo' :
+                                           movement.type === 'expense' ? '💸 Gasto' :
+                                           movement.type === 'vault_deposit' ? '🏦 Depósito' :
+                                           movement.type === 'bank_transfer' ? '🏧 Transferencia' :
+                                           movement.type === 'tip' ? '💰 Propina' :
+                                           movement.type === 'bonus' ? '🎁 Bono' :
+                                           '📝 ' + movement.type}
+                                        </Badge>
+                                        <span className="text-sm text-gray-500">
+                                          {new Date(movement.timestamp).toLocaleDateString('es-ES')} {new Date(movement.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        {movement.urgent && (
+                                          <Badge className="bg-red-500 text-white">
+                                            ⚡ Urgente
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <p className="font-semibold text-gray-800">{movement.description}</p>
+                                          {movement.reference && (
+                                            <p className="text-sm text-gray-600">
+                                              Ref: {movement.reference}
+                                            </p>
+                                          )}
+                                          {movement.category && (
+                                            <p className="text-sm text-gray-600">
+                                              Categoría: {movement.category}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <p className="text-sm text-gray-600">Usuario:</p>
+                                          <p className="font-medium text-gray-800">{movement.userId || 'Sistema'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="text-right">
+                                      <p className={`text-2xl font-bold ${
+                                        movement.type === 'sale_cash' || movement.type === 'entry' ? 'text-green-600' : 
+                                        movement.type === 'exit' || movement.type === 'expense' ? 'text-red-600' : 
+                                        'text-gray-600'
+                                      }`}>
+                                        {movement.type === 'sale_cash' || movement.type === 'entry' ? '+' : 
+                                         movement.type === 'exit' || movement.type === 'expense' ? '-' : ''}
+                                        ${movement.amount.toLocaleString()}
+                                      </p>
+                                      {movement.approved !== undefined && (
+                                        <Badge variant={movement.approved ? 'default' : 'destructive'} className="mt-1">
+                                          {movement.approved ? '✅ Aprobado' : '❌ Pendiente'}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              // Ventas del POS
+                              const sale = item.data as POSSale;
+                              const isExpanded = expandedSales[sale.id] || false;
+                              const toggleExpanded = () => {
+                                setExpandedSales(prev => ({
+                                  ...prev,
+                                  [sale.id]: !prev[sale.id]
+                                }));
+                              };
+
+                              return (
+                                <div key={sale.id} className="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl border border-blue-200 hover:shadow-lg transition-all duration-300 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                                          {sale.saleNumber}
+                                        </Badge>
+                                        <Badge 
+                                          variant="outline" 
+                                          className={
+                                            sale.paymentMethod === 'cash' ? 'bg-green-100 text-green-700 border-green-300' :
+                                            sale.paymentMethod === 'card' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                            sale.paymentMethod === 'transfer' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                            sale.paymentMethod === 'credit' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                            'bg-gray-100 text-gray-700 border-gray-300'
+                                          }
+                                        >
+                                          {sale.paymentMethod === 'cash' ? '💵 Efectivo' :
+                                           sale.paymentMethod === 'card' ? '💳 Tarjeta' :
+                                           sale.paymentMethod === 'transfer' ? '🏦 Transferencia' :
+                                           sale.paymentMethod === 'credit' ? '⏰ Crédito' : '🔄 Mixto'}
+                                        </Badge>
+                                        <span className="text-sm text-gray-500">
+                                          {sale.timestamp.toLocaleDateString('es-ES')} {sale.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <p className="font-semibold text-gray-800">{sale.customer?.name || 'Cliente'}</p>
+                                          <p className="text-sm text-gray-600">
+                                            {sale.items?.length || 0} producto(s)
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-sm text-gray-600">Cajero:</p>
+                                          <p className="font-medium text-gray-800">{sale.cashier || 'N/A'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-3">
+                                      <div className="text-right">
+                                        <p className="text-2xl font-bold text-green-600">
+                                          ${sale.total.toLocaleString()}
+                                        </p>
+                                        <Badge variant={sale.status === 'completed' ? 'default' : 'secondary'} className="mt-1">
+                                          {sale.status === 'completed' ? '✅ Completada' :
+                                           sale.status === 'pending' ? '⏳ Pendiente' :
+                                           sale.status === 'cancelled' ? '❌ Cancelada' : '🔄 Reembolsada'}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={toggleExpanded}
+                                        className="ml-2"
+                                      >
+                                        {isExpanded ? (
+                                          <>
+                                            <ChevronUp className="h-4 w-4 mr-1" />
+                                            Ocultar
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Eye className="h-4 w-4 mr-1" />
+                                            Ver productos
+                                          </>
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {/* Detalles expandibles de productos */}
+                                  {isExpanded && (
+                                    <div className="border-t border-blue-200 bg-white/50 p-4 mt-4">
+                                      <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                        <Package className="h-4 w-4" />
+                                        Productos vendidos:
+                                      </h4>
+                                      
+                                      {sale.items && sale.items.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {sale.items.map((item, index) => (
+                                            <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                                              <div className="flex-1">
+                                                <p className="font-medium text-gray-800">
+                                                  {item.product?.name || 'Producto sin nombre'}
+                                                </p>
+                                                <p className="text-sm text-gray-600">
+                                                  Cantidad: {item.quantity} x ${item.product?.price?.toLocaleString() || '0'}
+                                                </p>
+                                              </div>
+                                              <div className="text-right">
+                                                <p className="font-bold text-gray-800">
+                                                  ${item.subtotal?.toLocaleString() || '0'}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="text-center py-4 text-gray-500">
+                                          <Package className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                                          <p>No hay detalles de productos disponibles</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                          })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Departments Tab */}
+              <TabsContent value="departments" className="p-8">
+                <div className="text-center py-16">
+                  <Building className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-2xl font-bold text-gray-700 mb-2">Análisis por Departamento</h3>
+                  <p className="text-gray-600">Métricas detalladas y performance por categoría...</p>
+                </div>
+              </TabsContent>
+
+              {/* Alerts Tab */}
+              <TabsContent value="alerts" className="p-8">
+                <div className="text-center py-16">
+                  <Bell className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-2xl font-bold text-gray-700 mb-2">Sistema de Alertas</h3>
+                  <p className="text-gray-600">Notificaciones inteligentes y monitoreo automático...</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+
+        {/* Modal para crear nuevo corte */}
+        <AlertDialog open={isCreatingReport} onOpenChange={setIsCreatingReport}>
+          <AlertDialogContent className="bg-white/95 backdrop-blur-xl border border-white/50">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-3 text-2xl">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full">
+                  <Rocket className="h-6 w-6 text-white" />
+                </div>
+                Inicializar Sistema de Caja
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-600">
+                Configure el balance inicial para activar el sistema de corte de caja del día {new Date(selectedDate).toLocaleDateString('es-ES')}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-6">
+              <Label htmlFor="opening-balance" className="text-base font-medium">Balance Inicial ($)</Label>
+              <Input
+                id="opening-balance"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className="mt-2 text-lg h-12 bg-white/80 border-gray-300"
+                onChange={(e) => {
+                  const balance = parseFloat(e.target.value) || 0;
+                  e.target.setAttribute('data-balance', balance.toString());
+                }}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  const input = document.getElementById('opening-balance') as HTMLInputElement;
+                  const balance = parseFloat(input.getAttribute('data-balance') || '0') || 0;
+                  createNewReport(balance);
+                  setIsCreatingReport(false);
+                }}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              >
+                <Rocket className="h-4 w-4 mr-2" />
+                Activar Sistema
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Mensaje cuando no hay corte activo */}
+        {!currentReport && !isCreatingReport && (
+          <div className="text-center py-16">
+            <Card className="max-w-2xl mx-auto bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl">
+              <CardContent className="py-16">
+                <div className="space-y-6">
+                  <div className="relative inline-block">
+                    <Calculator className="h-24 w-24 mx-auto text-gray-300" />
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                      <AlertCircle className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-bold text-gray-700 mb-4">Sistema en Standby</h3>
+                    <p className="text-gray-600 text-lg mb-8">
+                      No hay un corte de caja activo para el día {new Date(selectedDate).toLocaleDateString('es-ES')}. 
+                      Active el sistema para comenzar a operar.
+                    </p>
+                    <Button
+                      onClick={() => setIsCreatingReport(true)}
+                      size="lg"
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-xl transform hover:scale-105 transition-all duration-300"
+                    >
+                      <Rocket className="h-5 w-5 mr-3" />
+                      Activar Sistema de Caja
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        </div>
+      </div>
+    </SpectacularEffects>
+  );
+};
+
+export default CashRegisterSystem;

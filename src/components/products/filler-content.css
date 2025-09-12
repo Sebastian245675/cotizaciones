@@ -1,0 +1,390 @@
+/* Estilos avanzados para el contenido de relleno */
+:root {
+  --filler-primary: #1e3a8a;
+  --filler-secondary: #3b82f6;
+  --filler-accent: #f59e0b;
+  --filler-background: rgba(248, 250, 252, 0.8);
+  --filler-text-dark: #334155;
+  --filler-text-light: #64748b;
+  --filler-border-radius: 0.75rem;
+  --filler-shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+  --filler-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --filler-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+
+/* Contenedor principal con efecto de glassmorphism */
+.filler-content-container {
+  margin-top: 2rem;
+  padding: 2rem;
+  border-radius: var(--filler-border-radius);
+  background-color: var(--filler-background);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--filler-shadow-sm);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Efecto de fondo con gradiente animado */
+.filler-content-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(245, 158, 11, 0.05), rgba(99, 102, 241, 0.05));
+  background-size: 400% 400%;
+  animation: gradientBackground 15s ease infinite;
+  z-index: -1;
+}
+
+@keyframes gradientBackground {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Elementos de contenido con efectos avanzados */
+.filler-item {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--filler-border-radius);
+}
+
+.filler-item:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--filler-shadow-lg);
+}
+
+/* Efecto de subrayado en hover */
+.filler-item:hover .filler-item-title::after {
+  width: 100%;
+  left: 0;
+}
+
+.filler-item-title {
+  position: relative;
+  display: inline-block;
+}
+
+.filler-item-title::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: -2px;
+  right: 0;
+  background-color: var(--filler-secondary);
+  transition: width 0.3s ease, left 0.3s ease;
+}
+
+/* Iconos con animaciones y estilos mejorados */
+.filler-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffffff, #f0f9ff);
+  box-shadow: var(--filler-shadow-sm);
+  transition: all 0.3s ease;
+  font-size: 1.25rem;
+}
+
+.filler-item:hover .filler-icon {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: var(--filler-shadow-md);
+}
+
+/* Botones con efectos avanzados */
+.filler-button {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+.filler-button::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: -100%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.4), rgba(255,255,255,0.1));
+  transition: left 0.5s ease;
+}
+
+.filler-button:hover::after {
+  left: 100%;
+}
+
+.filler-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--filler-shadow-md);
+}
+
+.filler-button:active {
+  transform: scale(0.98);
+}
+
+/* Animaciones para elementos */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.filler-animation-fade {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.filler-animation-scale {
+  animation: scaleIn 0.5s ease-out forwards;
+}
+
+.filler-animation-slide {
+  animation: slideInRight 0.7s ease-out forwards;
+}
+
+.filler-animation-delay-1 { animation-delay: 0.1s; }
+.filler-animation-delay-2 { animation-delay: 0.2s; }
+.filler-animation-delay-3 { animation-delay: 0.3s; }
+.filler-animation-delay-4 { animation-delay: 0.4s; }
+.filler-animation-delay-5 { animation-delay: 0.5s; }
+
+/* Títulos de sección con diseño mejorado */
+.filler-section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--filler-primary);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  position: relative;
+  display: inline-block;
+}
+
+.filler-section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 60px;
+  background: linear-gradient(90deg, var(--filler-secondary), var(--filler-accent));
+  border-radius: 3px;
+}
+
+/* Grid avanzado para contenido */
+.filler-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+/* Separadores estilizados */
+.filler-divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--filler-secondary), transparent);
+  margin: 2.5rem 0;
+  opacity: 0.7;
+}
+
+/* Tarjeta destacada con borde brillante */
+.filler-featured-card {
+  position: relative;
+  border-radius: var(--filler-border-radius);
+  overflow: hidden;
+}
+
+.filler-featured-card::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
+  background-size: 400% 400%;
+  z-index: -1;
+  border-radius: calc(var(--filler-border-radius) + 2px);
+  animation: borderGradient 3s ease alternate infinite;
+}
+
+@keyframes borderGradient {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+/* Tarjetas con diferentes estilos de fondos */
+.filler-card-blue {
+  background: linear-gradient(145deg, #f0f9ff, #dbeafe);
+  border: 1px solid #bfdbfe;
+}
+
+.filler-card-amber {
+  background: linear-gradient(145deg, #fffbeb, #fef3c7);
+  border: 1px solid #fde68a;
+}
+
+.filler-card-purple {
+  background: linear-gradient(145deg, #f5f3ff, #ede9fe);
+  border: 1px solid #ddd6fe;
+}
+
+.filler-card-green {
+  background: linear-gradient(145deg, #ecfdf5, #d1fae5);
+  border: 1px solid #a7f3d0;
+}
+
+.filler-card-rose {
+  background: linear-gradient(145deg, #fff1f2, #ffe4e6);
+  border: 1px solid #fecdd3;
+}
+
+/* Imagen decorativa con efecto paralaje */
+.filler-decorative-image {
+  overflow: hidden;
+  border-radius: var(--filler-border-radius);
+  transform: perspective(1000px);
+  transition: transform 0.3s ease;
+}
+
+.filler-decorative-image img {
+  transition: transform 0.5s ease;
+}
+
+.filler-decorative-image:hover img {
+  transform: scale(1.05);
+}
+
+/* Elementos para estadísticas */
+.filler-stat-counter {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--filler-primary), var(--filler-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+/* Burbujas de fondo animadas */
+.filler-background-bubbles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.filler-bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
+  animation: floatingBubble ease-in-out infinite;
+  opacity: 0.4;
+}
+
+@keyframes floatingBubble {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* Contenedor responsive para galería */
+.filler-gallery-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.filler-gallery-item {
+  overflow: hidden;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.filler-gallery-item:hover {
+  transform: scale(1.05);
+  z-index: 1;
+}
+
+/* Timeline de eventos */
+.filler-timeline {
+  position: relative;
+  margin: 2rem 0;
+  padding-left: 2rem;
+}
+
+.filler-timeline::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--filler-secondary), transparent);
+}
+
+.filler-timeline-item {
+  position: relative;
+  padding-bottom: 2rem;
+}
+
+.filler-timeline-dot {
+  position: absolute;
+  left: -2rem;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: white;
+  border: 3px solid var(--filler-secondary);
+}
+
+/* Input mejorado */
+.filler-input {
+  transition: all 0.3s ease;
+  border: 1px solid #e2e8f0;
+}
+
+.filler-input:focus {
+  border-color: var(--filler-secondary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+/* Tarjeta testimonial */
+.filler-testimonial {
+  position: relative;
+  padding: 1.5rem;
+  background-color: white;
+  border-radius: var(--filler-border-radius);
+  box-shadow: var(--filler-shadow-sm);
+}
+
+.filler-testimonial::before {
+  content: '"';
+  position: absolute;
+  top: -10px;
+  left: 15px;
+  font-size: 4rem;
+  font-family: serif;
+  color: rgba(59, 130, 246, 0.1);
+  line-height: 1;
+}

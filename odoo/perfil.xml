@@ -1,0 +1,374 @@
+<t name="Mi Portal" t-name="portal.portal_my_home">
+        <t t-call="portal.portal_layout">
+            <t t-set="my_details" t-value="True"/>
+            <!-- Obtener usuario - Variable corregida -->
+            <t t-set="user_id" t-value="request.env.user"/>
+            <!-- Importar fuente Poppins -->
+            <t t-set="head">
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&amp;display=swap"/>
+                <style>
+                    /* Estilos globales inline para garantizar compatibilidad */
+                    .o_portal_my_home * {
+                        font-family: 'Poppins', sans-serif;
+                    }
+                    .o_portal_my_home .card:hover {
+                        transform: translateY(-5px) !important;
+                        box-shadow: 0 15px 35px rgba(0,0,0,0.08) !important;
+                        transition: all 0.3s ease;
+                    }
+                    .o_portal_my_home .btn:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                        transition: all 0.3s ease;
+                    }
+                </style>
+            </t>
+            <div class="o_portal_my_home">
+                <!-- Header de bienvenida mejorado -->
+                <div class="py-5 mb-4" style="background: linear-gradient(135deg, #FFF6ED 0%, #FFF 100%); border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); position: relative; overflow: hidden;">
+                    <!-- Elementos decorativos de fondo -->
+                    <div style="position: absolute; top: -30px; right: -30px; width: 150px; height: 150px; border-radius: 50%; background-color: rgba(255,145,77,0.1); z-index: 0;"></div>
+                    <div style="position: absolute; bottom: -20px; left: -20px; width: 100px; height: 100px; border-radius: 50%; background-color: rgba(255,145,77,0.05); z-index: 0;"></div>
+                    
+                    <div class="container position-relative" style="z-index: 1;">
+                        <div class="row align-items-center">
+                            <div class="col-lg-3 col-md-4 text-center mb-4 mb-md-0">
+                                <div style="width: 130px; height: 130px; margin: 0 auto; border-radius: 50%; background: linear-gradient(45deg, #FF914D 0%, #FF7E33 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 2.8rem; font-weight: bold; box-shadow: 0 10px 25px rgba(255,145,77,0.3); border: 5px solid rgba(255,255,255,0.8);">
+                                    <t t-esc="user_id.name[:1].upper() if user_id else ''"/>
+                                </div>
+                            </div>
+                            <div class="col-lg-9 col-md-8 text-md-start text-center">
+                                <span style="background-color: rgba(255,145,77,0.1); color: #FF914D; padding: 6px 15px; border-radius: 50px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin-bottom: 10px;">
+                                    ÁREA PERSONAL
+                                </span>
+                                <h1 style="font-family: 'Poppins', sans-serif; font-weight: 700; color: #333; font-size: 2.2rem; margin-bottom: 10px;">
+                                    ¡Bienvenido, <span style="color: #FF914D; position: relative;"><t t-esc="user_id.name if user_id else ''"/>
+                                    <span style="position: absolute; bottom: -3px; left: 0; width: 100%; height: 4px; background-color: rgba(255,145,77,0.3); border-radius: 2px;"></span></span>!
+                                </h1>
+                                <p class="lead" style="font-family: 'Poppins', sans-serif; color: #555; font-size: 1.1rem; max-width: 550px; margin-left: auto; margin-right: auto; margin-bottom: 20px;">
+                                    Gestione sus pedidos, favoritos y configuración desde su panel personal.
+                                </p>
+                                <div class="d-flex flex-wrap justify-content-center justify-content-md-start gap-3 mt-3">
+                                    <a href="/shop" class="btn btn-primary" style="background: linear-gradient(to right, #FF914D, #FF7E33); border: none; border-radius: 50px; padding: 10px 25px; font-weight: 500; box-shadow: 0 5px 15px rgba(255,145,77,0.2);">
+                                        <i class="fa fa-shopping-bag me-2"></i> Explorar Tienda
+                                    </a>
+                                    <a href="/my/orders" class="btn btn-outline-secondary" style="border: 2px solid rgba(0,0,0,0.1); color: #555; border-radius: 50px; padding: 10px 25px; font-weight: 500;">
+                                        <i class="fa fa-list-alt me-2"></i> Mis Pedidos
+                                    </a>
+                                    <a href="/my/wishlist" class="btn" style="background-color: rgba(255,145,77,0.1); color: #FF914D; border: none; border-radius: 50px; padding: 10px 25px; font-weight: 500;">
+                                        <i class="fa fa-heart me-2"></i> Favoritos
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="oe_structure" id="oe_structure_portal_my_home_1"/>
+                
+                <!-- Panel de estadísticas rápidas mejorado -->
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100" style="border-radius: 16px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; overflow: hidden;">
+                            <div class="card-body d-flex align-items-center p-4">
+                                <div style="width: 70px; height: 70px; border-radius: 16px; background: linear-gradient(135deg, rgba(255,145,77,0.2) 0%, rgba(255,145,77,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 20px; position: relative;">
+                                    <i class="fa fa-shopping-cart" style="color: #FF914D; font-size: 28px;"></i>
+                                    <div style="position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; border-radius: 50%; background-color: #FF914D; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; box-shadow: 0 4px 8px rgba(255,145,77,0.3);">
+                                        <t t-esc="user_orders_count if user_orders_count else 0"/>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 style="font-family: 'Poppins', sans-serif; color: #333; font-weight: 700; font-size: 1.5rem; margin-bottom: 5px;">
+                                        Mis Pedidos
+                                    </h3>
+                                    <p style="margin-bottom: 0; color: #777; font-size: 0.9rem;">Gestione sus compras y seguimiento</p>
+                                </div>
+                            </div>
+                            <a href="/my/orders" class="stretched-link" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1;"></a>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100" style="border-radius: 16px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; overflow: hidden;">
+                            <div class="card-body d-flex align-items-center p-4">
+                                <div style="width: 70px; height: 70px; border-radius: 16px; background: linear-gradient(135deg, rgba(76,175,80,0.2) 0%, rgba(76,175,80,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 20px; position: relative;">
+                                    <i class="fa fa-heart" style="color: #4CAF50; font-size: 28px;"></i>
+                                    <div style="position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; border-radius: 50%; background-color: #4CAF50; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; box-shadow: 0 4px 8px rgba(76,175,80,0.3);">
+                                        <t t-esc="user_wishlists_count if user_wishlists_count else 0"/>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 style="font-family: 'Poppins', sans-serif; color: #333; font-weight: 700; font-size: 1.5rem; margin-bottom: 5px;">
+                                        Mis Favoritos
+                                    </h3>
+                                    <p style="margin-bottom: 0; color: #777; font-size: 0.9rem;">Productos guardados para después</p>
+                                </div>
+                            </div>
+                            <a href="/my/wishlist" class="stretched-link" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1;"></a>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100" style="border-radius: 16px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; overflow: hidden;">
+                            <div class="card-body d-flex align-items-center p-4">
+                                <div style="width: 70px; height: 70px; border-radius: 16px; background: linear-gradient(135deg, rgba(33,150,243,0.2) 0%, rgba(33,150,243,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 20px; position: relative;">
+                                    <i class="fa fa-truck" style="color: #2196F3; font-size: 28px;"></i>
+                                    <div style="position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; border-radius: 50%; background-color: #2196F3; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; box-shadow: 0 4px 8px rgba(33,150,243,0.3);">
+                                        <t t-esc="user_shipments_count if user_shipments_count else 0"/>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 style="font-family: 'Poppins', sans-serif; color: #333; font-weight: 700; font-size: 1.5rem; margin-bottom: 5px;">
+                                        Mis Envíos
+                                    </h3>
+                                    <p style="margin-bottom: 0; color: #777; font-size: 0.9rem;">Estado y seguimiento de paquetes</p>
+                                </div>
+                            </div>
+                            <a href="/my/shipment" class="stretched-link" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1;"></a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Secciones principales del portal - Diseño mejorado -->
+                <div class="o_portal_docs">
+                    <div class="d-flex align-items-center justify-content-between mb-4">
+                        <div class="d-flex align-items-center">
+                            <div style="width: 24px; height: 4px; background-color: #FF914D; border-radius: 2px; margin-right: 10px;"></div>
+                            <h2 style="font-family: 'Poppins', sans-serif; font-weight: 700; color: #333; margin: 0; font-size: 1.6rem;">
+                                Mi Panel Personal
+                            </h2>
+                        </div>
+                        <div>
+                            <span style="color: #777; font-size: 0.9rem;">Última actualización: <span style="font-weight: 500;">Hoy</span></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Categorías del Portal -->
+                    <div t-if="portal_alert_category_enable" class="o_portal_category row g-4 mt-0" id="portal_alert_category"/>
+                    <div t-if="portal_client_category_enable" class="o_portal_category row g-4 mt-0" id="portal_client_category"/>
+                    <div t-if="portal_service_category_enable" class="o_portal_category row g-4 mt-0" id="portal_service_category"/>
+                    <div t-if="portal_vendor_category_enable" class="o_portal_category row g-4 mt-0" id="portal_vendor_category"/>
+                    
+                    <!-- Tarjetas comunes rediseñadas -->
+                    <div class="o_portal_category row g-4 mt-2" id="portal_common_category">
+                        <!-- Perfil personal - Tarjeta mejorada -->
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100" style="border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all 0.3s ease; position: relative; overflow: hidden;">
+                                <!-- Elemento decorativo -->
+                                <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(255,145,77,0.1) 0%, rgba(255,145,77,0) 70%);"></div>
+                                
+                                <div class="card-body p-4">
+                                    <div class="d-flex align-items-center mb-4">
+                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, rgba(255,145,77,0.2) 0%, rgba(255,145,77,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                                            <i class="fa fa-user" style="color: #FF914D; font-size: 24px;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 style="margin: 0; font-family: 'Poppins', sans-serif; font-weight: 700; color: #333;">Perfil Personal</h5>
+                                            <span style="color: #777; font-size: 0.85rem;">Sus datos personales</span>
+                                        </div>
+                                    </div>
+                                    <ul style="list-style: none; padding: 0; margin: 0 0 20px 0;">
+                                        <li style="display: flex; align-items: center; margin-bottom: 10px; color: #555; font-size: 0.95rem;">
+                                            <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #FF914D; margin-right: 10px;"></div>
+                                            <span>Actualizar información personal</span>
+                                        </li>
+                                        <li style="display: flex; align-items: center; margin-bottom: 10px; color: #555; font-size: 0.95rem;">
+                                            <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #FF914D; margin-right: 10px;"></div>
+                                            <span>Preferencias de comunicación</span>
+                                        </li>
+                                    </ul>
+                                    <a href="/my/details" class="btn w-100 position-relative" style="background: linear-gradient(to right, #FF914D, #FF7E33); border: none; color: white; border-radius: 16px; padding: 12px; font-weight: 500; overflow: hidden;">
+                                        <span class="position-relative" style="z-index: 2;">Gestionar Perfil</span>
+                                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.1) 60%, rgba(255,255,255,0.1) 100%); transform: translateX(-100%); transition: transform 0.6s; z-index: 1;"></div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Conexión y seguridad - Tarjeta mejorada -->
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100" style="border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all 0.3s ease; position: relative; overflow: hidden;">
+                                <!-- Elemento decorativo -->
+                                <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(76,175,80,0.1) 0%, rgba(76,175,80,0) 70%);"></div>
+                                
+                                <div class="card-body p-4">
+                                    <div class="d-flex align-items-center mb-4">
+                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, rgba(76,175,80,0.2) 0%, rgba(76,175,80,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                                            <i class="fa fa-lock" style="color: #4CAF50; font-size: 24px;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 style="margin: 0; font-family: 'Poppins', sans-serif; font-weight: 700; color: #333;">Seguridad</h5>
+                                            <span style="color: #777; font-size: 0.85rem;">Protección de cuenta</span>
+                                        </div>
+                                    </div>
+                                    <ul style="list-style: none; padding: 0; margin: 0 0 20px 0;">
+                                        <li style="display: flex; align-items: center; margin-bottom: 10px; color: #555; font-size: 0.95rem;">
+                                            <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #4CAF50; margin-right: 10px;"></div>
+                                            <span>Cambiar contraseña</span>
+                                        </li>
+                                        <li style="display: flex; align-items: center; margin-bottom: 10px; color: #555; font-size: 0.95rem;">
+                                            <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #4CAF50; margin-right: 10px;"></div>
+                                            <span>Verificación en dos pasos</span>
+                                        </li>
+                                    </ul>
+                                    <a href="/my/security" class="btn w-100" style="background-color: rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.3); color: #4CAF50; border-radius: 16px; padding: 12px; font-weight: 500;">
+                                        <i class="fa fa-shield me-2"></i> Configurar Seguridad
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Pedidos - Tarjeta mejorada -->
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100" style="border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all 0.3s ease; position: relative; overflow: hidden;">
+                                <!-- Elemento decorativo -->
+                                <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(33,150,243,0.1) 0%, rgba(33,150,243,0) 70%);"></div>
+                                
+                                <div class="card-body p-4">
+                                    <div class="d-flex align-items-center mb-4">
+                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, rgba(33,150,243,0.2) 0%, rgba(33,150,243,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                                            <i class="fa fa-shopping-basket" style="color: #2196F3; font-size: 24px;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 style="margin: 0; font-family: 'Poppins', sans-serif; font-weight: 700; color: #333;">Mis Pedidos</h5>
+                                            <span style="color: #777; font-size: 0.85rem;">Historial de compras</span>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                                        <div style="text-align: center; padding: 10px; background-color: rgba(33,150,243,0.05); border-radius: 12px; flex: 1; margin-right: 10px;">
+                                            <div style="color: #2196F3; font-weight: 700; font-size: 1.2rem;">
+                                                <t t-esc="user_orders_count if user_orders_count else 0"/>
+                                            </div>
+                                            <div style="color: #777; font-size: 0.8rem;">Pedidos</div>
+                                        </div>
+                                        <div style="text-align: center; padding: 10px; background-color: rgba(33,150,243,0.05); border-radius: 12px; flex: 1;">
+                                            <div style="color: #2196F3; font-weight: 700; font-size: 1.2rem;">
+                                                <t t-esc="user_shipments_count if user_shipments_count else 0"/>
+                                            </div>
+                                            <div style="color: #777; font-size: 0.8rem;">Envíos</div>
+                                        </div>
+                                    </div>
+                                    <a href="/my/orders" class="btn w-100" style="background-color: rgba(33,150,243,0.1); border: 1px solid rgba(33,150,243,0.3); color: #2196F3; border-radius: 16px; padding: 12px; font-weight: 500;">
+                                        <i class="fa fa-history me-2"></i> Ver Historial
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Direcciones - Tarjeta mejorada -->
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100" style="border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all 0.3s ease; position: relative; overflow: hidden; background: linear-gradient(145deg, #fff, #fdfdfd);">
+                                <!-- Elemento decorativo -->
+                                <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(156,39,176,0.1) 0%, rgba(156,39,176,0) 70%);"></div>
+                                
+                                <div class="card-body p-4">
+                                    <div class="d-flex align-items-center mb-4">
+                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, rgba(156,39,176,0.2) 0%, rgba(156,39,176,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                                            <i class="fa fa-map-marker" style="color: #9C27B0; font-size: 24px;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 style="margin: 0; font-family: 'Poppins', sans-serif; font-weight: 700; color: #333;">Mis Direcciones</h5>
+                                            <span style="color: #777; font-size: 0.85rem;">Ubicaciones de envío</span>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3" style="background-color: rgba(156,39,176,0.05); border-radius: 12px; padding: 10px;">
+                                        <div style="font-weight: 600; color: #333; margin-bottom: 5px; font-size: 0.95rem;">Dirección Principal</div>
+                                        <div style="color: #777; font-size: 0.9rem;">
+                                            <i class="fa fa-home me-2" style="color: #9C27B0;"></i>
+                                            <t t-esc="user_id.partner_id.street if user_id and user_id.partner_id and user_id.partner_id.street else 'No configurada'"/>
+                                        </div>
+                                    </div>
+                                    <a href="/my/addresses" class="btn w-100" style="background-color: rgba(156,39,176,0.1); border: 1px solid rgba(156,39,176,0.3); color: #9C27B0; border-radius: 16px; padding: 12px; font-weight: 500;">
+                                        <i class="fa fa-edit me-2"></i> Editar Direcciones
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Favoritos - Tarjeta mejorada -->
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100" style="border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all 0.3s ease; position: relative; overflow: hidden; background: linear-gradient(145deg, #fff, #fdfdfd);">
+                                <!-- Elemento decorativo -->
+                                <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(233,30,99,0.1) 0%, rgba(233,30,99,0) 70%);"></div>
+                                
+                                <div class="card-body p-4">
+                                    <div class="d-flex align-items-center mb-4">
+                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, rgba(233,30,99,0.2) 0%, rgba(233,30,99,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                                            <i class="fa fa-heart" style="color: #E91E63; font-size: 24px;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 style="margin: 0; font-family: 'Poppins', sans-serif; font-weight: 700; color: #333;">Mis Favoritos</h5>
+                                            <span style="color: #777; font-size: 0.85rem;">Lista de deseos</span>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-center align-items-center mb-3" style="background-color: rgba(233,30,99,0.05); border-radius: 12px; padding: 15px;">
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 2.5rem; font-weight: 700; color: #E91E63;">
+                                                <t t-esc="user_wishlists_count if user_wishlists_count else 0"/>
+                                            </div>
+                                            <div style="color: #777; font-size: 0.9rem;">Productos guardados</div>
+                                        </div>
+                                    </div>
+                                    <a href="/my/wishlist" class="btn w-100" style="background-color: rgba(233,30,99,0.1); border: 1px solid rgba(233,30,99,0.3); color: #E91E63; border-radius: 16px; padding: 12px; font-weight: 500;">
+                                        <i class="fa fa-heart me-2"></i> Ver Favoritos
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Soporte técnico - Tarjeta mejorada -->
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100" style="border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.04); transition: all 0.3s ease; position: relative; overflow: hidden; background: linear-gradient(145deg, #fff, #fdfdfd);">
+                                <!-- Elemento decorativo -->
+                                <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, rgba(255,193,7,0.1) 0%, rgba(255,193,7,0) 70%);"></div>
+                                
+                                <div class="card-body p-4">
+                                    <div class="d-flex align-items-center mb-4">
+                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, rgba(255,193,7,0.2) 0%, rgba(255,193,7,0.1) 100%); display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                                            <i class="fa fa-life-ring" style="color: #FFC107; font-size: 24px;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 style="margin: 0; font-family: 'Poppins', sans-serif; font-weight: 700; color: #333;">Soporte Técnico</h5>
+                                            <span style="color: #777; font-size: 0.85rem;">Asistencia y ayuda</span>
+                                        </div>
+                                    </div>
+                                    <div style="background-color: rgba(255,193,7,0.05); border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+                                        <div style="font-weight: 600; color: #333; margin-bottom: 5px;">¿Necesitas ayuda?</div>
+                                        <div style="color: #777; font-size: 0.9rem;">
+                                            Nuestro equipo de soporte está disponible 24/7 para resolver todas tus consultas sobre productos y servicios.
+                                        </div>
+                                    </div>
+                                    <a href="/help" class="btn w-100" style="background-color: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); color: #FFC107; border-radius: 16px; padding: 12px; font-weight: 500;">
+                                        <i class="fa fa-headset me-2"></i> Contactar Soporte
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="o_portal_doc_spinner spinner-border text-o-color-2 align-self-center mt-5"/>
+                </div>
+                
+                <!-- Llamada a la acción mejorada -->
+                <div class="mt-5 p-5 position-relative" style="background: linear-gradient(135deg, rgba(255,145,77,0.15) 0%, rgba(255,145,77,0.05) 100%); border-radius: 24px; overflow: hidden;">
+                    <!-- Elementos decorativos -->
+                    <div style="position: absolute; top: -30px; right: -30px; width: 150px; height: 150px; border-radius: 50%; background-color: rgba(255,145,77,0.1); z-index: 0;"></div>
+                    <div style="position: absolute; bottom: -20px; left: -20px; width: 120px; height: 120px; border-radius: 50%; background-color: rgba(255,145,77,0.05); z-index: 0;"></div>
+                    
+                    <div class="text-center position-relative" style="z-index: 1;">
+                        <div style="display: inline-flex; align-items: center; justify-content: center; width: 70px; height: 70px; border-radius: 50%; background-color: rgba(255,145,77,0.2); margin-bottom: 20px;">
+                            <i class="fa fa-headset" style="color: #FF914D; font-size: 30px;"></i>
+                        </div>
+                        <h3 style="font-family: 'Poppins', sans-serif; font-weight: 700; color: #333; margin-bottom: 15px;">¿Necesita ayuda adicional?</h3>
+                        <p style="color: #666; max-width: 600px; margin: 0 auto 25px; font-size: 1.1rem;">Estamos aquí para ayudarle con cualquier consulta sobre sus productos o servicios. Nuestro equipo de soporte está disponible para asistirle.</p>
+                        <div class="d-flex flex-wrap justify-content-center gap-3">
+                            <a href="/contactus" class="btn btn-primary" style="background: linear-gradient(to right, #FF914D, #FF7E33); border: none; border-radius: 50px; padding: 12px 30px; font-weight: 500; box-shadow: 0 5px 15px rgba(255,145,77,0.2);">
+                                <i class="fa fa-envelope me-2"></i> Enviar Mensaje
+                            </a>
+                            <a href="tel:+123456789" class="btn" style="background-color: white; color: #333; border: none; border-radius: 50px; padding: 12px 30px; font-weight: 500; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                                <i class="fa fa-phone me-2" style="color: #FF914D;"></i> Llamar Ahora
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="oe_structure" id="oe_structure_portal_my_home_2"/>
+        </t>
+    </t>

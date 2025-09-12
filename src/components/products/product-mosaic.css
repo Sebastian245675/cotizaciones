@@ -1,0 +1,113 @@
+.product-mosaic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Responsive grid */
+  gap: 1.5rem; /* Espacio entre tarjetas */
+  background-color: transparent; /* Sin fondo para el grid */
+  padding: 0; /* Sin padding para el grid */
+  border-radius: 0; /* Sin borde redondeado */
+  overflow: hidden;
+  box-shadow: none; /* Sin sombra para el grid */
+  border: none; /* Sin borde para el grid */
+  max-width: 1400px; /* Ancho máximo */
+  margin: 0 auto; /* Centrado */
+}
+
+.product-mosaic-item {
+  background-color: white;
+  position: relative;
+  height: 100%;
+  min-height: 420px; /* Altura más compacta */
+  transition: all 0.3s ease;
+  z-index: 1;
+  display: flex;
+  overflow: hidden;
+  border: none; /* Sin borde */
+  margin: 0; /* Sin margen negativo */
+  border-radius: 0.75rem; /* Esquinas redondeadas */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Sombra sutil */
+}
+
+.product-mosaic-item:hover {
+  transform: scale(1.02);
+  z-index: 10;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 
+              0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Add subtle borders to create separation */
+.product-mosaic-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Different background colors for adjacent items */
+.product-mosaic-item:nth-child(odd) {
+  background-color: #ffffff;
+}
+
+.product-mosaic-item:nth-child(even) {
+  background-color: #fafbfc;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
+  
+  .product-mosaic-item {
+    min-height: 400px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 768px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .product-mosaic-item {
+    min-height: 420px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1279px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .product-mosaic-item {
+    min-height: 440px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .product-mosaic-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .product-mosaic-item {
+    min-height: 450px;
+  }
+}
+
+/* Animation for item appearance */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.product-mosaic-item {
+  animation: fadeIn 0.5s ease-out forwards;
+  animation-delay: calc(0.05s * var(--animation-order, 0));
+  opacity: 0;
+}
+
+/* Estilo para los placeholders de la última fila */
+.product-mosaic-item.opacity-0 {
+  opacity: 0 !important; /* Mantener siempre invisible */
+  animation: none; /* Sin animación */
+  pointer-events: none; /* No interactivo */
+}

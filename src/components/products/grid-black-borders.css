@@ -1,0 +1,37 @@
+/* Black Border Grid Styling */
+
+/* Make sure borders are visible even on hover */
+.product-mosaic-item {
+  position: relative;
+  border: 0.5px solid #333333;
+  margin: -0.5px 0 0 -0.5px; /* Adjusted negative margin for thinner borders */
+}
+
+/* Ensure borders remain visible during hover transitions */
+.product-mosaic-item:before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 0.5px solid #333333;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Add a distinct border to the entire grid container with a softer color */
+.product-mosaic-grid {
+  border: 0.5px solid #333333;
+  background-color: #444444;
+  gap: 0;
+}
+
+/* Custom hover effect that preserves the grid structure */
+.product-mosaic-item:hover {
+  z-index: 5;
+  transform: scale(1.02);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Make sure the borders stay visible in all states with a softer color */
+.product-mosaic-item::after {
+  border: 0.5px solid #333333;
+}

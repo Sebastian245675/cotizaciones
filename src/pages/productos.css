@@ -1,0 +1,60 @@
+/* Estilos específicos para la página de productos */
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Animación para la aparición de elementos */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* Estilos para la barra de búsqueda */
+.search-input::placeholder {
+  color: #cbd5e1; /* slate-300 */
+}
+
+/* Efecto de resaltado para tarjetas de categoría */
+.category-card {
+  transition: all 0.3s ease;
+}
+
+.category-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 
+              0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Mejorar la visualización de imágenes */
+.product-image-container {
+  overflow: hidden;
+  background-color: #f8fafc; /* slate-50 */
+}
+
+.product-image {
+  transition: transform 0.5s ease;
+}
+
+.product-image-container:hover .product-image {
+  transform: scale(1.05);
+}
+
+/* Diseño adaptable */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

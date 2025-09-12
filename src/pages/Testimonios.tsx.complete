@@ -1,0 +1,1193 @@
+import React, { useEffect, useState, useRef } from "react";
+import { TopPromoBar } from "@/components/layout/TopPromoBar";
+import { AdvancedHeader } from "@/components/layout/AdvancedHeader";
+import { useCategories } from "@/hooks/use-categories";
+import { useAuth } from "@/contexts/AuthContext";
+import { db } from '@/firebase';
+import { collection, getDoc, doc, getDocs, addDoc, query, where, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { Star, Quote, Check, Edit, Trash2, X, PenLine, Send, AlertCircle, MessageCircle, ThumbsUp, Users } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogTrigger,
+  DialogClose
+} from "@/components/ui/dialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
+
+interface Testimonio {
+  id: string;
+  nombre: string;
+  comentario: string;
+  calificacion: number;
+  fecha: Date;
+  imagenUrl?: string;
+  profesion?: string;
+  userId?: string;
+  email?: string;
+  productoComprado?: string;
+  fotoProducto?: string;
+}
+
+// Variantes para animaciones
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.8, ease: "easeOut" } 
+  }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 50 },
+  visible: { 
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      damping: 15,
+      stiffness: 100
+    }
+  },
+  hover: {
+    y: -10,
+    scale: 1.02,
+    boxShadow: "0px 10px 30px rgba(0, 0, 0, 0.1)",
+    transition: { duration: 0.3 }
+  }
+};
+
+const Testimonios = () => {
+  const { categories } = useCategories();
+  const { user, isAuthenticated, currentUser } = useAuth();
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [promoVisible, setPromoVisible] = useState(true);
+  const [info, setInfo] = useState<{ content: string; enabled: boolean } | null>(null);
+  const [testimonios, setTestimonios] = useState<Testimonio[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [usuarioYaComentó, setUsuarioYaComentó] = useState<boolean>(false);
+  const [miTestimonio, setMiTestimonio] = useState<Testimonio | null>(null);
+  const [formTestimonio, setFormTestimonio] = useState({
+    comentario: "",
+    calificacion: 5,
+    profesion: "",
+    productoComprado: ""
+  });
+  const [enviandoTestimonio, setEnviandoTestimonio] = useState<boolean>(false);
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [editando, setEditando] = useState<boolean>(false);
+  const [mostrarFormulario, setMostrarFormulario] = useState<boolean>(false);
+  const [activeTestimonio, setActiveTestimonio] = useState<string | null>(null);
+  const [estadisticas, setEstadisticas] = useState({
+    total: 0,
+    promedio: 0,
+    cinco: 0,
+    cuatro: 0,
+    tres: 0,
+    dos: 0,
+    uno: 0
+  });
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      setLoading(true);
+      // Intentar obtener contenido personalizado primero
+      const docRef = doc(db, 'infoSections', 'testimonios');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setInfo({
+          content: docSnap.data().content || '',
+          enabled: docSnap.data().enabled ?? false,
+        });
+      } else {
+        setInfo(null);
+      }
+
+      // Obtener testimonios (si existe la colección)
+      try {
+        const testimoniosSnapshot = await getDocs(collection(db, 'testimonios'));
+        const testimoniosList: Testimonio[] = [];
+        testimoniosSnapshot.forEach(doc => {
+          const data = doc.data();
+          testimoniosList.push({
+            id: doc.id,
+            nombre: data.nombre || 'Cliente',
+            comentario: data.comentario || '',
+            calificacion: data.calificacion || 5,
+            fecha: data.fecha?.toDate() || new Date(),
+            imagenUrl: data.imagenUrl || '',
+            profesion: data.profesion || '',
+            userId: data.userId || '',
+            email: data.email || '',
+            productoComprado: data.productoComprado || '',
+            fotoProducto: data.fotoProducto || ''
+          });
+        });
+        
+        // Solo usar testimonios reales de la base de datos
+        // Ordenar por fecha (más recientes primero)
+        testimoniosList.sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
+        setTestimonios(testimoniosList);
+        
+        // Calcular estadísticas
+        if (testimoniosList.length > 0) {
+          const total = testimoniosList.length;
+          const suma = testimoniosList.reduce((acc, t) => acc + t.calificacion, 0);
+          const promedio = Math.round((suma / total) * 10) / 10;
+          
+          const cinco = testimoniosList.filter(t => t.calificacion === 5).length;
+          const cuatro = testimoniosList.filter(t => t.calificacion === 4).length;
+          const tres = testimoniosList.filter(t => t.calificacion === 3).length;
+          const dos = testimoniosList.filter(t => t.calificacion === 2).length;
+          const uno = testimoniosList.filter(t => t.calificacion === 1).length;
+          
+          setEstadisticas({
+            total,
+            promedio,
+            cinco,
+            cuatro,
+            tres,
+            dos,
+            uno
+          });
+        }
+        
+        // Verificar si el usuario ya ha comentado
+        if (user) {
+          const miTestimonio = testimoniosList.find(t => t.userId === user.id);
+          if (miTestimonio) {
+            setUsuarioYaComentó(true);
+            setMiTestimonio(miTestimonio);
+            setFormTestimonio({
+              comentario: miTestimonio.comentario || '',
+              calificacion: miTestimonio.calificacion || 5,
+              profesion: miTestimonio.profesion || '',
+              productoComprado: miTestimonio.productoComprado || ''
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error obteniendo testimonios:", error);
+        setTestimonios([]); // En caso de error, mostramos una lista vacía en lugar de testimonios de muestra
+      }
+
+      setLoading(false);
+    };
+    
+    fetchInfo();
+  }, [user]);
+  
+  // Función para renderizar estrellas según la calificación
+  const renderStars = (rating: number) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <motion.div
+          key={i}
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: i * 0.05, duration: 0.2 }}
+        >
+          <Star
+            className={`h-4 w-4 ${i <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+          />
+        </motion.div>
+      );
+    }
+    return stars;
+  };
+  
+  // Función para renderizar estrellas seleccionables con animación
+  const renderSelectableStars = (selectedRating: number, onSelect: (rating: number) => void) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <motion.div
+          key={i}
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <Star
+            className={`h-7 w-7 cursor-pointer transition-colors duration-200 ${
+              i <= selectedRating ? "fill-yellow-400 text-yellow-400" : "text-gray-300 hover:text-yellow-200"
+            }`}
+            onClick={() => onSelect(i)}
+          />
+        </motion.div>
+      );
+    }
+    return stars;
+  };
+  
+  // Función para manejar cambios en el formulario
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormTestimonio(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Función para guardar un nuevo testimonio
+  const guardarTestimonio = async () => {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Error",
+        description: "Debes iniciar sesión para dejar un testimonio",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!formTestimonio.comentario) {
+      toast({
+        title: "Error",
+        description: "Por favor, escribe un comentario",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setEnviandoTestimonio(true);
+    
+    try {
+      // Si está editando, actualizar el testimonio existente
+      if (editando && miTestimonio) {
+        await updateDoc(doc(db, "testimonios", miTestimonio.id), {
+          comentario: formTestimonio.comentario,
+          calificacion: formTestimonio.calificacion,
+          profesion: formTestimonio.profesion,
+          productoComprado: formTestimonio.productoComprado,
+          fechaActualizado: serverTimestamp()
+        });
+        
+        // Actualizar el estado local
+        const testimonioActualizado: Testimonio = {
+          ...miTestimonio,
+          comentario: formTestimonio.comentario,
+          calificacion: formTestimonio.calificacion,
+          profesion: formTestimonio.profesion,
+          productoComprado: formTestimonio.productoComprado,
+          fecha: new Date() // Esto es solo para la visualización, en Firestore usamos serverTimestamp()
+        };
+        
+        setMiTestimonio(testimonioActualizado);
+        setTestimonios(prev => prev.map(t => t.id === miTestimonio.id ? testimonioActualizado : t));
+        
+        toast({
+          title: "¡Éxito!",
+          description: "Tu testimonio ha sido actualizado correctamente",
+          variant: "default"
+        });
+      } else {
+        // Crear un nuevo testimonio
+        const nuevoTestimonio = {
+          nombre: user.name || user.email?.split('@')[0] || "Usuario",
+          email: user.email,
+          comentario: formTestimonio.comentario,
+          calificacion: formTestimonio.calificacion,
+          profesion: formTestimonio.profesion,
+          productoComprado: formTestimonio.productoComprado,
+          fecha: serverTimestamp(),
+          userId: user.id,
+          imagenUrl: currentUser?.photoURL || ""
+        };
+        
+        const docRef = await addDoc(collection(db, "testimonios"), nuevoTestimonio);
+        
+        // Agregar el nuevo testimonio al estado local
+        const testimonioParaMostrar: Testimonio = {
+          id: docRef.id,
+          ...nuevoTestimonio,
+          fecha: new Date() // Esto es solo para la visualización, en Firestore usamos serverTimestamp()
+        };
+        
+        setMiTestimonio(testimonioParaMostrar);
+        setTestimonios(prev => [testimonioParaMostrar, ...prev]);
+        setUsuarioYaComentó(true);
+        
+        toast({
+          title: "¡Gracias por tu opinión!",
+          description: "Tu testimonio ha sido publicado correctamente",
+          variant: "default"
+        });
+
+        // Actualizar estadísticas
+        setEstadisticas(prev => {
+          const newTotal = prev.total + 1;
+          const newSuma = prev.promedio * prev.total + formTestimonio.calificacion;
+          const newPromedio = Math.round((newSuma / newTotal) * 10) / 10;
+          
+          // Actualizar el contador de la calificación correspondiente
+          const newStats = { ...prev, total: newTotal, promedio: newPromedio };
+          switch (formTestimonio.calificacion) {
+            case 5: newStats.cinco++; break;
+            case 4: newStats.cuatro++; break;
+            case 3: newStats.tres++; break;
+            case 2: newStats.dos++; break;
+            case 1: newStats.uno++; break;
+          }
+          
+          return newStats;
+        });
+      }
+      
+      setModalOpen(false);
+      setEditando(false);
+    } catch (error) {
+      console.error("Error al guardar el testimonio:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar tu testimonio. Por favor, intenta nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setEnviandoTestimonio(false);
+    }
+  };
+  
+  // Función para eliminar un testimonio
+  const eliminarTestimonio = async () => {
+    if (!miTestimonio || !isAuthenticated) return;
+    
+    try {
+      await deleteDoc(doc(db, "testimonios", miTestimonio.id));
+      
+      // Actualizar estado local
+      setTestimonios(prev => prev.filter(t => t.id !== miTestimonio.id));
+      setMiTestimonio(null);
+      setUsuarioYaComentó(false);
+      
+      // Actualizar estadísticas
+      setEstadisticas(prev => {
+        if (prev.total <= 1) return {
+          total: 0, promedio: 0, cinco: 0, cuatro: 0, tres: 0, dos: 0, uno: 0
+        };
+        
+        const newTotal = prev.total - 1;
+        const newSuma = prev.promedio * prev.total - miTestimonio.calificacion;
+        const newPromedio = Math.round((newSuma / newTotal) * 10) / 10;
+        
+        // Actualizar el contador de la calificación correspondiente
+        const newStats = { ...prev, total: newTotal, promedio: newPromedio };
+        switch (miTestimonio.calificacion) {
+          case 5: newStats.cinco = Math.max(0, newStats.cinco - 1); break;
+          case 4: newStats.cuatro = Math.max(0, newStats.cuatro - 1); break;
+          case 3: newStats.tres = Math.max(0, newStats.tres - 1); break;
+          case 2: newStats.dos = Math.max(0, newStats.dos - 1); break;
+          case 1: newStats.uno = Math.max(0, newStats.uno - 1); break;
+        }
+        
+        return newStats;
+      });
+      
+      toast({
+        title: "Testimonio eliminado",
+        description: "Tu testimonio ha sido eliminado correctamente",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error al eliminar testimonio:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el testimonio",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Componente de gráfico de barras para calificaciones
+  const RatingBar = ({ count, total, rating }: { count: number, total: number, rating: number }) => {
+    const percentage = total > 0 ? (count / total) * 100 : 0;
+    
+    return (
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-24 text-sm text-gray-600 flex items-center">
+          <span>{rating} {rating === 1 ? 'estrella' : 'estrellas'}</span>
+        </div>
+        <div className="flex-1 bg-gray-200 rounded-full h-2.5 overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${percentage}%` }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className={`h-full rounded-full ${rating >= 4 ? 'bg-green-500' : rating === 3 ? 'bg-yellow-500' : 'bg-red-500'}`}
+          />
+        </div>
+        <div className="w-10 text-right text-sm text-gray-600">
+          {count}
+        </div>
+      </div>
+    );
+  };
+  
+  // Componente para las estadísticas animadas
+  const AnimatedCounter = ({ value, label, icon }: { value: number, label: string, icon: React.ReactNode }) => {
+    const [count, setCount] = useState(0);
+    const counterRef = useRef(null);
+    
+    useEffect(() => {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            let start = 0;
+            const increment = value / 40;
+            const timer = setInterval(() => {
+              start += increment;
+              if (start > value) {
+                setCount(value);
+                clearInterval(timer);
+              } else {
+                setCount(Math.floor(start));
+              }
+            }, 30);
+            
+            return () => clearInterval(timer);
+          }
+        },
+        { threshold: 0.2 }
+      );
+      
+      if (counterRef.current) {
+        observer.observe(counterRef.current);
+      }
+      
+      return () => {
+        if (counterRef.current) observer.unobserve(counterRef.current);
+      };
+    }, [value]);
+    
+    return (
+      <motion.div
+        ref={counterRef}
+        initial={{ y: 30, opacity: 0 }}
+        whileInView={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="bg-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center"
+      >
+        <div className="p-3 rounded-full bg-gradient-to-r from-[#FF914D]/20 to-[#FF914D]/40 mb-3">
+          {icon}
+        </div>
+        <div className="text-3xl font-bold text-[#FF914D]">{count}</div>
+        <div className="text-gray-600 text-sm">{label}</div>
+      </motion.div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-orange-50 to-white">
+      <div className="absolute inset-0 overflow-hidden z-0">
+        <div className="absolute top-0 left-0 w-full h-full opacity-5">
+          {/* Decorative pattern */}
+          <svg className="w-full h-full" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,0 L1000,0 L1000,1000 L0,1000 Z" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,100 C150,50 200,50 250,100 S350,150 400,100 S500,50 550,100 S650,150 700,100 S800,50 850,100 S950,150 1000,100" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,200 C150,150 200,150 250,200 S350,250 400,200 S500,150 550,200 S650,250 700,200 S800,150 850,200 S950,250 1000,200" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,300 C150,250 200,250 250,300 S350,350 400,300 S500,250 550,300 S650,350 700,300 S800,250 850,300 S950,350 1000,300" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,400 C150,350 200,350 250,400 S350,450 400,400 S500,350 550,400 S650,450 700,400 S800,350 850,400 S950,450 1000,400" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,500 C150,450 200,450 250,500 S350,550 400,500 S500,450 550,500 S650,550 700,500 S800,450 850,500 S950,550 1000,500" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,600 C150,550 200,550 250,600 S350,650 400,600 S500,550 550,600 S650,650 700,600 S800,550 850,600 S950,650 1000,600" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,700 C150,650 200,650 250,700 S350,750 400,700 S500,650 550,700 S650,750 700,700 S800,650 850,700 S950,750 1000,700" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,800 C150,750 200,750 250,800 S350,850 400,800 S500,750 550,800 S650,850 700,800 S800,750 850,800 S950,850 1000,800" fill="none" stroke="#FF914D" strokeWidth="1"/>
+            <path d="M100,900 C150,850 200,850 250,900 S350,950 400,900 S500,850 550,900 S650,950 700,900 S800,850 850,900 S950,950 1000,900" fill="none" stroke="#FF914D" strokeWidth="1"/>
+          </svg>
+        </div>
+      </div>
+      
+      {promoVisible && <TopPromoBar setPromoVisible={setPromoVisible} />}
+      <AdvancedHeader
+        categories={categories}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        promoVisible={promoVisible}
+      />
+      
+      {/* Hero Section */}
+      <section className="relative overflow-hidden pt-28 pb-16">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#FF914D] rounded-full opacity-10 blur-3xl"></div>
+        <div className="absolute -bottom-10 -left-10 w-56 h-56 bg-[#FF914D] rounded-full opacity-20 blur-3xl"></div>
+        
+        <div className="container mx-auto px-4 z-10 relative">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-12"
+          >
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                className="flex"
+              >
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star key={star} className="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                ))}
+              </motion.div>
+            </div>
+            
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.8 }}
+              className="text-5xl md:text-7xl font-serif font-bold text-gray-900 mb-6 tracking-tight"
+            >
+              Lo que nuestros clientes <span className="text-[#FF914D]">opinan</span>
+            </motion.h1>
+            
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: "80px" }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+              className="h-1 bg-[#FF914D] mx-auto mb-6"
+            ></motion.div>
+            
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8, duration: 0.8 }}
+              className="text-xl text-gray-600 max-w-3xl mx-auto"
+            >
+              Conoce las experiencias de quienes han confiado en nosotros y han encontrado las mejores soluciones para sus proyectos
+            </motion.p>
+          </motion.div>
+
+          {/* Stats Section */}
+          {estadisticas.total > 0 && (
+            <motion.div 
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={{
+                hidden: { opacity: 0 },
+                visible: { 
+                  opacity: 1,
+                  transition: { duration: 0.8 } 
+                }
+              }}
+              className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16"
+            >
+              <AnimatedCounter 
+                value={estadisticas.total} 
+                label="Testimonios" 
+                icon={<MessageCircle className="h-6 w-6 text-[#FF914D]" />} 
+              />
+              <AnimatedCounter 
+                value={estadisticas.promedio} 
+                label="Calificación promedio" 
+                icon={<Star className="h-6 w-6 fill-yellow-400 text-[#FF914D]" />} 
+              />
+              <AnimatedCounter 
+                value={Math.round((estadisticas.cinco / estadisticas.total) * 100)} 
+                label="% de satisfacción" 
+                icon={<ThumbsUp className="h-6 w-6 text-[#FF914D]" />} 
+              />
+            </motion.div>
+          )}
+          
+          {loading ? (
+            <div className="flex justify-center items-center py-24">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-gray-200"></div>
+                <div className="w-16 h-16 rounded-full border-4 border-t-[#FF914D] border-r-transparent border-b-transparent border-l-transparent absolute top-0 left-0 animate-spin"></div>
+              </div>
+            </div>
+          ) : info && info.enabled ? (
+            <motion.div 
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0, y: 20 },
+                visible: { 
+                  opacity: 1, 
+                  y: 0,
+                  transition: { duration: 0.8 } 
+                }
+              }}
+              className="prose prose-lg max-w-none text-gray-800 mb-12 bg-white p-8 rounded-xl shadow-sm"
+              dangerouslySetInnerHTML={{ __html: info.content.replace(/\n/g, '<br />') }} 
+            />
+          ) : null}
+        </div>
+      </section>
+      
+      <main className="flex-1 flex flex-col">
+        <section className="bg-white py-16 relative z-10">
+          <div className="container mx-auto px-4 sm:px-6">
+            {isAuthenticated && (
+              <motion.div 
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  visible: { 
+                    opacity: 1, 
+                    y: 0,
+                    transition: { duration: 0.8 } 
+                  }
+                }}
+                className="mb-16"
+              >
+                {usuarioYaComentó ? (
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-8 rounded-xl shadow-lg border border-orange-100">
+                    <div className="flex justify-between items-start mb-6">
+                      <h3 className="text-2xl font-semibold text-[#FF914D] flex items-center gap-2">
+                        <PenLine className="h-6 w-6" />
+                        Tu testimonio
+                      </h3>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            setEditando(true);
+                            setModalOpen(true);
+                          }}
+                          className="text-[#FF914D] border-orange-200 hover:bg-orange-50"
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar
+                        </Button>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción eliminará permanentemente tu testimonio y no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={eliminarTestimonio} className="bg-red-600 hover:bg-red-700 text-white">
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+
+                    {miTestimonio && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="bg-white p-6 rounded-lg shadow-sm"
+                      >
+                        <div className="flex items-center mb-4">
+                          <Avatar className="h-14 w-14 border-2 border-orange-200 mr-4">
+                            {miTestimonio.imagenUrl && miTestimonio.imagenUrl !== '' ? (
+                              <AvatarImage src={miTestimonio.imagenUrl} alt={miTestimonio.nombre} />
+                            ) : (
+                              <AvatarFallback className="bg-[#FF914D] text-white">
+                                {miTestimonio.nombre && miTestimonio.nombre.length > 0
+                                  ? miTestimonio.nombre.substring(0, 2).toUpperCase()
+                                  : 'US'}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-lg">{miTestimonio.nombre}</p>
+                            {miTestimonio.profesion && (
+                              <p className="text-gray-500">{miTestimonio.profesion}</p>
+                            )}
+                            <div className="flex mt-1">
+                              {renderStars(miTestimonio.calificacion)}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="relative">
+                          <Quote className="absolute text-orange-100 h-10 w-10 -top-2 -left-2" />
+                          <p className="text-gray-700 italic text-lg pl-5">"{miTestimonio.comentario}"</p>
+                        </div>
+                        
+                        {miTestimonio.productoComprado && (
+                          <div className="mt-4 bg-orange-50 p-4 rounded-md text-sm text-gray-600">
+                            <p className="font-medium text-[#FF914D] mb-1">Producto comprado:</p>
+                            <p>{miTestimonio.productoComprado}</p>
+                          </div>
+                        )}
+                        
+                        <p className="mt-4 text-sm text-gray-500">
+                          Publicado el {miTestimonio.fecha.toLocaleDateString('es-AR', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </motion.div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-8 rounded-xl shadow-lg border border-orange-100">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
+                      <div>
+                        <h3 className="text-2xl font-semibold text-[#FF914D] flex items-center gap-2 mb-4 md:mb-0">
+                          <PenLine className="h-6 w-6" />
+                          Comparte tu experiencia
+                        </h3>
+                      </div>
+                      <Button 
+                        onClick={() => setModalOpen(true)} 
+                        className="bg-[#FF914D] hover:bg-[#e87f3d] text-white"
+                      >
+                        <PenLine className="h-5 w-5 mr-2" />
+                        Escribir mi testimonio
+                      </Button>
+                    </div>
+                    <p className="text-gray-700">
+                      Ayuda a otros clientes compartiendo tu experiencia de compra con nosotros. 
+                      Tu opinión es valiosa y nos ayuda a seguir mejorando.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+            
+            {/* Estadísticas de calificaciones */}
+            {estadisticas.total > 0 && (
+              <motion.div 
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  visible: { 
+                    opacity: 1, 
+                    y: 0,
+                    transition: { duration: 0.8 } 
+                  }
+                }}
+                className="mb-16 bg-white p-6 rounded-xl shadow-md"
+              >
+                <h3 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  Calificaciones de los clientes
+                </h3>
+                
+                <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
+                  <div className="md:w-1/3 mb-6 md:mb-0 flex flex-col items-center justify-center">
+                    <div className="text-6xl font-bold text-gray-800">
+                      {estadisticas.promedio}
+                    </div>
+                    <div className="flex mb-2 mt-2">
+                      {renderStars(Math.round(estadisticas.promedio))}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {estadisticas.total} {estadisticas.total === 1 ? 'valoración' : 'valoraciones'}
+                    </div>
+                  </div>
+                  
+                  <div className="md:w-2/3">
+                    <RatingBar count={estadisticas.cinco} total={estadisticas.total} rating={5} />
+                    <RatingBar count={estadisticas.cuatro} total={estadisticas.total} rating={4} />
+                    <RatingBar count={estadisticas.tres} total={estadisticas.total} rating={3} />
+                    <RatingBar count={estadisticas.dos} total={estadisticas.total} rating={2} />
+                    <RatingBar count={estadisticas.uno} total={estadisticas.total} rating={1} />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Sección principal de testimonios */}
+            <motion.div 
+              variants={staggerContainer}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+            >
+              {testimonios.length === 0 ? (
+                <motion.div 
+                  variants={{
+                    hidden: { opacity: 0, y: 20 },
+                    visible: { 
+                      opacity: 1, 
+                      y: 0,
+                      transition: { duration: 0.8 } 
+                    }
+                  }}
+                  className="col-span-3 text-center py-16 bg-white rounded-xl shadow-sm"
+                >
+                  <div className="p-4 rounded-full bg-orange-50 inline-flex mx-auto mb-6">
+                    <MessageCircle className="h-10 w-10 text-[#FF914D]" />
+                  </div>
+                  <p className="text-gray-500 text-xl mb-3">Aún no hay testimonios disponibles.</p>
+                  <p className="text-gray-500">¡Sé el primero en compartir tu experiencia!</p>
+                  
+                  {isAuthenticated ? (
+                    !usuarioYaComentó && (
+                      <Button 
+                        onClick={() => setModalOpen(true)} 
+                        className="mt-8 bg-[#FF914D] hover:bg-[#e87f3d]"
+                      >
+                        <PenLine className="h-5 w-5 mr-2" />
+                        Escribir mi testimonio
+                      </Button>
+                    )
+                  ) : (
+                    <div className="mt-8">
+                      <p className="text-sm text-gray-500 mb-2">Inicia sesión para dejar tu testimonio</p>
+                      <Button 
+                        onClick={() => setModalOpen(true)}
+                        className="bg-[#FF914D] hover:bg-[#e87f3d]"
+                      >
+                        Iniciar sesión
+                      </Button>
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                testimonios.map((testimonio) => (
+                  <motion.div
+                    key={testimonio.id}
+                    variants={cardVariants}
+                    whileHover="hover"
+                    onClick={() => setActiveTestimonio(activeTestimonio === testimonio.id ? null : testimonio.id)}
+                    className={`transition-all duration-300 ${
+                      miTestimonio?.id === testimonio.id ? 'ring-2 ring-[#FF914D]' : ''
+                    }`}
+                  >
+                    <Card className="border-0 shadow-lg h-full overflow-hidden">
+                      <CardContent className="p-0">
+                        <div className="p-6 relative bg-gradient-to-br from-orange-50 to-white">
+                          <Quote className="absolute text-[#FF914D] h-16 w-16 -top-4 -left-4 opacity-20" />
+                          <div className="flex items-center mb-4 mt-4">
+                            <Avatar className="h-14 w-14 border-2 border-orange-200">
+                              {testimonio.imagenUrl && testimonio.imagenUrl !== '' ? (
+                                <AvatarImage src={testimonio.imagenUrl} alt={testimonio.nombre} />
+                              ) : (
+                                <AvatarFallback className="bg-[#FF914D] text-white">
+                                  {testimonio.nombre && testimonio.nombre.length > 0
+                                    ? testimonio.nombre.substring(0, 2).toUpperCase()
+                                    : 'US'}
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <div className="ml-4">
+                              <div className="flex items-center">
+                                <p className="font-semibold text-lg">{testimonio.nombre}</p>
+                              </div>
+                              {testimonio.profesion && (
+                                <p className="text-sm text-gray-500">{testimonio.profesion}</p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center mb-4">
+                            <div className="flex">
+                              {renderStars(testimonio.calificacion)}
+                            </div>
+                          </div>
+                          
+                          <div className="relative">
+                            <p className="text-gray-700 italic mb-4 line-clamp-4">{testimonio.comentario}</p>
+                            {testimonio.comentario.length > 150 && activeTestimonio !== testimonio.id && (
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white to-transparent h-10"></div>
+                            )}
+                          </div>
+                          
+                          {activeTestimonio === testimonio.id && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="mt-2"
+                            >
+                              <p className="text-gray-700 italic mb-4">{testimonio.comentario}</p>
+                            </motion.div>
+                          )}
+                          
+                          {testimonio.productoComprado && (
+                            <div className="bg-white/80 p-3 rounded-lg mb-3 text-sm border border-orange-100 mt-4">
+                              <p className="font-medium text-[#FF914D]">Producto comprado:</p>
+                              <p className="text-gray-600">{testimonio.productoComprado}</p>
+                            </div>
+                          )}
+                          
+                          <div className="flex justify-between items-center mt-4">
+                            <p className="text-xs text-gray-500">
+                              {testimonio.fecha.toLocaleDateString('es-AR', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </p>
+                            
+                            {testimonio.comentario.length > 150 && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-[#FF914D] hover:text-[#e87f3d] hover:bg-orange-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveTestimonio(activeTestimonio === testimonio.id ? null : testimonio.id);
+                                }}
+                              >
+                                {activeTestimonio === testimonio.id ? 'Ver menos' : 'Ver más'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              )}
+            </motion.div>
+
+            {/* Modal para agregar o editar testimonio */}
+            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+              <DialogContent className="sm:max-w-lg" aria-describedby="dialog-description">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl">{editando ? 'Editar testimonio' : 'Nuevo testimonio'}</DialogTitle>
+                  <p id="dialog-description" className="text-gray-500 mt-2">
+                    {editando 
+                      ? 'Modifica tu testimonio para compartir tu experiencia actualizada.'
+                      : 'Comparte tu experiencia con nuestros productos y ayuda a otros clientes.'}
+                  </p>
+                </DialogHeader>
+                
+                <div className="grid gap-6 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="calificacion" className="text-base font-medium">Tu calificación</Label>
+                    <div className="flex gap-2 py-3">
+                      {renderSelectableStars(formTestimonio.calificacion, (rating) => 
+                        setFormTestimonio(prev => ({ ...prev, calificacion: rating }))
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="comentario" className="text-base font-medium">Tu comentario</Label>
+                    <Textarea 
+                      id="comentario"
+                      name="comentario"
+                      placeholder="Comparte tu experiencia con nuestros productos y servicio..."
+                      value={formTestimonio.comentario}
+                      onChange={handleFormChange}
+                      className="min-h-[150px] text-base"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="profesion" className="text-base font-medium">Profesión (opcional)</Label>
+                      <Input 
+                        id="profesion"
+                        name="profesion"
+                        placeholder="Ej: Arquitecto, Diseñadora, Ingeniero..."
+                        value={formTestimonio.profesion}
+                        onChange={handleFormChange}
+                        className="text-base"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="productoComprado" className="text-base font-medium">Producto que compraste</Label>
+                      <Input 
+                        id="productoComprado"
+                        name="productoComprado"
+                        placeholder="Ej: Material eléctrico, Cable, Iluminación..."
+                        value={formTestimonio.productoComprado}
+                        onChange={handleFormChange}
+                        className="text-base"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <DialogFooter className="flex gap-2 items-center">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setModalOpen(false)}
+                    className="border-gray-300"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    onClick={guardarTestimonio}
+                    disabled={!formTestimonio.comentario || enviandoTestimonio}
+                    className="bg-[#FF914D] hover:bg-[#e87f3d] px-8"
+                  >
+                    {enviandoTestimonio ? (
+                      <>
+                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin mr-2"></div>
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        {editando ? 'Actualizar' : 'Publicar'}
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Sección de invitación para dejar testimonio */}
+            <motion.div 
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="mt-24 text-center"
+            >
+              <div className="bg-gradient-to-r from-[#FF914D]/10 to-amber-50 p-12 rounded-2xl shadow-xl relative overflow-hidden">
+                <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#FF914D]/20 rounded-full"></div>
+                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-[#FF914D]/10 rounded-full"></div>
+                <div className="relative z-10">
+                  <div className="p-4 rounded-full bg-white/90 inline-flex mx-auto mb-6 shadow-md">
+                    <Users className="h-10 w-10 text-[#FF914D]" />
+                  </div>
+                  <h3 className="text-3xl font-serif font-bold mb-4">¿Has comprado con nosotros?</h3>
+                  <p className="text-lg text-gray-700 mb-8 max-w-2xl mx-auto">
+                    Nos encantaría conocer tu opinión. Tu experiencia puede ayudar a otros clientes a tomar mejores decisiones.
+                  </p>
+                  
+                  {isAuthenticated ? (
+                    usuarioYaComentó ? (
+                      <div className="bg-white/80 p-6 rounded-xl inline-block shadow-md">
+                        <p className="text-[#FF914D] flex items-center gap-2 font-medium">
+                          <Check className="h-5 w-5" />
+                          Ya has publicado tu testimonio. ¡Gracias por compartir tu experiencia!
+                        </p>
+                      </div>
+                    ) : (
+                      <Button 
+                        onClick={() => setModalOpen(true)} 
+                        className="px-10 py-7 bg-[#FF914D] hover:bg-[#e87f3d] text-white text-lg shadow-lg hover:shadow-xl transition-all duration-300 rounded-full"
+                      >
+                        <PenLine className="h-5 w-5 mr-2" />
+                        Escribir mi testimonio
+                      </Button>
+                    )
+                  ) : (
+                    <div className="flex flex-col items-center gap-4">
+                      <p className="text-[#FF914D] flex items-center gap-2 font-medium">
+                        <AlertCircle className="h-5 w-5" />
+                        Inicia sesión para dejar tu testimonio
+                      </p>
+                      <Button 
+                        onClick={() => setModalOpen(true)}
+                        className="px-8 py-6 bg-[#FF914D] hover:bg-[#e87f3d] text-white text-lg shadow-md hover:shadow-lg transition-all duration-300 rounded-full"
+                      >
+                        Iniciar sesión
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+      </main>
+      
+      {/* Footer */}
+      <footer className="bg-white py-16 mt-16">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-[#FF914D] rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">T</span>
+                </div>
+                <span className="text-lg font-bold text-[#FF914D]">REGALA ALGO</span>
+              </div>
+              <p className="text-gray-600 text-sm">
+                Tu proveedor de materiales eléctricos y de construcción de confianza.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-[#FF914D]">Productos</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>Materiales Eléctricos</li>
+                <li>Materiales de Construcción</li>
+                <li>Herramientas Profesionales</li>
+                <li>Iluminación</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-[#FF914D]">Servicios</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>Asesoría Técnica</li>
+                <li>Presupuestos</li>
+                <li>Entregas a Obra</li>
+                <li>Financiamiento</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-[#FF914D]">Contacto</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>📍 Olavarría 610 (esquina San Luis)</li>
+                <li>
+                  <a href="https://maps.app.goo.gl/gonu6cj9cJnDfJBz5?g_st=aw" 
+                     className="text-[#FF914D] hover:underline">
+                    Ver en el mapa
+                  </a>
+                </li>
+                <li>WhatsApp: +54 3873439775</li>
+                <li>Instagram: <a href="https://www.instagram.com/regala.algo?igsh=OWk2enhxYzg2eHVq" target="_blank" rel="noopener noreferrer" className="text-[#FF914D] hover:underline">regala.algo</a></li>
+                <li>Facebook: Regala Algo</li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 mt-8 pt-8 text-center text-sm text-gray-600">
+            <p>&copy; 2024 REGALA ALGO. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default Testimonios;

@@ -1,0 +1,36 @@
+/* Import all product component styles */
+@import './product-mosaic.css';
+
+/* Additional global product styles */
+.category-section {
+  scroll-margin-top: 80px; /* For smooth scrolling to category sections */
+}
+
+.categories-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+/* Animation for category sections */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.category-animate-in {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .categories-container {
+    gap: 2rem;
+  }
+}

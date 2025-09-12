@@ -1,0 +1,43 @@
+{
+  "name": "pos-whatsapp-service",
+  "version": "2.0.0",
+  "description": "Sistema WhatsApp Avanzado para POS - Múltiples Números, IA, Flujos y Campañas",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "whatsapp",
+    "pos",
+    "baileys",
+    "ai",
+    "automation",
+    "campaigns",
+    "flows"
+  ],
+  "author": "POS Team",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "express": "^4.21.2",
+    "jimp": "^1.6.0",
+    "moment": "^2.30.1",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "openai": "^4.67.3",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.0",
+    "sqlite3": "^5.1.7",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

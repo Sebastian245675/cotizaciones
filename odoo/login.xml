@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="enhanced_login_button" inherit_id="portal.placeholder_user_sign_in">
+        <xpath expr="." position="inside">
+            <li t-if="not user_id._is_public()" t-attf-class="#{_item_class} o_no_autohide_item">
+                <a t-attf-href="/web/login" t-attf-class="#{_link_class}" style="padding: 8px 20px; margin-left: 10px; border-radius: 50px; background: linear-gradient(135deg, #FF914D, #FF7E33); color: white !important; font-weight: 600;">
+                    <i class="fa fa-user me-2"></i>
+                    <span>Iniciar sesión</span>
+                </a>
+            </li>
+        </xpath>
+    </template>
+</odoo>

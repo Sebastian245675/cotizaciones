@@ -1,0 +1,890 @@
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+const nodemailer = require('nodemailer');
+const cors = require('cors')({ origin: true });
+
+admin.initializeApp();
+
+// Para desarrollo local, puedes usar servicios como Mailtrap o EmailJS
+// Para producción, considera usar SendGrid, Mailgun, o Amazon SES
+
+// Configurar el transporte de correo electrónico usando variables de entorno
+// Esto es más seguro que tener las credenciales directamente en el código
+// Puedes configurar estas variables en la consola de Firebase o en un .env local
+let transporter;
+
+// Intentar configurar el transporte de correo con variables de entorno - Versión corregida
+try {
+  transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER || 'j24291972@gmail.com',
+      pass: process.env.EMAIL_PASSWORD || 'ufxx grvv atvb jued'
+    },
+    // Agregar configuración TLS para resolver problemas de certificado
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+  
+  console.log('Transporte de correo configurado correctamente');
+} catch (error) {
+  console.error('Error configurando transporte de email:', error);
+}
+
+// Función de utilidad para crear el HTML del correo
+const createWelcomeEmailHTML = (userName) => {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="https://firebasestorage.googleapis.com/v0/b/tienda-arg.appspot.com/o/logo-regala-algo.png?alt=media" alt="REGALA ALGO Logo" style="max-width: 200px;">
+      </div>
+      
+      <h1 style="color: #3b82f6; text-align: center; margin-bottom: 20px;">🎉 ¡Bienvenidos a Regala Algo!</h1>
+      
+      <p style="font-size: 16px; line-height: 1.6; color: #333;">Hola <strong>${userName}</strong>,</p>
+      
+      <p style="font-size: 16px; line-height: 1.6; color: #333;">En nuestro local vas a encontrar todo lo que necesitas y mucho más: desde artículos para tu hogar 🏠, decoración y cotillón para tus fiestas 🪅, hasta electrodomésticos y productos que te facilitan el día a día ⚡.</p>
+      
+      <p style="font-size: 18px; line-height: 1.6; color: #3b82f6; font-weight: bold; text-align: center; margin: 25px 0;">💡 Un solo lugar, mil soluciones.</p>
+      
+      <p style="font-size: 16px; line-height: 1.6; color: #333;">Te esperamos para que descubras ofertas, novedades y la mejor atención.</p>
+      
+      <div style="background-color: #f9f9f9; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+        <p style="font-size: 16px; line-height: 1.6; margin: 0;">
+          <strong>📍 Dirección:</strong> Olavarría 610 (esquina San luis)
+        </p>
+        <p style="font-size: 16px; line-height: 1.6; margin: 10px 0 0 0;">
+          <strong>📞 WhatsApp:</strong> 3815087142
+        </p>
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="https://maps.app.goo.gl/gonu6cj9cJnDfJBz5?g_st=aw" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-right: 10px;">
+          <span style="vertical-align: middle;">📍</span> Ver ubicación
+        </a>
+        <a href="https://tienda-arg.web.app" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+          🛒 Explorar la tienda
+        </a>
+      </div>
+      
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #666; font-size: 14px;">
+        <p>REGALA ALGO - Un solo lugar, mil soluciones.</p>
+        <p>© ${new Date().getFullYear()} REGALA ALGO. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  `;
+};
+
+// Función que se activa cuando se crea un nuevo usuario en Firebase Auth
+exports.sendWelcomeEmail = functions.auth.user().onCreate(async (user) => {
+  try {
+    if (!transporter) {
+      console.error('El transporte de correo no está configurado');
+      return null;
+    }
+
+    // Esperar un momento para dar tiempo a que se cree el documento en Firestore
+    // Esto ayuda a garantizar que tengamos los datos más recientes
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Obtener datos adicionales del usuario desde Firestore
+    const userDoc = await admin.firestore().collection('users').doc(user.uid).get();
+    const userData = userDoc.data() || {};
+    
+    const userName = userData.name || user.displayName || user.email.split('@')[0];
+    
+    // Configurar el mensaje
+    const mailOptions = {
+      from: `"REGALA ALGO" <${process.env.EMAIL_USER || 'noreply@regalaalgo.com'}>`,
+      to: user.email,
+      subject: '🎉 ¡Bienvenido a Regala Algo - Un solo lugar, mil soluciones!',
+      html: createWelcomeEmailHTML(userName)
+    };
+
+    // Registrar el evento en analytics o logs
+    await admin.firestore().collection('email_logs').add({
+      userId: user.uid,
+      email: user.email,
+      type: 'welcome',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      success: true
+    });
+
+    // Enviar el correo
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error al enviar correo de bienvenida:', error);
+    
+    // Registrar el error
+    await admin.firestore().collection('email_logs').add({
+      userId: user?.uid || 'unknown',
+      email: user?.email || 'unknown',
+      type: 'welcome',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      success: false,
+      error: error.message
+    });
+    
+    return null;
+  }
+});
+
+// Función para enviar correo después del registro manual (llamable desde la aplicación)
+exports.sendRegistrationEmail = functions.https.onCall(async (data, context) => {
+  try {
+    // Verificar si el transporte está configurado
+    if (!transporter) {
+      console.error('El transporte de correo no está configurado');
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'El servicio de correo no está disponible temporalmente'
+      );
+    }
+
+    // Validar datos
+    if (!data.email || !data.name) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'El correo y nombre son obligatorios'
+      );
+    }
+
+    // Sanitizar datos para evitar inyecciones
+    const name = data.name.toString().trim().substring(0, 50);
+    const email = data.email.toString().trim().toLowerCase();
+
+    // Validar formato de correo
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'El formato del correo electrónico no es válido'
+      );
+    }
+
+    // Configurar el mensaje
+    const mailOptions = {
+      from: `"REGALA ALGO" <${process.env.EMAIL_USER || 'noreply@regalaalgo.com'}>`,
+      to: email,
+      subject: '🎉 ¡Bienvenido a Regala Algo - Un solo lugar, mil soluciones!',
+      html: createWelcomeEmailHTML(name)
+    };
+
+    // Registrar intento de envío
+    const logRef = admin.firestore().collection('email_logs').doc();
+    
+    await logRef.set({
+      id: logRef.id,
+      email: email,
+      type: 'manual_welcome',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      status: 'sending'
+    });
+
+    // Enviar el correo
+    const info = await transporter.sendMail(mailOptions);
+    
+    // Actualizar log con éxito
+    await logRef.update({
+      status: 'sent',
+      messageId: info.messageId
+    });
+    
+    return { 
+      success: true, 
+      message: 'Correo enviado correctamente',
+      messageId: info.messageId
+    };
+  } catch (error) {
+    console.error('Error al enviar correo de registro:', error);
+    
+    // Registrar error
+    if (logRef) {
+      await logRef.update({
+        status: 'error',
+        error: error.message
+      });
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal', 
+      'Error al enviar el correo', 
+      error.message
+    );
+  }
+});
+
+// Función para crear el HTML del correo de cumpleaños
+const createBirthdayEmailHTML = (data) => {
+  const { nombre, mensaje } = data;
+  
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; border: 1px solid #f0f0f0; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: linear-gradient(to bottom right, #fff9f9, #fff);">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="https://firebasestorage.googleapis.com/v0/b/cumpleaos-d73b0.appspot.com/o/logo-nuevo.png?alt=media" alt="Logo" style="max-width: 180px;">
+      </div>
+      
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #e91e63; font-size: 28px; margin-bottom: 10px;">🎂 ¡Feliz Cumpleaños ${nombre}! 🎉</h1>
+        <div style="width: 80px; height: 4px; background: linear-gradient(to right, #e91e63, #ff9a9e); margin: 0 auto;"></div>
+      </div>
+      
+      <div style="background-color: #fff; border-radius: 8px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border-left: 4px solid #e91e63;">
+        <p style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 15px;">
+          ${mensaje || `Queremos desearte un día maravilloso lleno de alegría y buenos momentos. ¡Que todos tus deseos se hagan realidad!`}
+        </p>
+      </div>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <div style="font-size: 28px; margin-bottom: 10px;">🎁 🎈 🎊</div>
+      </div>
+      
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eaeaea; text-align: center; color: #666; font-size: 14px;">
+        <p>Este es un mensaje automático, por favor no respondas a este correo.</p>
+        <p>© ${new Date().getFullYear()} Empresa. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  `;
+};
+
+// Función para crear el HTML del correo de notificación para administradores
+const createAdminNotificationHTML = (data) => {
+  const { nombre, mensaje, tipo } = data;
+  
+  let titulo = '';
+  let emoji = '';
+  let color = '#3b82f6';
+  
+  if (tipo === 'birthday') {
+    titulo = '¡Cumpleaños Hoy!';
+    emoji = '🎂';
+    color = '#e91e63';
+  } else if (tipo === 'welcome') {
+    titulo = 'Nuevo Empleado Registrado';
+    emoji = '👋';
+    color = '#10b981';
+  } else if (tipo === 'update') {
+    titulo = 'Datos de Empleado Actualizados';
+    emoji = '📝';
+    color = '#f59e0b';
+  }
+  
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+      <div style="text-align: center; margin-bottom: 15px;">
+        <img src="https://firebasestorage.googleapis.com/v0/b/cumpleaos-d73b0.appspot.com/o/logo-nuevo.png?alt=media" alt="Logo" style="max-width: 150px;">
+      </div>
+      
+      <div style="background-color: ${color}; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+        <h1 style="color: white; font-size: 24px; margin: 0;">${emoji} ${titulo}</h1>
+      </div>
+      
+      <div style="background-color: #f9f9f9; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
+        <p style="font-size: 16px; line-height: 1.6; color: #333;">
+          ${mensaje || `Notificación relacionada con el empleado ${nombre}.`}
+        </p>
+      </div>
+      
+      <div style="background-color: #f0f7ff; border-radius: 8px; padding: 15px; margin-top: 20px; border-left: 4px solid #3b82f6;">
+        <p style="margin: 0; font-size: 15px; color: #334155;">
+          <strong>Empleado:</strong> ${nombre}
+        </p>
+      </div>
+      
+      <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #e0e0e0; text-align: center; color: #666; font-size: 14px;">
+        <p>Este es un mensaje automático del sistema de Gestión de Empleados.</p>
+        <p>© ${new Date().getFullYear()}. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  `;
+};
+
+// Función para procesar correos pendientes
+exports.processPendingEmails = functions.pubsub.schedule('every 5 minutes').onRun(async (context) => {
+  try {
+    // Verificar si el transporte está configurado
+    if (!transporter) {
+      console.error('El transporte de correo no está configurado');
+      return null;
+    }
+    
+    // Obtener correos pendientes (limitado a 50 por ejecución)
+    const pendingEmailsQuery = admin.firestore()
+      .collection('pendingEmails')
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'asc')
+      .limit(50);
+    
+    const pendingSnapshot = await pendingEmailsQuery.get();
+    
+    // Si no hay correos pendientes, finalizar
+    if (pendingSnapshot.empty) {
+      console.log('No hay correos pendientes para procesar');
+      return null;
+    }
+    
+    console.log(`Procesando ${pendingSnapshot.size} correos pendientes`);
+    
+    // Procesar cada correo pendiente
+    const batch = admin.firestore().batch();
+    const emailPromises = [];
+    
+    pendingSnapshot.forEach(doc => {
+      const emailData = doc.data();
+      const docRef = doc.ref;
+      
+      // Preparar contenido HTML según el tipo de correo
+      let htmlContent = '';
+      let subject = emailData.subject;
+      
+      if (emailData.type.includes('birthday')) {
+        htmlContent = createBirthdayEmailHTML({
+          nombre: emailData.employeeName || 'Estimado/a',
+          mensaje: emailData.message
+        });
+      } else if (emailData.type.includes('admin')) {
+        const tipoNotificacion = emailData.type.includes('birthday') ? 'birthday' : 
+                               emailData.type.includes('welcome') ? 'welcome' : 'update';
+        
+        htmlContent = createAdminNotificationHTML({
+          nombre: emailData.employeeName || 'No especificado',
+          mensaje: emailData.message,
+          tipo: tipoNotificacion
+        });
+      } else {
+        // Correo genérico
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Notificación</h2>
+            <p>${emailData.message}</p>
+          </div>
+        `;
+      }
+      
+      // Configurar opciones del correo
+      const mailOptions = {
+        from: `"Gestión de Empleados" <${process.env.EMAIL_USER || 'noreply@empresa.com'}>`,
+        to: emailData.to,
+        subject: subject,
+        html: htmlContent
+      };
+      
+      // Crear promesa para enviar el correo
+      const emailPromise = transporter.sendMail(mailOptions)
+        .then((info) => {
+          // Marcar como enviado en el batch
+          batch.update(docRef, {
+            status: 'sent',
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            messageId: info.messageId || ''
+          });
+          return { id: doc.id, success: true };
+        })
+        .catch((error) => {
+          console.error(`Error enviando correo ${doc.id}:`, error);
+          
+          // Incrementar contador de intentos
+          const attempts = (emailData.attempts || 0) + 1;
+          
+          if (attempts >= 3) {
+            // Si hay demasiados intentos fallidos, marcar como fallido
+            batch.update(docRef, {
+              status: 'failed',
+              error: error.message,
+              attempts: attempts,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          } else {
+            // Intentar de nuevo más tarde
+            batch.update(docRef, {
+              attempts: attempts,
+              lastAttemptError: error.message,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+          
+          return { id: doc.id, success: false, error: error.message };
+        });
+      
+      emailPromises.push(emailPromise);
+    });
+    
+    // Esperar a que todos los correos sean procesados
+    const results = await Promise.all(emailPromises);
+    
+    // Aplicar las actualizaciones en lote
+    await batch.commit();
+    
+    // Registrar estadísticas
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    console.log(`Procesamiento completado: ${successful} exitosos, ${failed} fallidos`);
+    
+    // Registrar en análisis
+    await admin.firestore().collection('emailStats').add({
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      processed: results.length,
+      successful: successful,
+      failed: failed
+    });
+    
+    return { processed: results.length, successful, failed };
+  } catch (error) {
+    console.error('Error procesando correos pendientes:', error);
+    return null;
+  }
+});
+
+// Enviar correo de cumpleaños directamente (función invocable)
+exports.sendBirthdayEmail = functions.https.onCall(async (data, context) => {
+  try {
+    // Verificar autenticación
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Se requiere autenticación para enviar correos'
+      );
+    }
+    
+    // Verificar si el transporte está configurado
+    if (!transporter) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'El servicio de correo no está configurado correctamente'
+      );
+    }
+    
+    // Validar datos
+    if (!data.employeeId || !data.type) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Se requiere ID del empleado y tipo de correo'
+      );
+    }
+    
+    console.log(`Procesando solicitud de correo tipo: ${data.type} para empleado: ${data.employeeId}`);
+    
+    // Obtener datos del empleado
+    const employeeDoc = await admin.firestore().collection('empleados').doc(data.employeeId).get();
+    
+    if (!employeeDoc.exists) {
+      throw new functions.https.HttpsError(
+        'not-found',
+        'No se encontró el empleado especificado'
+      );
+    }
+    
+    const employee = employeeDoc.data();
+    
+    // Determinar el destinatario de correo
+    const emailTo = data.to || employee.email || `${employee.telefono}@example.com`;
+    
+    // Crear y guardar registro de correo pendiente
+    const emailLogRef = admin.firestore().collection('pendingEmails').doc();
+    await emailLogRef.set({
+      to: emailTo,
+      subject: data.subject || '¡Feliz Cumpleaños!',
+      message: data.message || `¡Feliz cumpleaños ${employee.nombre}!`,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: 'sending',
+      type: data.type,
+      employeeId: data.employeeId,
+      employeeName: employee.nombre,
+      sentBy: context.auth.uid,
+      attempts: 1
+    });
+    
+    // Preparar contenido HTML según el tipo de correo
+    let htmlContent = '';
+    let subject = data.subject || '¡Feliz Cumpleaños!';
+    
+    if (data.type.includes('birthday')) {
+      htmlContent = createBirthdayEmailHTML({
+        nombre: employee.nombre || 'Estimado/a',
+        mensaje: data.message || `¡Te deseamos un muy feliz cumpleaños! Queremos agradecerte por ser parte de nuestro equipo.`
+      });
+    } else if (data.type.includes('admin')) {
+      const tipoNotificacion = data.type.includes('birthday') ? 'birthday' : 
+                             data.type.includes('welcome') ? 'welcome' : 'update';
+      
+      htmlContent = createAdminNotificationHTML({
+        nombre: employee.nombre || 'No especificado',
+        mensaje: data.message || `Notificación relacionada con el empleado`,
+        tipo: tipoNotificacion
+      });
+    } else {
+      // Correo genérico
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Notificación</h2>
+          <p>${data.message || 'Notificación del sistema'}</p>
+        </div>
+      `;
+    }
+    
+    // Configurar opciones del correo
+    const mailOptions = {
+      from: `"Gestión de Empleados" <${process.env.EMAIL_USER || 'noreply@empresa.com'}>`,
+      to: emailTo,
+      subject: subject,
+      html: htmlContent
+    };
+    
+    console.log(`Enviando correo a: ${emailTo}, tipo: ${data.type}`);
+    
+    // Enviar el correo directamente
+    const info = await transporter.sendMail(mailOptions);
+    
+    // Actualizar el estado del correo en la base de datos
+    await emailLogRef.update({
+      status: 'sent',
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      messageId: info.messageId || ''
+    });
+    
+    console.log(`Correo enviado con éxito. ID del mensaje: ${info.messageId}`);
+    
+    // Registrar en la colección de correos enviados para análisis
+    await admin.firestore().collection('sentEmails').add({
+      employeeId: data.employeeId,
+      sentDate: new Date().toISOString().split('T')[0],
+      type: data.type,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      messageId: info.messageId || ''
+    });
+    
+    return { 
+      success: true, 
+      message: 'Correo enviado correctamente',
+      messageId: info.messageId 
+    };
+  } catch (error) {
+    console.error('Error al enviar correo de cumpleaños:', error);
+    
+    // Intentar actualizar el registro si falló
+    try {
+      if (data.employeeId) {
+        const failedEmailsQuery = await admin.firestore()
+          .collection('pendingEmails')
+          .where('employeeId', '==', data.employeeId)
+          .where('status', '==', 'sending')
+          .limit(1)
+          .get();
+        
+        if (!failedEmailsQuery.empty) {
+          await failedEmailsQuery.docs[0].ref.update({
+            status: 'failed',
+            error: error.message,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+    } catch (updateError) {
+      console.error('Error al actualizar estado de correo fallido:', updateError);
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Error al enviar el correo',
+      error.message
+    );
+  }
+});
+
+// Endpoint HTTP para pruebas de correo (mantener para compatibilidad)
+exports.testEmail = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    // Solo permitir peticiones POST
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+    
+    try {
+      const { email, name } = req.body;
+      
+      if (!email || !name) {
+        res.status(400).send({ error: 'Email y nombre son requeridos' });
+        return;
+      }
+      
+      if (!transporter) {
+        res.status(500).send({ error: 'Servicio de correo no configurado' });
+        return;
+      }
+      
+      // Enviar correo de prueba
+      const mailOptions = {
+        from: `"REGALA ALGO Test" <${process.env.EMAIL_USER || 'test@regalaalgo.com'}>`,
+        to: email,
+        subject: '[PRUEBA] Bienvenido a REGALA ALGO',
+        html: createWelcomeEmailHTML(name)
+      };
+      
+      const info = await transporter.sendMail(mailOptions);
+      
+      res.status(200).send({
+        success: true,
+        message: 'Correo de prueba enviado',
+        info: {
+          messageId: info.messageId,
+          response: info.response
+        }
+      });
+    } catch (error) {
+      console.error('Error en prueba de correo:', error);
+      res.status(500).send({
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  });
+});
+
+// Versión invocable de la función de prueba de correo
+exports.testEmailCallable = functions.https.onCall(async (data, context) => {
+  try {
+    // Verificar autenticación
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Se requiere autenticación para probar el servicio de correo'
+      );
+    }
+    
+    const { email, name } = data;
+    
+    if (!email || !name) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Email y nombre son requeridos'
+      );
+    }
+    
+    if (!transporter) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'El servicio de correo no está configurado'
+      );
+    }
+    
+    // Enviar correo de prueba
+    const mailOptions = {
+      from: `"REGALA ALGO Test" <${process.env.EMAIL_USER || 'test@regalaalgo.com'}>`,
+      to: email,
+      subject: '[PRUEBA] Servicio de Correo - Sistema de Gestión',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #3b82f6;">Prueba de Correo Electrónico</h2>
+          <p>Hola ${name},</p>
+          <p>Este es un mensaje de prueba para verificar que el servicio de correo electrónico está funcionando correctamente.</p>
+          <p style="margin-top: 20px;">Fecha y hora de envío: ${new Date().toLocaleString()}</p>
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+            <p>Este es un correo automático, por favor no responda a este mensaje.</p>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    
+    // Registrar actividad en logs
+    console.log(`Correo de prueba enviado a ${email}`);
+    
+    return {
+      success: true,
+      message: 'Correo de prueba enviado correctamente',
+      info: {
+        messageId: info.messageId,
+        response: info.response
+      }
+    };
+  } catch (error) {
+    console.error('Error en prueba de correo invocable:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      'Error al enviar correo de prueba',
+      error.message
+    );
+  }
+});
+
+// Función para enviar PDF de cotización por correo
+exports.sendQuotePDF = functions.https.onCall(async (data, context) => {
+  try {
+    // Verificar autenticación
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'Se requiere autenticación para enviar PDFs'
+      );
+    }
+
+    // Verificar si el transporte está configurado
+    if (!transporter) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'El servicio de correo no está configurado correctamente'
+      );
+    }
+
+    // Validar datos requeridos
+    if (!data.clientEmail || !data.pdfBase64 || !data.clientName) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Se requiere email del cliente, PDF en base64 y nombre del cliente'
+      );
+    }
+
+    console.log(`Enviando PDF de cotización a: ${data.clientEmail}`);
+
+    // Validar formato de correo
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.clientEmail)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'El formato del correo electrónico no es válido'
+      );
+    }
+
+    // Crear contenido HTML del correo
+    const createQuoteEmailHTML = (clientName, quoteNumber) => {
+      return `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://firebasestorage.googleapis.com/v0/b/tienda-arg.appspot.com/o/logo-regala-algo.png?alt=media" alt="MIRG Logo" style="max-width: 200px;">
+          </div>
+          
+          <h1 style="color: #3b82f6; text-align: center; margin-bottom: 20px;">📄 Su Cotización Está Lista</h1>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #333;">Estimado/a <strong>${clientName}</strong>,</p>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #333;">Nos complace enviarle la cotización solicitada. En el archivo adjunto encontrará todos los detalles de los productos/servicios cotizados con sus respectivos precios.</p>
+          
+          <div style="background-color: #f9f9f9; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+            <p style="font-size: 16px; line-height: 1.6; margin: 0;">
+              <strong>📋 Número de Cotización:</strong> ${quoteNumber || 'COT-' + Date.now()}
+            </p>
+            <p style="font-size: 16px; line-height: 1.6; margin: 10px 0 0 0;">
+              <strong>📅 Fecha de Emisión:</strong> ${new Date().toLocaleDateString('es-MX')}
+            </p>
+          </div>
+
+          <div style="background-color: #e7f3ff; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <h3 style="color: #1e40af; margin: 0 0 10px 0;">📎 Archivo Adjunto</h3>
+            <p style="margin: 0; color: #334155;">
+              Su cotización completa se encuentra en el archivo PDF adjunto a este correo.
+            </p>
+          </div>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #333;">Si tiene alguna pregunta sobre esta cotización o desea realizar alguna modificación, no dude en contactarnos.</p>
+          
+          <div style="background-color: #f9f9f9; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
+            <h3 style="color: #059669; margin: 0 0 10px 0;">📞 Información de Contacto</h3>
+            <p style="font-size: 16px; line-height: 1.6; margin: 5px 0;">
+              <strong>📧 Email:</strong> MIRGTALLER@GMAIL.COM
+            </p>
+            <p style="font-size: 16px; line-height: 1.6; margin: 5px 0;">
+              <strong>📱 Teléfono:</strong> 811-514-7756 / 811-796-7956
+            </p>
+            <p style="font-size: 16px; line-height: 1.6; margin: 5px 0;">
+              <strong>📍 Dirección:</strong> 4TA VIDRIERA #927 COL 1 DE MAYO EN MONTERREY, N.L., MÉXICO
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #3b82f6; margin: 0;">
+              ¡Gracias por confiar en nosotros!
+            </p>
+          </div>
+          
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #666; font-size: 14px;">
+            <p>MIRG - HECTOR ROLANDO RAMOS GARCIA</p>
+            <p>RFC: RAGH931025DP4</p>
+            <p>© ${new Date().getFullYear()} MIRG. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      `;
+    };
+
+    // Convertir base64 a buffer para el adjunto
+    const pdfBuffer = Buffer.from(data.pdfBase64, 'base64');
+    
+    // Configurar opciones del correo
+    const mailOptions = {
+      from: `"MIRG - Cotizaciones" <${process.env.EMAIL_USER || 'MIRGTALLER@gmail.com'}>`,
+      to: data.clientEmail,
+      subject: `📄 Su Cotización - ${data.clientName} | MIRG`,
+      html: createQuoteEmailHTML(data.clientName, data.quoteNumber),
+      attachments: [
+        {
+          filename: `Cotizacion_${data.clientName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }
+      ]
+    };
+
+    // Registrar intento de envío
+    const logRef = admin.firestore().collection('email_logs').doc();
+    await logRef.set({
+      id: logRef.id,
+      email: data.clientEmail,
+      clientName: data.clientName,
+      type: 'quote_pdf',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      status: 'sending',
+      quoteNumber: data.quoteNumber || 'COT-' + Date.now()
+    });
+
+    console.log(`Enviando correo con PDF a: ${data.clientEmail}`);
+
+    // Enviar el correo
+    const info = await transporter.sendMail(mailOptions);
+    
+    // Actualizar log con éxito
+    await logRef.update({
+      status: 'sent',
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      messageId: info.messageId
+    });
+
+    console.log(`PDF enviado exitosamente. MessageID: ${info.messageId}`);
+    
+    return { 
+      success: true, 
+      message: 'PDF enviado correctamente al cliente',
+      messageId: info.messageId,
+      sentTo: data.clientEmail
+    };
+
+  } catch (error) {
+    console.error('Error al enviar PDF por correo:', error);
+    
+    // Registrar error en logs
+    try {
+      if (data.clientEmail) {
+        await admin.firestore().collection('email_logs').add({
+          email: data.clientEmail,
+          clientName: data.clientName || 'Desconocido',
+          type: 'quote_pdf',
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          status: 'failed',
+          error: error.message
+        });
+      }
+    } catch (logError) {
+      console.error('Error al registrar fallo de envío:', logError);
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal',
+      'Error al enviar el PDF por correo: ' + error.message,
+      error.message
+    );
+  }
+});

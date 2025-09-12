@@ -1,0 +1,142 @@
+/* Estilos responsivos para EmployeeManager.tsx */
+
+/* Estilos generales para mejorar la visualización en móvil */
+.employee-manager-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Mejoras para las tarjetas de empleados en móvil */
+@media (max-width: 640px) {
+  /* Reducir padding en tarjetas para móvil */
+  .employee-card-content {
+    padding: 12px !important;
+  }
+  
+  /* Asegurar que el texto de nombres largos no desborde */
+  .employee-name {
+    word-break: break-word;
+    font-size: 1rem;
+    line-height: 1.25rem;
+  }
+  
+  /* Ajustar los datos de contacto para que no desborden */
+  .contact-info {
+    font-size: 0.8rem;
+    word-break: break-all;
+  }
+  
+  /* Ajustar tamaño de texto de preferencias */
+  .preferences-container {
+    padding: 8px !important;
+  }
+  
+  .preference-item {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  
+  /* Hacer más pequeños los botones en móvil */
+  .action-button {
+    width: 28px !important;
+    height: 28px !important;
+    padding: 4px !important;
+  }
+  
+  /* Ajustar tabs en móvil */
+  .tabs-list {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Formularios más compactos en móvil */
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  
+  /* Etiquetas más pequeñas */
+  .form-label {
+    font-size: 0.8rem;
+  }
+  
+  /* Ajustar espaciado entre elementos del formulario */
+  .form-group {
+    margin-bottom: 12px !important;
+  }
+}
+
+/* Mejoras específicas para las tarjetas de cumpleaños próximos */
+.birthday-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .birthday-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+}
+
+/* Evitar que el correo electrónico desborde el contenedor */
+.email-container {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Estilos para la sección de configuración de correo */
+.email-settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .email-settings-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mejorar visualización de la dirección */
+.address-container {
+  word-break: break-word;
+}
+
+/* Hacer que el botón de nueva entrada sea más accesible en móvil */
+.floating-action-button {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@media (min-width: 768px) {
+  .floating-action-button {
+    display: none;
+  }
+}
+
+/* Mejorar la barra de herramientas para móvil */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    flex-direction: column;
+  }
+  
+  .toolbar-button {
+    width: 100%;
+  }
+}

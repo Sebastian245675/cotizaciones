@@ -1,0 +1,99 @@
+/* Estilos adicionales para el AdvancedIndex */
+
+/* Ocultar la barra de desplazamiento horizontal */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE y Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;             /* Chrome, Safari y Opera */
+}
+
+/* Estilos para las imágenes publicitarias */
+@media (min-width: 1024px) {
+  /* En pantallas grandes, añadir una animación sutil al pasar el mouse */
+  .ad-image-container:hover img {
+    transform: scale(1.03);
+  }
+  
+  .ad-image-container img {
+    transition: transform 0.5s ease;
+  }
+
+  /* Contenedor para el comportamiento de scroll */
+  .sticky-ads-container {
+    position: sticky;
+    top: 24px; /* Alineado con el encabezado fijo */
+    height: fit-content;
+    max-height: calc(100vh - 48px);
+    display: flex;
+    flex-direction: column;
+    gap: 5rem; /* Aumentado significativamente el espaciado entre las imágenes */
+  }
+}
+
+/* Asegurar que las imágenes publicitarias tengan una altura mínima */
+@media (min-width: 1280px) {
+  .ad-image-tall {
+    min-height: 500px;
+    margin-top: 2.5rem;
+  }
+  
+  .ad-image-medium {
+    min-height: 450px;
+    margin-top: 2.5rem;
+  }
+  
+  /* Eliminar el margen superior de la primera imagen */
+  .ad-image-container:first-child {
+    margin-top: 0;
+  }
+  
+  /* Estilos para los comentarios destacados */
+  .ad-image-container + div {
+    animation: fadeIn 0.8s ease-out;
+  }
+}
+
+/* Animaciones para los comentarios y sus elementos */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Animación escalonada para cada comentario */
+.ad-image-container + div > div > div > div:nth-child(1) {
+  animation: fadeIn 0.6s ease-out 0.1s both;
+}
+
+.ad-image-container + div > div > div > div:nth-child(2) {
+  animation: fadeIn 0.6s ease-out 0.2s both;
+}
+
+.ad-image-container + div > div > div > div:nth-child(3) {
+  animation: fadeIn 0.6s ease-out 0.3s both;
+}
+
+.ad-image-container + div > div > div > div:nth-child(4) {
+  animation: fadeIn 0.6s ease-out 0.4s both;
+}
+
+.ad-image-container + div > div > div > div:nth-child(5) {
+  animation: fadeIn 0.6s ease-out 0.5s both;
+}
+
+/* Estilo para el contenedor principal de comentarios */
+@media (min-width: 1024px) {
+  .ad-image-container + div {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+    position: relative;
+  }
+  
+  /* Efecto hover para los comentarios individuales */
+  .ad-image-container + div > div > div > div:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+}
