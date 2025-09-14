@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
@@ -60,7 +60,8 @@ import {
   Calendar,
   HelpCircle,
   Info,
-  LogOut
+  LogOut,
+  Scale
 } from 'lucide-react';
 import { collection, getDocs, doc, setDoc, addDoc, query, orderBy, limit, updateDoc, where, Timestamp, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -187,6 +188,7 @@ interface Product {
   margin?: number;
   puntosRecompensa?: number;
   tipoRecompensa?: 'fijo' | 'porcentaje';
+  tipoVenta?: 'unidad' | 'granel' | 'paquete' | 'kilos';
 }
 
 interface CartItem {
@@ -251,6 +253,9 @@ interface SaleTab {
 }
 
 const POSSalesSystem: React.FC = () => {
+  console.log('🚀 POSSalesSystem - Componente iniciando...');
+  console.log('🚀 POSSalesSystem - Timestamp:', new Date().toISOString());
+  
   const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -338,6 +343,11 @@ const POSSalesSystem: React.FC = () => {
   // Estados adicionales para pestañas
   const [editingTabId, setEditingTabId] = useState<string>('');
   const [editingTabName, setEditingTabName] = useState('');
+  
+  // Estados para venta por kilos
+  const [showWeightDialog, setShowWeightDialog] = useState(false);
+  const [selectedProductForWeight, setSelectedProductForWeight] = useState<Product | null>(null);
+  const [weightInput, setWeightInput] = useState('');
 
   // Estados para verificación de corte de caja
   const [cashRegisterStatus, setCashRegisterStatus] = useState<{
@@ -346,12 +356,14 @@ const POSSalesSystem: React.FC = () => {
     reportId: string | null;
     openingBalance: number;
     openedAt?: Date | null;
+    justClosed?: boolean;
   }>({
     isOpen: false,
     isLoading: true,
     reportId: null,
     openingBalance: 0,
-    openedAt: null
+    openedAt: null,
+    justClosed: false
   });
   const [showCashRegisterModal, setShowCashRegisterModal] = useState(false);
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
@@ -366,6 +378,104 @@ const POSSalesSystem: React.FC = () => {
   const [openingBalance, setOpeningBalance] = useState('');
 
   const { user } = useAuth();
+
+  // Función auxiliar para obtener email de usuario de forma segura
+  const getUserEmail = (): string | null => {
+    const email = user?.email;
+    if (!email) {
+      console.log('⚠️ getUserEmail: No hay email de usuario disponible');
+      console.log('⚠️ Usuario completo:', user);
+      return null;
+    }
+    return email;
+  };
+
+  // Estado para controlar si ya se verificó que existe un turno
+  const [turnAlreadyExists, setTurnAlreadyExists] = useState(false);
+
+  // Función simplificada para verificar turno existente
+  const verifyExistingTurn = async (): Promise<boolean> => {
+    try {
+      console.log('🔍 VERIFICACIÓN DIRECTA DE TURNO EXISTENTE...');
+      console.log('📊 Estado antes de verificar:', cashRegisterStatus);
+      console.log('🎭 Modal antes de verificar:', showCashRegisterModal);
+      
+      // Usar el email del usuario actual, no hardcoded
+      const userEmail = getUserEmail();
+      if (!userEmail) {
+        console.log('❌ No hay email de usuario para verificar turno');
+        return false;
+      }
+      
+      console.log('🎯 Buscando turno para usuario actual:', userEmail);
+      
+      const openQuery = query(
+        collection(db, 'cash_reports'),
+        where('status', '==', 'open'),
+        where('createdBy', '==', userEmail)
+      );
+      
+      const snapshot = await getDocs(openQuery);
+      console.log(`📊 Turnos encontrados para ${userEmail}: ${snapshot.docs.length}`);
+      
+      if (!snapshot.empty) {
+        const reportDoc = snapshot.docs[0];
+        const reportData = reportDoc.data();
+        
+        console.log('✅ TURNO ENCONTRADO:', {
+          id: reportDoc.id,
+          createdBy: reportData.createdBy,
+          status: reportData.status,
+          openingBalance: reportData.openingBalance
+        });
+        
+        // Actualizar el estado inmediatamente y cerrar modal EN EL MISMO setState
+        const newCashRegisterStatus = {
+          isOpen: true,
+          isLoading: false,
+          reportId: reportDoc.id,
+          openingBalance: reportData.openingBalance || 0,
+          openedAt: reportData.shiftStart?.toDate() || new Date()
+        };
+        
+        console.log('🔧 Aplicando estado:', newCashRegisterStatus);
+        setCashRegisterStatus(newCashRegisterStatus);
+        
+        // Marcar que el turno ya existe
+        setTurnAlreadyExists(true);
+        
+        // Usar setTimeout para asegurar que el estado se actualice antes de cerrar el modal
+        setTimeout(() => {
+          console.log('🔒 Cerrando modal después de actualizar estado...');
+          setShowCashRegisterModal(false);
+        }, 50);
+        
+        console.log('✅ Estado actualizado - Turno activo y modal cerrado');
+        
+        // Verificar que el cambio se aplicó y forzar cierre del modal
+        setTimeout(() => {
+          console.log('🔄 Verificación post-actualización:');
+          console.log('   cashRegisterStatus.isOpen:', cashRegisterStatus.isOpen);
+          console.log('   cashRegisterStatus.reportId:', cashRegisterStatus.reportId);
+          console.log('   showCashRegisterModal:', showCashRegisterModal);
+          
+          // Forzar cierre del modal si hay reportId
+          if (reportDoc.id && showCashRegisterModal) {
+            console.log('🔧 FORZANDO cierre del modal...');
+            setShowCashRegisterModal(false);
+          }
+        }, 100);
+        
+        return true;
+      } else {
+        console.log('❌ No se encontró turno abierto');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error verificando turno:', error);
+      return false;
+    }
+  };
 
   // Funciones para manejar pestañas múltiples
   const createNewTab = () => {
@@ -528,7 +638,29 @@ const POSSalesSystem: React.FC = () => {
       setDailyStats(cachedDailyStats);
     }
 
-    if (cachedCashRegisterStatus) {
+    // FORZAR LIMPIEZA PARA SUBCUENTAS - No deben heredar turnos de otros usuarios
+    const isSubAccount = user?.email && user.email !== 'admin@gmail.com';
+    if (isSubAccount) {
+      console.log('🔑 SUBCUENTA DETECTADA - Limpiando cualquier cache de turnos heredado');
+      console.log('   Usuario actual:', user?.email);
+      
+      // Limpiar todo el cache local
+      storage.removeItem('cash_register_status_cache');
+      localStorage.removeItem('pos_cash_register_status');
+      localStorage.removeItem('pos_cash_register_date');
+      
+      // Forzar estado inicial limpio
+      setCashRegisterStatus({
+        isOpen: false,
+        reportId: null,
+        openedAt: null,
+        isLoading: false,
+        justClosed: false,
+        openingBalance: 0
+      });
+      
+      console.log('✅ Estado de caja limpiado para subcuenta');
+    } else if (cachedCashRegisterStatus) {
       console.log('📦 Recuperando estado de caja del cache');
       // Convertir fechas de string a Date objects si es necesario
       const restoredStatus = {
@@ -610,10 +742,30 @@ const POSSalesSystem: React.FC = () => {
 
   // Inicializar con una pestaña por defecto
   useEffect(() => {
+    console.log('🚀 POSSalesSystem - useEffect de inicialización ejecutándose...');
+    console.log('🚀 POSSalesSystem - saleTabs.length:', saleTabs.length);
     if (saleTabs.length === 0) {
+      console.log('🚀 POSSalesSystem - Creando pestaña inicial...');
       createNewTab();
     }
   }, []);
+
+  // Verificar estado del turno cuando el usuario esté autenticado
+  useEffect(() => {
+    if (user && user.email) {
+      console.log('👤 Usuario autenticado detectado:', user.email);
+      const userEmail = getUserEmail();
+      if (!userEmail) {
+        console.log('❌ Email no disponible aunque user existe');
+        return;
+      }
+      console.log('� cashRegisterStatus actual:', cashRegisterStatus);
+      console.log('�🔍 Verificando estado del turno para usuario autenticado...');
+      checkCashRegisterStatus(true, userEmail); // Pasar email explícitamente
+    } else {
+      console.log('❌ Usuario no disponible o sin email:', user);
+    }
+  }, [user]);
 
   // Guardar datos de la pestaña activa cuando cambian los estados
   useEffect(() => {
@@ -624,29 +776,77 @@ const POSSalesSystem: React.FC = () => {
       paymentMethod, receivedAmount, cardAmount, transferAmount, creditDueDate, creditNotes]);
 
   // Función para verificar si hay un corte de caja abierto
-  const checkCashRegisterStatus = async () => {
+  const checkCashRegisterStatus = async (forceCheck = false, userEmail?: string) => {
     try {
       console.log('🔍 Verificando estado del corte de caja...');
+      console.log('📧 Email recibido como parámetro:', userEmail);
+      console.log('📧 Email del contexto user:', user?.email);
+      
+      // Usar el email pasado como parámetro o el del contexto
+      const emailToUse = userEmail || user?.email;
+      console.log('📧 Email que se usará para la consulta:', emailToUse);
+      
+      if (!emailToUse) {
+        console.log('❌ No hay email disponible para la consulta');
+        setCashRegisterStatus(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
+      
+      // Si acabamos de cerrar un turno y no es una verificación forzada, no hacer nada
+      if (cashRegisterStatus.justClosed && !forceCheck) {
+        console.log('⏸️ Verificación omitida - turno recién cerrado');
+        return;
+      }
+      
+      // Verificar si hay un cierre reciente guardado en localStorage
+      const recentClosed = localStorage.getItem('pos_cash_register_closed');
+      if (recentClosed && !forceCheck) {
+        const closedData = JSON.parse(recentClosed);
+        const timeSinceClosure = Date.now() - closedData.closedAt;
+        
+        // Si se cerró hace menos de 5 minutos, no verificar automáticamente
+        if (timeSinceClosure < 5 * 60 * 1000) { // 5 minutos
+          console.log('⏸️ Verificación omitida - cierre reciente detectado');
+          return;
+        } else {
+          // Limpiar el flag después de 5 minutos
+          localStorage.removeItem('pos_cash_register_closed');
+        }
+      }
+      
       setCashRegisterStatus(prev => ({ ...prev, isLoading: true }));
       
       // Limpiar cache local para forzar consulta en tiempo real
       localStorage.removeItem('pos_cash_register_status');
       localStorage.removeItem('pos_cash_register_date');
       
-      // BÚSQUEDA SIMPLE Y DIRECTA: Buscar cualquier reporte abierto
-      console.log('🎯 BÚSQUEDA DIRECTA: Cualquier reporte abierto...');
+      // BÚSQUEDA SIMPLE Y DIRECTA: Buscar cualquier reporte abierto DEL USUARIO ACTUAL
+      console.log('🎯 BÚSQUEDA DIRECTA: Cualquier reporte abierto del usuario:', emailToUse);
+      console.log('🧹 LIMPIANDO CACHE LOCAL...');
+      
+      // LIMPIAR TODO EL CACHE RELACIONADO CON TURNOS
+      localStorage.removeItem('pos_cash_register_status');
+      localStorage.removeItem('pos_cash_register_date');
+      localStorage.removeItem('cash_register_status_cache');
       
       const openQuery = query(
         collection(db, 'cash_reports'),
         where('status', '==', 'open'),
+        where('createdBy', '==', emailToUse),
         orderBy('date', 'desc'),
         limit(10)
       );
       
       const openSnapshot = await getDocs(openQuery);
-      console.log(`📊 Reportes abiertos encontrados: ${openSnapshot.docs.length}`);
+      console.log(`📊 Reportes abiertos encontrados para ${emailToUse}: ${openSnapshot.docs.length}`);
       
       // Mostrar todos los reportes abiertos para debug
+      if (openSnapshot.docs.length === 0) {
+        console.log('✅ CORRECTO: No hay turnos abiertos para este usuario');
+      } else {
+        console.log('⚠️ ATENCIÓN: Se encontraron turnos abiertos que no deberían existir:');
+      }
+      
       openSnapshot.docs.forEach((doc, index) => {
         const data = doc.data();
         console.log(`📄 Reporte abierto ${index + 1}:`, {
@@ -654,7 +854,8 @@ const POSSalesSystem: React.FC = () => {
           status: data.status,
           date: data.date?.toDate()?.toISOString(),
           createdBy: data.createdBy,
-          openingBalance: data.openingBalance
+          openingBalance: data.openingBalance,
+          esMismoUsuario: data.createdBy === emailToUse
         });
       });
       
@@ -701,12 +902,17 @@ const POSSalesSystem: React.FC = () => {
         isOpen: false,
         isLoading: false,
         reportId: null,
-        openingBalance: 0
+        openingBalance: 0,
+        justClosed: false // Limpiar el flag si es una verificación normal
       });
       
-      // Mostrar modal automáticamente cuando no hay turno activo
-      console.log('🎯 Mostrando modal automáticamente para iniciar turno...');
-      setShowCashRegisterModal(true);
+      // Solo mostrar modal si no acabamos de cerrar un turno
+      if (!cashRegisterStatus.justClosed && forceCheck !== false) {
+        console.log('🎯 Mostrando modal automáticamente para iniciar turno...');
+        setShowCashRegisterModal(true);
+      } else {
+        console.log('⏸️ Modal omitido - turno recién cerrado o verificación silenciosa');
+      }
       
     } catch (error) {
       console.error('❌ Error verificando corte de caja:', error);
@@ -714,12 +920,15 @@ const POSSalesSystem: React.FC = () => {
         isOpen: false,
         isLoading: false,
         reportId: null,
-        openingBalance: 0
+        openingBalance: 0,
+        justClosed: false
       });
       
-      // Mostrar modal automáticamente también en caso de error
-      console.log('🎯 Mostrando modal automáticamente debido a error...');
-      setShowCashRegisterModal(true);
+      // Solo mostrar modal en caso de error si no acabamos de cerrar
+      if (!cashRegisterStatus.justClosed) {
+        console.log('🎯 Mostrando modal automáticamente debido a error...');
+        setShowCashRegisterModal(true);
+      }
     }
   };
 
@@ -753,6 +962,136 @@ const POSSalesSystem: React.FC = () => {
   // Exponer función de depuración globalmente
   useEffect(() => {
     (window as any).debugCashRegister = debugCashRegister;
+    
+    // Función para verificar turnos directamente en Firebase
+    (window as any).verificarTurnos = async () => {
+      console.log('🔍 VERIFICANDO TURNOS EN FIREBASE - cash_reports');
+      console.log('👤 Usuario actual:', user?.email);
+      
+      try {
+        // 1. Buscar TODOS los turnos
+        const allSnapshot = await getDocs(collection(db, 'cash_reports'));
+        console.log(`📊 Total de turnos en Firebase: ${allSnapshot.docs.length}`);
+        
+        if (allSnapshot.docs.length === 0) {
+          console.log('❌ ERROR: No hay turnos en la colección cash_reports');
+          return;
+        }
+        
+        // 2. Mostrar todos los turnos
+        console.log('\n📄 TODOS LOS TURNOS:');
+        allSnapshot.docs.forEach((doc, index) => {
+          const data = doc.data();
+          console.log(`${index + 1}. ID: ${doc.id}`);
+          console.log(`   Status: ${data.status}`);
+          console.log(`   CreatedBy: ${data.createdBy}`);
+          console.log(`   Date: ${data.date?.toDate?.()?.toLocaleString()}`);
+          console.log(`   OpeningBalance: ${data.openingBalance}`);
+          console.log('---');
+        });
+        
+        // 3. Buscar turnos abiertos SIN filtro de usuario
+        const openSnapshot = await getDocs(query(
+          collection(db, 'cash_reports'),
+          where('status', '==', 'open')
+        ));
+        
+        console.log(`\n🔓 Turnos abiertos (todos): ${openSnapshot.docs.length}`);
+        openSnapshot.docs.forEach((doc, index) => {
+          const data = doc.data();
+          console.log(`${index + 1}. ID: ${doc.id} - CreatedBy: ${data.createdBy} - Status: ${data.status}`);
+        });
+        
+        // 4. Buscar turnos abiertos CON filtro de usuario actual
+        if (user?.email) {
+          const userOpenSnapshot = await getDocs(query(
+            collection(db, 'cash_reports'),
+            where('status', '==', 'open'),
+            where('createdBy', '==', user.email)
+          ));
+          
+          console.log(`\n🔒 Turnos abiertos del usuario ${user.email}: ${userOpenSnapshot.docs.length}`);
+          userOpenSnapshot.docs.forEach((doc, index) => {
+            const data = doc.data();
+            console.log(`${index + 1}. ID: ${doc.id} - Status: ${data.status} - Date: ${data.date?.toDate?.()?.toLocaleString()}`);
+          });
+        }
+        
+        console.log('\n✅ Verificación completa');
+        
+      } catch (error) {
+        console.error('❌ Error verificando turnos:', error);
+      }
+    };
+    
+    (window as any).debugTurnoAdmin = async () => {
+      console.log('🔍 DEBUG TURNO ADMIN - INICIANDO...');
+      console.log('👤 Usuario actual:', user);
+      console.log('📧 Email del usuario:', user?.email);
+      console.log('📊 Estado actual del cashRegister:', cashRegisterStatus);
+      
+      if (!user?.email) {
+        console.log('❌ ERROR: No hay usuario autenticado');
+        return;
+      }
+      
+      try {
+        console.log('🔎 Buscando turnos abiertos en Firebase...');
+        const openQuery = query(
+          collection(db, 'cash_reports'),
+          where('status', '==', 'open'),
+          where('createdBy', '==', user.email),
+          orderBy('date', 'desc'),
+          limit(10)
+        );
+        
+        const openSnapshot = await getDocs(openQuery);
+        console.log(`📊 Turnos encontrados: ${openSnapshot.docs.length}`);
+        
+        if (openSnapshot.docs.length === 0) {
+          console.log('✅ No hay turnos abiertos para este usuario');
+          
+          // Buscar TODOS los turnos del usuario (abiertos y cerrados)
+          console.log('🔍 Buscando TODOS los turnos del usuario...');
+          const allQuery = query(
+            collection(db, 'cash_reports'),
+            where('createdBy', '==', user.email),
+            orderBy('date', 'desc'),
+            limit(5)
+          );
+          
+          const allSnapshot = await getDocs(allQuery);
+          console.log(`📊 Total de turnos del usuario: ${allSnapshot.docs.length}`);
+          
+          allSnapshot.docs.forEach((doc, index) => {
+            const data = doc.data();
+            console.log(`📄 Turno ${index + 1}:`, {
+              id: doc.id,
+              status: data.status,
+              date: data.date?.toDate()?.toLocaleString(),
+              createdBy: data.createdBy,
+              openingBalance: data.openingBalance
+            });
+          });
+        } else {
+          console.log('⚠️ TURNOS ABIERTOS ENCONTRADOS:');
+          openSnapshot.docs.forEach((doc, index) => {
+            const data = doc.data();
+            console.log(`📄 Turno abierto ${index + 1}:`, {
+              id: doc.id,
+              status: data.status,
+              date: data.date?.toDate()?.toLocaleString(),
+              createdBy: data.createdBy,
+              openingBalance: data.openingBalance,
+              esMismoUsuario: data.createdBy === user.email
+            });
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error en debug:', error);
+      }
+    };
+    
     (window as any).debugSaleUpdate = async () => {
       console.log('🔍 DEPURACIÓN DE ACTUALIZACIÓN DE VENTAS');
       console.log('📊 Estado del corte de caja:', cashRegisterStatus);
@@ -782,10 +1121,11 @@ const POSSalesSystem: React.FC = () => {
       console.log('📊 Estado local:', cashRegisterStatus);
       
       try {
-        // Buscar reporte activo en la BD
+        // Buscar reporte activo en la BD DEL USUARIO ACTUAL
         const reportsQuery = query(
           collection(db, 'cash_reports'),
           where('status', '==', 'open'),
+          where('createdBy', '==', user?.email),
           orderBy('date', 'desc'),
           limit(1)
         );
@@ -865,11 +1205,15 @@ const POSSalesSystem: React.FC = () => {
         isLoading: false,
         reportId: docRef.id,
         openingBalance: openingBalanceNum,
-        openedAt: new Date()
+        openedAt: new Date(),
+        justClosed: false
       };
       
       // SÍ establecer estado inmediatamente para evitar más consultas
       setCashRegisterStatus(newStatus);
+      
+      // Limpiar cualquier estado de justClosed del localStorage al crear nuevo registro
+      localStorage.removeItem('lastCashRegisterClosed');
       
       // NO guardar en localStorage - siempre consultar Firebase en tiempo real
       console.log('� Estado actualizado sin cache local para mantener sincronización en tiempo real');
@@ -995,24 +1339,46 @@ const POSSalesSystem: React.FC = () => {
       // Actualizar el reporte para cerrarlo
       await updateDoc(reportRef, {
         status: 'closed',
+        date: Timestamp.now(), // Actualizar fecha de cierre para el historial
         closingBalance: closingBalanceNum,
         actualCashCount: actualCashCountNum,
         expectedBalance: expectedBalance,
         variance: variance,
         closingNotes: closingNotes,
         shiftEnd: Timestamp.now(),
-        closedBy: user?.email || 'unknown'
+        closedBy: user?.email || 'unknown',
+        // Datos adicionales para el historial
+        finalReport: {
+          totalSales: currentReport.totalSales || 0,
+          cashSales: currentReport.cashSales || 0,
+          creditCardSales: currentReport.creditCardSales || 0,
+          digitalPayments: currentReport.digitalPayments || 0,
+          movements: currentReport.movements || [],
+          totalMovements: (currentReport.movements || []).length,
+          hoursWorked: Math.round((Date.now() - (currentReport.shiftStart?.toMillis() || Date.now())) / 1000 / 60 / 60 * 100) / 100,
+          profitability: currentReport.totalSales > 0 ? ((currentReport.totalProfit || 0) / currentReport.totalSales * 100) : 0,
+          averageTicket: currentReport.totalSales > 0 ? (currentReport.totalSales / Math.max(1, (currentReport.movements || []).filter(m => m.type === 'sale_cash').length)) : 0
+        }
       });
 
       console.log('✅ Turno cerrado exitosamente');
 
-      // Actualizar estado local
-      setCashRegisterStatus({
+      // Actualizar estado local INMEDIATAMENTE y bloquear futuras verificaciones
+      const closedStatus = {
         isOpen: false,
         isLoading: false,
         reportId: null,
-        openingBalance: 0
-      });
+        openingBalance: 0,
+        justClosed: true // Flag para evitar reabrir modal automáticamente
+      };
+      
+      setCashRegisterStatus(closedStatus);
+      
+      // Guardar estado en localStorage para persistir el cierre
+      localStorage.setItem('pos_cash_register_closed', JSON.stringify({
+        closedAt: Date.now(),
+        lastReportId: cashRegisterStatus.reportId
+      }));
 
       // Limpiar campos del modal
       setClosingBalance('');
@@ -1028,9 +1394,17 @@ const POSSalesSystem: React.FC = () => {
           : `⚠️ Faltante: $${Math.abs(variance).toLocaleString()}`;
 
       toast({
-        title: "🏁 Turno cerrado exitosamente",
-        description: `Balance esperado: $${expectedBalance.toLocaleString()} | Conteo real: $${actualCashCountNum.toLocaleString()} | ${varianceMessage}`,
+        title: "🏁 Turno y Corte de Caja Cerrados",
+        description: `Turno: ${varianceMessage} | Corte: Balance esperado $${expectedBalance.toLocaleString()} vs Real $${actualCashCountNum.toLocaleString()} | Total vendido: $${(currentReport.totalSales || 0).toLocaleString()}`,
       });
+
+      // Mostrar notificación adicional sobre el archivo en historial
+      setTimeout(() => {
+        toast({
+          title: "📋 Reporte Guardado en Historial",
+          description: `El corte de caja aparece ahora en "📋 Historial de Cortes Cerrados" con todos los datos del turno. ID: ${cashRegisterStatus.reportId?.slice(-8)}`,
+        });
+      }, 2000);
 
       // Limpiar cualquier venta en progreso
       clearSale();
@@ -1050,8 +1424,16 @@ const POSSalesSystem: React.FC = () => {
     checkConnectionStatus();
     fetchInitialData();
     initializeOfflineSystem();
-    // Verificar estado del corte de caja
-    checkCashRegisterStatus();
+    // NUEVO: Verificar turno directamente PRIMERO
+    verifyExistingTurn().then(foundTurn => {
+      if (!foundTurn) {
+        console.log('⚠️ verifyExistingTurn no encontró turno, ejecutando método original...');
+        // Solo ejecutar el método original si no se encontró turno
+        checkCashRegisterStatus();
+      } else {
+        console.log('✅ verifyExistingTurn encontró turno, omitiendo método original');
+      }
+    });
   }, []);
 
   // NUEVO: Efecto para forzar la carga del reporte al inicio
@@ -1065,25 +1447,45 @@ const POSSalesSystem: React.FC = () => {
     
     // Forzar carga inmediata si no hay turno activo
     const forceLoadCashRegister = async () => {
-      console.log('🔍 FORZANDO VERIFICACIÓN DE TURNO...');
+      const userEmail = getUserEmail();
+      if (!userEmail) {
+        console.log('❌ forceLoadCashRegister: No se puede ejecutar sin email de usuario');
+        return;
+      }
+      
+      console.log('🔍 FORZANDO VERIFICACIÓN DE TURNO PARA USUARIO:', userEmail);
       
       try {
-        // Búsqueda MUY SIMPLE - todos los reportes abiertos
-        console.log('🎯 BÚSQUEDA ULTRA DIRECTA...');
+        // Búsqueda MUY SIMPLE - reportes abiertos DEL USUARIO ACTUAL
+        console.log('🎯 BÚSQUEDA ULTRA DIRECTA CON FILTRO DE USUARIO...');
         
         const allQuery = query(
           collection(db, "cash_reports"),
+          where("createdBy", "==", userEmail),
           orderBy("date", "desc"),
           limit(50)
         );
         
         const allSnapshot = await getDocs(allQuery);
-        console.log(`📊 TODOS LOS REPORTES: ${allSnapshot.docs.length}`);
+        console.log(`📊 REPORTES ENCONTRADOS PARA ${userEmail}: ${allSnapshot.docs.length}`);
         
-        // Mostrar TODOS los reportes para debug
+        if (allSnapshot.docs.length === 0) {
+          console.log('✅ CORRECTO: No hay reportes para este usuario - Estado limpio');
+          setCashRegisterStatus({
+            isOpen: false,
+            reportId: null,
+            openedAt: null,
+            isLoading: false,
+            justClosed: false,
+            openingBalance: 0
+          });
+          return;
+        }
+        
+        // Mostrar reportes del usuario para debug
         allSnapshot.docs.forEach((doc, index) => {
           const data = doc.data();
-          console.log(`📄 Reporte ${index + 1}:`, {
+          console.log(`📄 Reporte ${index + 1} (${data.createdBy}):`, {
             id: doc.id,
             status: data.status,
             date: data.date?.toDate()?.toISOString(),
@@ -2223,15 +2625,21 @@ const POSSalesSystem: React.FC = () => {
       return saleDate >= today;
     });
 
-    const totalSales = todaySales.reduce((sum, sale) => sum + sale.total, 0);
+    const totalSales = todaySales.reduce((sum, sale) => {
+      const saleTotal = (sale as any).total || (sale as any).resumen?.total || 0;
+      return sum + saleTotal;
+    }, 0);
     const salesCount = todaySales.length;
     const averageTicket = salesCount > 0 ? totalSales / salesCount : 0;
 
     // Productos más vendidos del día
     const productCount: { [key: string]: number } = {};
     todaySales.forEach(sale => {
-      sale.items.forEach(item => {
-        productCount[item.product.name] = (productCount[item.product.name] || 0) + item.quantity;
+      const items = (sale as any).items || (sale as any).productos || [];
+      items.forEach((item: any) => {
+        const productName = item.product?.name || item.nombre || 'Producto sin nombre';
+        const quantity = item.quantity || item.cantidad || 1;
+        productCount[productName] = (productCount[productName] || 0) + quantity;
       });
     });
 
@@ -2252,6 +2660,7 @@ const POSSalesSystem: React.FC = () => {
     try {
       const salesQuery = query(
         collection(db, 'ventas'),
+        where('cashier', '==', user?.email),
         orderBy('timestamp', 'desc'),
         limit(50)
       );
@@ -2287,9 +2696,10 @@ const POSSalesSystem: React.FC = () => {
       console.log('� Cargando todas las ventas para filtrado robusto...');
       
       try {
-        // Obtener todas las ventas sin filtros iniciales
+        // Obtener todas las ventas DEL USUARIO ACTUAL sin filtros iniciales
         const allSalesQuery = query(
           collection(db, 'ventas'),
+          where('cashier', '==', user?.email),
           orderBy('timestamp', 'desc'),
           limit(500) // Limitamos a las últimas 500 ventas para rendimiento
         );
@@ -2361,7 +2771,7 @@ const POSSalesSystem: React.FC = () => {
           saleNumber: sale.saleNumber,
           reportId: sale.reportId,
           timestamp: sale.timestamp.toISOString(),
-          total: sale.total
+          total: (sale as any).total || (sale as any).resumen?.total || 0
         })));
         
         setAllSalesHistory(salesData);
@@ -2435,10 +2845,12 @@ const POSSalesSystem: React.FC = () => {
 
     // Filtrar por cliente
     if (salesHistoryFilter.customer) {
-      filtered = filtered.filter(sale => 
-        sale.customer.name.toLowerCase().includes(salesHistoryFilter.customer.toLowerCase()) ||
-        (sale.customer.clientCode && sale.customer.clientCode.toLowerCase().includes(salesHistoryFilter.customer.toLowerCase()))
-      );
+      filtered = filtered.filter(sale => {
+        const customerName = (sale as any).customer?.name || (sale as any).cliente?.name || '';
+        const clientCode = (sale as any).customer?.clientCode || (sale as any).cliente?.clientCode || '';
+        return customerName.toLowerCase().includes(salesHistoryFilter.customer.toLowerCase()) ||
+               clientCode.toLowerCase().includes(salesHistoryFilter.customer.toLowerCase());
+      });
       console.log('👤 Después de filtro cliente:', filtered.length);
     }
 
@@ -2454,7 +2866,10 @@ const POSSalesSystem: React.FC = () => {
     if (salesHistoryFilter.minAmount) {
       const minAmount = parseFloat(salesHistoryFilter.minAmount);
       if (!isNaN(minAmount)) {
-        filtered = filtered.filter(sale => sale.total >= minAmount);
+        filtered = filtered.filter(sale => {
+          const saleTotal = (sale as any).total || (sale as any).resumen?.total || 0;
+          return saleTotal >= minAmount;
+        });
         console.log('💰 Después de filtro monto mínimo:', filtered.length);
       }
     }
@@ -2463,7 +2878,10 @@ const POSSalesSystem: React.FC = () => {
     if (salesHistoryFilter.maxAmount) {
       const maxAmount = parseFloat(salesHistoryFilter.maxAmount);
       if (!isNaN(maxAmount)) {
-        filtered = filtered.filter(sale => sale.total <= maxAmount);
+        filtered = filtered.filter(sale => {
+          const saleTotal = (sale as any).total || (sale as any).resumen?.total || 0;
+          return saleTotal <= maxAmount;
+        });
         console.log('💰 Después de filtro monto máximo:', filtered.length);
       }
     }
@@ -2492,7 +2910,8 @@ const POSSalesSystem: React.FC = () => {
       id: product.id,
       name: product.name,
       price: product.price,
-      stock: product.stock
+      stock: product.stock,
+      tipoVenta: product.tipoVenta
     });
 
     // Validar que el producto tenga los datos básicos
@@ -2516,6 +2935,15 @@ const POSSalesSystem: React.FC = () => {
       return;
     }
 
+    // Si es un producto que se vende por kilos, abrir diálogo de peso
+    if (product.tipoVenta === 'kilos') {
+      setSelectedProductForWeight(product);
+      setWeightInput('');
+      setShowWeightDialog(true);
+      return;
+    }
+
+    // Para otros tipos de venta, continuar con la lógica normal
     if (product.stock == null) {
       console.error('❌ Producto sin stock definido:', product);
       toast({
@@ -2572,17 +3000,20 @@ const POSSalesSystem: React.FC = () => {
       return;
     }
 
+    // Redondear a 2 decimales para productos por kilos
+    const roundedQuantity = Math.round(newQuantity * 100) / 100;
+
     setCart(cart.map(item => {
       if (item.product.id === productId) {
         const price = item.product.price || 0;
         const discountAmount = item.discountType === 'percentage' 
-          ? (price * newQuantity * item.discount / 100)
+          ? (price * roundedQuantity * item.discount / 100)
           : item.discount;
         
         return {
           ...item,
-          quantity: newQuantity,
-          subtotal: (price * newQuantity) - discountAmount
+          quantity: roundedQuantity,
+          subtotal: (price * roundedQuantity) - discountAmount
         };
       }
       return item;
@@ -2591,6 +3022,66 @@ const POSSalesSystem: React.FC = () => {
 
   const removeFromCart = (productId: string) => {
     setCart(cart.filter(item => item.product.id !== productId));
+  };
+
+  // Función para confirmar el peso y agregar producto por kilos al carrito
+  const confirmWeight = () => {
+    if (!selectedProductForWeight) return;
+    
+    const weight = parseFloat(weightInput);
+    if (isNaN(weight) || weight <= 0) {
+      toast({
+        title: "Peso inválido",
+        description: "Por favor ingresa un peso válido en kilogramos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (weight > selectedProductForWeight.stock) {
+      toast({
+        title: "Stock insuficiente",
+        description: `Solo hay ${selectedProductForWeight.stock} kg disponibles`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const existingItem = cart.find(item => item.product.id === selectedProductForWeight.id);
+    
+    if (existingItem) {
+      const newQuantity = existingItem.quantity + weight;
+      if (newQuantity > selectedProductForWeight.stock) {
+        toast({
+          title: "Stock insuficiente",
+          description: `Solo hay ${selectedProductForWeight.stock} kg disponibles`,
+          variant: "destructive"
+        });
+        return;
+      }
+      updateQuantity(selectedProductForWeight.id, newQuantity);
+    } else {
+      const newItem: CartItem = {
+        product: selectedProductForWeight,
+        quantity: weight,
+        discount: 0,
+        discountType: 'percentage',
+        subtotal: (selectedProductForWeight.price || 0) * weight
+      };
+      setCart([...cart, newItem]);
+    }
+    
+    // Limpiar y cerrar diálogo
+    setShowWeightDialog(false);
+    setSelectedProductForWeight(null);
+    setWeightInput('');
+    setSearchTerm('');
+    setBarcodeInput('');
+    
+    toast({
+      title: "Producto agregado",
+      description: `${weight} kg de ${selectedProductForWeight.name} agregados al carrito`,
+    });
   };
 
   const updateItemDiscount = (productId: string, discount: number, discountType: 'percentage' | 'amount') => {
@@ -3548,8 +4039,8 @@ ${customer.clientCode ? `🆔 Código Cliente: ${customer.clientCode}\n` : ''}${
 ────────────────────────────────────────────────
 ${cart.map((item, index) => {
   let line = `${(index + 1).toString().padStart(2, '0')}. ${item.product.name}\n`;
-  line += `    📦 Cantidad: ${item.quantity} unidad(es)\n`;
-  line += `    💵 Precio Unit.: $${(item.product.price || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}\n`;
+  line += `    📦 Cantidad: ${item.product.tipoVenta === 'kilos' ? `${item.quantity.toFixed(2)} kg` : `${item.quantity} unidad(es)`}\n`;
+  line += `    💵 Precio Unit.: $${(item.product.price || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}${item.product.tipoVenta === 'kilos' ? '/kg' : ''}\n`;
   
   if (item.discount > 0) {
     const discountText = item.discountType === 'percentage' ? `${item.discount}%` : `$${item.discount.toLocaleString()}`;
@@ -3755,19 +4246,36 @@ ${totalPointsEarned > 0 && customer.clientCode ?
 
   return (
     <>
-      {/* Modal para iniciar corte de caja */}
-      <Dialog 
-        open={showCashRegisterModal} 
-        onOpenChange={(open) => {
-          console.log('🔄 Modal onChange:', { open, cashRegisterIsOpen: cashRegisterStatus.isOpen });
-          // Solo permitir cerrar el modal si ya hay un turno activo
-          if (open === false && !cashRegisterStatus.isOpen) {
-            console.log('⚠️ No se puede cerrar el modal sin turno activo');
-            return; // No cerrar el modal si no hay turno
-          }
-          setShowCashRegisterModal(open);
-        }}
-      >
+      {/* Modal para iniciar corte de caja - SOLO si no existe turno */}
+      {!turnAlreadyExists && (
+        <Dialog 
+          open={showCashRegisterModal} 
+          onOpenChange={(open) => {
+            console.log('🔄 Modal onChange:', { 
+              open, 
+              cashRegisterIsOpen: cashRegisterStatus.isOpen,
+              reportId: cashRegisterStatus.reportId,
+              turnAlreadyExists 
+            });
+            
+            // Si se está intentando cerrar el modal
+            if (open === false) {
+              // Permitir cerrar si hay turno activo O si hay reportId (turno detectado)
+              if (cashRegisterStatus.isOpen || cashRegisterStatus.reportId || turnAlreadyExists) {
+                console.log('✅ Cerrando modal - Turno detectado');
+                setShowCashRegisterModal(false);
+              } else {
+                console.log('⚠️ No se puede cerrar el modal - Sin turno activo');
+                // No cerrar el modal si no hay turno
+              }
+            } else {
+              // Solo abrir el modal si no existe turno
+              if (!turnAlreadyExists) {
+                setShowCashRegisterModal(true);
+              }
+            }
+          }}
+        >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
@@ -3831,6 +4339,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
           </div>
         </DialogContent>
       </Dialog>
+      )}
 
       <div className={`pos-container ${!showSidebar ? 'fixed inset-0 w-full min-h-screen z-[9999] overflow-y-auto flex flex-col' : 'min-h-screen'} bg-gradient-to-br from-gray-50 to-blue-50`}>
       {/* Header Principal del POS */}
@@ -4496,9 +5005,20 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                           <div className="text-right ml-3 flex items-center gap-3">
                             <div className="text-center">
                               {product.price > 0 ? (
-                                <p className="font-bold text-green-600 text-lg">
-                                  ${product.price.toLocaleString('es-ES')}
-                                </p>
+                                <div>
+                                  <p className="font-bold text-green-600 text-lg">
+                                    ${product.price.toLocaleString('es-ES')}
+                                    {product.tipoVenta === 'kilos' && (
+                                      <span className="text-xs text-blue-600 ml-1">/kg</span>
+                                    )}
+                                  </p>
+                                  {product.tipoVenta === 'kilos' && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Scale className="h-3 w-3 mr-1" />
+                                      Por kilos
+                                    </Badge>
+                                  )}
+                                </div>
                               ) : (
                                 <div>
                                   <p className="font-bold text-red-600 text-sm">
@@ -4513,7 +5033,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                                 variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
                                 className="text-xs mt-1"
                               >
-                                📦 {product.stock} unid.
+                                📦 {product.stock} {product.tipoVenta === 'kilos' ? 'kg' : 'unid.'}
                               </Badge>
                               {/* Debug info - solo en desarrollo */}
                               {product.price <= 0 && (
@@ -4722,7 +5242,9 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                               <h4 className="font-medium text-gray-800 truncate text-sm">{item.product.name}</h4>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-600">
-                              <span>💰 ${(item.product.price || 0).toLocaleString('es-ES')} c/u</span>
+                              <span>💰 ${(item.product.price || 0).toLocaleString('es-ES')} 
+                                {item.product.tipoVenta === 'kilos' ? '/kg' : ' c/u'}
+                              </span>
                               {item.product.category && (
                                 <span className="inline-flex items-center gap-1">
                                   <Tag className="h-2.5 w-2.5" />
@@ -4747,9 +5269,9 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(item.product.id, item.quantity - (item.product.tipoVenta === 'kilos' ? 0.1 : 1))}
                             className="h-6 w-6 p-0 hover:bg-red-50 border-red-200"
-                            disabled={item.quantity <= 1}
+                            disabled={item.quantity <= (item.product.tipoVenta === 'kilos' ? 0.1 : 1)}
                           >
                             <Minus className="h-2.5 w-2.5" />
                           </Button>
@@ -4757,25 +5279,30 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                             type="number"
                             value={item.quantity}
                             onChange={(e) => {
-                              const newQty = parseInt(e.target.value) || 1;
+                              const newQty = item.product.tipoVenta === 'kilos' 
+                                ? parseFloat(e.target.value) || 0
+                                : parseInt(e.target.value) || 1;
                               if (newQty > 0 && newQty <= (item.product.stock || 0)) {
                                 updateQuantity(item.product.id, newQty);
                               }
                             }}
                             className="w-12 h-6 text-center font-bold text-xs"
-                            min="1"
+                            min={item.product.tipoVenta === 'kilos' ? "0.01" : "1"}
                             max={item.product.stock || 999}
+                            step={item.product.tipoVenta === 'kilos' ? "0.01" : "1"}
                           />
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(item.product.id, item.quantity + (item.product.tipoVenta === 'kilos' ? 0.1 : 1))}
                             className="h-6 w-6 p-0 hover:bg-green-50 border-green-200"
                             disabled={item.quantity >= (item.product.stock || 0)}
                           >
                             <Plus className="h-2.5 w-2.5" />
                           </Button>
-                          <span className="text-xs text-gray-500 ml-1">📦{item.product.stock || 0}</span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            📦{item.product.stock || 0}{item.product.tipoVenta === 'kilos' ? 'kg' : ''}
+                          </span>
                         </div>
                         
                         <div className="text-right">
@@ -6014,7 +6541,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                 Ventas Encontradas: {getFilteredSalesHistory().length}
               </h3>
               <Badge variant="secondary" className="text-sm">
-                Total: ${getFilteredSalesHistory().reduce((sum, sale) => sum + sale.total, 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                Total: ${getFilteredSalesHistory().reduce((sum, sale) => sum + ((sale as any).total || (sale as any).resumen?.total || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
               </Badge>
             </div>
             
@@ -6032,10 +6559,10 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <User className="h-4 w-4 text-blue-600" />
-                        <span className="font-semibold">{sale.customer.name}</span>
+                        <span className="font-semibold">{(sale as any).customer?.name || (sale as any).cliente?.name || 'Cliente General'}</span>
                       </div>
-                      {sale.customer.clientCode && (
-                        <p className="text-sm text-gray-600">Código: {sale.customer.clientCode}</p>
+                      {((sale as any).customer?.clientCode || (sale as any).cliente?.clientCode) && (
+                        <p className="text-sm text-gray-600">Código: {(sale as any).customer?.clientCode || (sale as any).cliente?.clientCode}</p>
                       )}
                     </div>
                     
@@ -6043,16 +6570,24 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       <div className="flex items-center gap-2 mb-1">
                         <Clock className="h-4 w-4 text-green-600" />
                         <span className="text-sm">
-                          {sale.timestamp instanceof Date 
-                            ? sale.timestamp.toLocaleDateString('es-ES')
-                            : new Date(sale.timestamp).toLocaleDateString('es-ES')
+                          {((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt) 
+                            ? (
+                              ((sale as any).timestamp instanceof Date 
+                                ? (sale as any).timestamp.toLocaleDateString('es-ES')
+                                : new Date((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt).toLocaleDateString('es-ES')
+                              )
+                            ) : 'Fecha N/A'
                           }
                         </span>
                       </div>
                       <p className="text-xs text-gray-600">
-                        {sale.timestamp instanceof Date 
-                          ? sale.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-                          : new Date(sale.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+                        {((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt)
+                          ? (
+                            ((sale as any).timestamp instanceof Date 
+                              ? (sale as any).timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+                              : new Date((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+                            )
+                          ) : 'Hora N/A'
                         }
                       </p>
                       {/* Información del cajero/vendedor */}
@@ -6068,27 +6603,27 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       <div className="flex items-center gap-2 mb-1">
                         <DollarSign className="h-4 w-4 text-purple-600" />
                         <span className="font-bold text-lg text-green-600">
-                          ${sale.total.toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                          ${((sale as any).total || (sale as any).resumen?.total || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={
-                          sale.paymentMethod === 'cash' ? 'default' : 
-                          sale.paymentMethod === 'card' ? 'secondary' : 
-                          sale.paymentMethod === 'transfer' ? 'outline' : 
-                          sale.paymentMethod === 'credit' ? 'destructive' : 'destructive'
+                          (sale as any).paymentMethod === 'cash' || (sale as any).pago?.method === 'cash' ? 'default' : 
+                          (sale as any).paymentMethod === 'card' || (sale as any).pago?.method === 'credit_card' || (sale as any).pago?.method === 'card' ? 'secondary' : 
+                          (sale as any).paymentMethod === 'transfer' || (sale as any).pago?.method === 'transfer' || (sale as any).pago?.method === 'digital' ? 'outline' : 
+                          (sale as any).paymentMethod === 'credit' || (sale as any).pago?.method === 'credit' ? 'destructive' : 'destructive'
                         }>
-                          {sale.paymentMethod === 'cash' ? '💵 Efectivo' : 
-                           sale.paymentMethod === 'card' ? '💳 Tarjeta' : 
-                           sale.paymentMethod === 'transfer' ? '🏦 Transfer.' : 
-                           sale.paymentMethod === 'credit' ? '⏰ Crédito' : 
+                          {((sale as any).paymentMethod === 'cash' || (sale as any).pago?.method === 'cash') ? '💵 Efectivo' : 
+                           ((sale as any).paymentMethod === 'card' || (sale as any).pago?.method === 'credit_card' || (sale as any).pago?.method === 'card') ? '💳 Tarjeta' : 
+                           ((sale as any).paymentMethod === 'transfer' || (sale as any).pago?.method === 'transfer' || (sale as any).pago?.method === 'digital') ? '🏦 Transfer.' : 
+                           ((sale as any).paymentMethod === 'credit' || (sale as any).pago?.method === 'credit') ? '⏰ Crédito' : 
                            '🔄 Mixto'}
                         </Badge>
                         
                         {/* Información adicional para créditos */}
-                        {sale.paymentMethod === 'credit' && sale.paymentDetails?.dueDate && (
+                        {((sale as any).paymentMethod === 'credit' || (sale as any).pago?.method === 'credit') && (sale as any).paymentDetails?.dueDate && (
                           <Badge variant="outline" className="text-xs ml-1">
-                            Vence: {new Date(sale.paymentDetails.dueDate).toLocaleDateString('es-ES')}
+                            Vence: {new Date((sale as any).paymentDetails.dueDate).toLocaleDateString('es-ES')}
                           </Badge>
                         )}
                       </div>
@@ -6096,10 +6631,10 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                     
                     <div>
                       <p className="text-sm font-medium mb-1">
-                        📦 {sale.items.length} producto{sale.items.length !== 1 ? 's' : ''}
+                        📦 {((sale as any).items || (sale as any).productos || []).length} producto{((sale as any).items || (sale as any).productos || []).length !== 1 ? 's' : ''}
                       </p>
                       <p className="text-sm text-gray-600">
-                        🧾 {sale.saleNumber}
+                        🧾 {(sale as any).saleNumber || (sale as any).numero || 'N/A'}
                       </p>
                       <Button
                         size="sm"
@@ -6120,14 +6655,14 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                         Ver detalles de productos
                       </summary>
                       <div className="mt-2 space-y-1">
-                        {sale.items.map((item, idx) => (
+                        {((sale as any).items || (sale as any).productos || []).map((item: any, idx: number) => (
                           <div key={idx} className="flex justify-between items-center py-1 px-2 bg-gray-50 rounded">
                             <div>
-                              <span className="font-medium">{item.product.name}</span>
-                              <span className="text-gray-600 ml-2">× {item.quantity}</span>
+                              <span className="font-medium">{item.product?.name || item.nombre || 'Producto'}</span>
+                              <span className="text-gray-600 ml-2">× {item.quantity || item.cantidad || 1}</span>
                             </div>
                             <span className="font-medium">
-                              ${item.subtotal.toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                              ${(item.subtotal || item.precio || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
                             </span>
                           </div>
                         ))}
@@ -6243,6 +6778,95 @@ ${totalPointsEarned > 0 && customer.clientCode ?
               <li>• El sistema guarda automáticamente el estado de cada pestaña</li>
             </ul>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para ingresar peso en productos por kilos */}
+      <Dialog open={showWeightDialog} onOpenChange={setShowWeightDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5 text-blue-600" />
+              Ingresar Peso
+            </DialogTitle>
+            <DialogDescription>
+              {selectedProductForWeight && (
+                <>
+                  Ingresa el peso en kilogramos para <strong>{selectedProductForWeight.name}</strong>
+                  <br />
+                  <span className="text-sm text-gray-500">
+                    Precio por kilo: ${(selectedProductForWeight.price || 0).toLocaleString()}
+                  </span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="weight">Peso (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={selectedProductForWeight?.stock || 999}
+                value={weightInput}
+                onChange={(e) => setWeightInput(e.target.value)}
+                placeholder="0.00"
+                className="text-lg font-medium"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    confirmWeight();
+                  }
+                }}
+              />
+              {selectedProductForWeight && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Stock disponible: {selectedProductForWeight.stock} kg
+                </div>
+              )}
+            </div>
+            
+            {weightInput && !isNaN(parseFloat(weightInput)) && parseFloat(weightInput) > 0 && (
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex justify-between items-center text-sm">
+                  <span>Peso:</span>
+                  <span className="font-medium">{parseFloat(weightInput).toFixed(2)} kg</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span>Precio por kg:</span>
+                  <span className="font-medium">${(selectedProductForWeight?.price || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg font-bold text-blue-700 mt-2 pt-2 border-t border-blue-300">
+                  <span>Total:</span>
+                  <span>${((selectedProductForWeight?.price || 0) * parseFloat(weightInput)).toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowWeightDialog(false);
+                setSelectedProductForWeight(null);
+                setWeightInput('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={confirmWeight}
+              disabled={!weightInput || isNaN(parseFloat(weightInput)) || parseFloat(weightInput) <= 0}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar al Carrito
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -6424,6 +7048,130 @@ ${totalPointsEarned > 0 && customer.clientCode ?
           </div>
         </div>
       )}
+      
+      {/* Diálogo para ingresar peso de productos por kilos */}
+      <Dialog open={showWeightDialog} onOpenChange={setShowWeightDialog}>
+        <DialogContent className="sm:max-w-lg md:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Scale className="h-6 w-6 text-blue-600" />
+              Ingresa el peso en kilogramos
+            </DialogTitle>
+            <DialogDescription className="text-base mt-3">
+              {selectedProductForWeight && (
+                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                  <div className="text-gray-800">
+                    <span className="text-gray-600">Producto:</span> <strong className="text-lg">{selectedProductForWeight.name}</strong>
+                  </div>
+                  <div className="text-gray-800">
+                    <span className="text-gray-600">Precio por kg:</span> <strong className="text-green-600 text-lg">${selectedProductForWeight.price.toLocaleString('es-ES')}</strong>
+                  </div>
+                  <div className="text-gray-800">
+                    <span className="text-gray-600">Stock disponible:</span> <strong className="text-blue-600">{selectedProductForWeight.stock} kg</strong>
+                  </div>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="space-y-3">
+              <Label htmlFor="weight" className="text-base font-semibold">Peso (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                placeholder="Ej: 2.5"
+                value={weightInput}
+                onChange={(e) => setWeightInput(e.target.value)}
+                min="0.01"
+                max={selectedProductForWeight?.stock || 999}
+                step="0.01"
+                className="text-2xl text-center font-bold h-16 text-blue-800"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    confirmWeight();
+                  } else if (e.key === 'Escape') {
+                    setShowWeightDialog(false);
+                    setSelectedProductForWeight(null);
+                    setWeightInput('');
+                  }
+                }}
+              />
+            </div>
+            
+            {weightInput && !isNaN(parseFloat(weightInput)) && selectedProductForWeight && (
+              <div className="bg-gradient-to-r from-blue-50 to-green-50 p-6 rounded-xl border-2 border-blue-200">
+                <div className="text-center space-y-3">
+                  <div className="text-lg text-blue-800">
+                    <div>Peso: <strong className="text-xl">{parseFloat(weightInput).toFixed(2)} kg</strong></div>
+                    <div>Precio por kg: <strong className="text-xl">${selectedProductForWeight.price.toLocaleString('es-ES')}</strong></div>
+                  </div>
+                  <div className="text-3xl font-bold text-green-700 bg-white py-3 px-6 rounded-lg border-2 border-green-200">
+                    Total: ${(parseFloat(weightInput) * selectedProductForWeight.price).toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Botones de peso rápido */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Pesos rápidos:</Label>
+              <div className="grid grid-cols-4 gap-3">
+                {[0.25, 0.5, 1, 2].map(peso => (
+                  <Button
+                    key={peso}
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setWeightInput(peso.toString())}
+                    className="text-base font-semibold h-12 hover:bg-blue-50 border-2"
+                  >
+                    {peso} kg
+                  </Button>
+                ))}
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                {[3, 5, 10, 25].map(peso => (
+                  <Button
+                    key={peso}
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setWeightInput(peso.toString())}
+                    className="text-base font-semibold h-12 hover:bg-blue-50 border-2"
+                  >
+                    {peso} kg
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-4 pt-4">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                setShowWeightDialog(false);
+                setSelectedProductForWeight(null);
+                setWeightInput('');
+              }}
+              className="flex-1 h-12 text-base"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmWeight}
+              disabled={!weightInput || isNaN(parseFloat(weightInput)) || parseFloat(weightInput) <= 0}
+              size="lg"
+              className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700 font-semibold"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Agregar al carrito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Cierre del div principal del POS */}
       </div>

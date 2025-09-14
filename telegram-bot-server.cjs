@@ -15,12 +15,45 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 let BOT_TOKEN = '';
 let OPENAI_API_KEY = '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';
 
-// Estadísticas
+// Estadísticas y almacenamiento
 let stats = {
   totalMessages: 0,
   exercisesSolved: 0,
   users: new Set()
 };
+
+// Almacenar mensajes recientes (últimos 50)
+let recentMessages = [];
+let recentChats = new Map();
+
+// Función para agregar mensaje al historial
+function addMessageToHistory(message, response = null) {
+  const messageData = {
+    id: Date.now() + Math.random(),
+    chatId: message.chat.id,
+    userId: message.from.id,
+    userName: message.from.first_name,
+    messageText: message.text || message.caption || '[Imagen]',
+    response: response,
+    timestamp: new Date().toISOString(),
+    hasImage: !!message.photo
+  };
+  
+  recentMessages.unshift(messageData);
+  if (recentMessages.length > 50) {
+    recentMessages = recentMessages.slice(0, 50);
+  }
+  
+  // Actualizar información del chat
+  const chatKey = message.chat.id.toString();
+  recentChats.set(chatKey, {
+    id: message.chat.id,
+    title: message.chat.title || message.from.first_name,
+    type: message.chat.type,
+    lastMessage: messageData.timestamp,
+    messageCount: (recentChats.get(chatKey)?.messageCount || 0) + 1
+  });
+}
 
 // Función para enviar mensaje a Telegram
 async function sendTelegramMessage(chatId, text) {
@@ -175,6 +208,9 @@ app.post('/webhook', async (req, res) => {
     stats.users.add(userId);
     stats.totalMessages++;
     
+    // Agregar mensaje al historial
+    let responseText = null;
+    
     // Manejar comando /start
     if (messageText.toLowerCase().includes('/start')) {
       const welcomeMessage = `🤖 **Bot Resolutor de Ejercicios**
@@ -191,7 +227,9 @@ app.post('/webhook', async (req, res) => {
 
 ¡Pruébame enviando una imagen ahora!`;
       
+      responseText = welcomeMessage;
       await sendTelegramMessage(chatId, welcomeMessage);
+      addMessageToHistory(message, responseText);
       return res.json({ ok: true });
     }
     
@@ -218,6 +256,7 @@ ${solution}
 ---
 ✅ *Ejercicio resuelto automáticamente con IA*`;
         
+        responseText = responseMessage;
         await sendTelegramMessage(chatId, responseMessage);
         
         // Actualizar estadísticas
@@ -226,11 +265,16 @@ ${solution}
         console.log('✅ Ejercicio resuelto y enviado');
       } catch (error) {
         console.error('Error procesando imagen:', error);
-        await sendTelegramMessage(chatId, '❌ Error al procesar la imagen. Por favor, inténtalo de nuevo con una imagen más clara.');
+        responseText = '❌ Error al procesar la imagen. Por favor, inténtalo de nuevo con una imagen más clara.';
+        await sendTelegramMessage(chatId, responseText);
       }
+      
+      addMessageToHistory(message, responseText);
     } else if (messageText && !messageText.includes('/start')) {
       // Respuesta para mensajes de texto
-      await sendTelegramMessage(chatId, '📸 Por favor, envía una **imagen** del ejercicio que quieres resolver.\n\n🤖 Analizaré la imagen y te daré la solución completa paso a paso.');
+      responseText = '📸 Por favor, envía una **imagen** del ejercicio que quieres resolver.\n\n🤖 Analizaré la imagen y te daré la solución completa paso a paso.';
+      await sendTelegramMessage(chatId, responseText);
+      addMessageToHistory(message, responseText);
     }
     
     res.json({ ok: true });
@@ -246,7 +290,9 @@ app.get('/stats', (req, res) => {
     totalMessages: stats.totalMessages,
     exercisesSolved: stats.exercisesSolved,
     totalUsers: stats.users.size,
-    botConfigured: !!BOT_TOKEN
+    botConfigured: !!BOT_TOKEN,
+    recentMessages: recentMessages.slice(0, 20), // Últimos 20 mensajes
+    recentChats: Array.from(recentChats.values()).slice(0, 10) // Últimos 10 chats
   });
 });
 

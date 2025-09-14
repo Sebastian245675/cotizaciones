@@ -207,7 +207,7 @@ const WhatsAppSimple: React.FC = () => {
 
   // Estados para Telegram Bot
   const [telegramBotToken, setTelegramBotToken] = useState('');
-  const [openaiApiKey, setOpenaiApiKey] = useState(import.meta.env.VITE_OPENAI_API_KEY || '');
+  const [openaiApiKey, setOpenaiApiKey] = useState('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');
   const [telegramBotConnected, setTelegramBotConnected] = useState(false);
   const [telegramBotStatus, setTelegramBotStatus] = useState('Desconectado');
   const [telegramMessages, setTelegramMessages] = useState(0);
@@ -2912,7 +2912,7 @@ INSTRUCCIONES CRÍTICAS:
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openaiApiKey}`
+              'Authorization': `Bearer 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`
             },
             body: JSON.stringify({
               model: model,

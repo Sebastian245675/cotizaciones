@@ -88,9 +88,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     }));
   };
 
-  // Definir items del sidebar - TODAS las funciones disponibles
+  // Definir items del sidebar - CON SISTEMA DE PERMISOS
   const getSidebarItems = (): SidebarItem[] => {
-    // Lista completa de TODAS las funciones sin filtros
+    // Lista completa de TODAS las funciones disponibles
     const allItems: SidebarItem[] = [
       // Core items
       { id: 'dashboard', icon: <BarChart3 className="h-5 w-5" />, label: 'Dashboard', description: 'Vista general del sistema' },
@@ -103,6 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       { id: 'revisiones', icon: <Bell className="h-5 w-5" />, label: 'Revisiones', description: 'Aprobar cambios pendientes' },
       
       // POS items
+      { id: 'pos-sales', icon: <ShoppingCart className="h-5 w-5" />, label: 'Ventas POS', description: 'Sistema de ventas punto de venta' },
       { id: 'inventario-pos', icon: <Package className="h-5 w-5" />, label: 'Inventario POS', description: 'Gestión completa de inventario' },
       { id: 'invoices', icon: <FileText className="h-5 w-5" />, label: 'Facturas', description: 'Sistema de facturación POS' },
       { id: 'cash-register', icon: <Calculator className="h-5 w-5" />, label: 'Corte de Caja', description: 'Control de caja diario' },
@@ -127,7 +128,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       { id: 'pos-settings', icon: <Settings className="h-5 w-5" />, label: 'Configuración POS', description: 'Ajustes del sistema' },
     ];
 
-    // Devolver TODAS las funciones sin filtros
+    // SISTEMA DE PERMISOS: Filtrar para subcuentas (cajeros)
+    if (isSubAdmin && !isAdmin) {
+      console.log('🔐 Aplicando permisos de cajero - Mostrando solo Ventas POS y Corte de Caja');
+      // Para CAJEROS: Solo mostrar Ventas POS y Corte de Caja
+      return allItems.filter(item => 
+        item.id === 'pos-sales' || 
+        item.id === 'cash-register'
+      );
+    }
+
+    // Para ADMIN: Mostrar TODAS las funciones sin filtros
     return allItems;
   };
 

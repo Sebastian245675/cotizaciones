@@ -73,7 +73,7 @@ export const ProductForm: React.FC = () => {
     colors: [] as { name: string, hexCode: string, image: string }[],
     // Nuevos campos
     habilitarEcommerce: true, // Por defecto habilitado para ecommerce
-    tipoVenta: 'unidad' as 'unidad' | 'granel' | 'paquete' // Tipo de venta
+    tipoVenta: 'unidad' as 'unidad' | 'granel' | 'paquete' | 'kilos' // Tipo de venta
   });
   const [products, setProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -1345,7 +1345,7 @@ export const ProductForm: React.FC = () => {
     }
     
     if (field === 'tipoVenta') {
-      const types = { unidad: 'Por Unidad', granel: 'A Granel', paquete: 'Por Paquete' };
+      const types = { unidad: 'Por Unidad', granel: 'A Granel', paquete: 'Por Paquete', kilos: 'Por Kilos' };
       return types[value as keyof typeof types] || value;
     }
     
@@ -2168,7 +2168,8 @@ export const ProductForm: React.FC = () => {
                         {[
                           { value: 'unidad', label: 'Por unidad', desc: 'Cantidades enteras' },
                           { value: 'granel', label: 'A granel', desc: 'Por peso/medida' },
-                          { value: 'paquete', label: 'Por paquete', desc: 'Conjunto completo' }
+                          { value: 'paquete', label: 'Por paquete', desc: 'Conjunto completo' },
+                          { value: 'kilos', label: 'Por kilos', desc: 'Venta por peso en kg' }
                         ].map((tipo) => (
                           <label key={tipo.value} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
                             <input
@@ -2176,7 +2177,7 @@ export const ProductForm: React.FC = () => {
                               name="tipoVenta"
                               value={tipo.value}
                               checked={formData.tipoVenta === tipo.value}
-                              onChange={() => setFormData({...formData, tipoVenta: tipo.value as 'unidad' | 'granel' | 'paquete'})}
+                              onChange={() => setFormData({...formData, tipoVenta: tipo.value as 'unidad' | 'granel' | 'paquete' | 'kilos'})}
                               className="w-4 h-4 text-blue-600"
                             />
                             <div>

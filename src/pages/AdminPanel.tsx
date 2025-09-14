@@ -140,11 +140,18 @@ export const AdminPanel: React.FC = () => {
   console.log('AdminPanel rendered, user:', user);
 
   useEffect(() => {
+    console.log('🚀 useEffect de AuthStateChanged iniciado');
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      console.log('🔍 AuthStateChanged - firebaseUser:', firebaseUser);
+      console.log('📧 Email del usuario:', firebaseUser?.email);
       if (firebaseUser) {
+        console.log('✅ Usuario logueado - Email:', firebaseUser.email);
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
         const userData = userDoc.data();
+        console.log('📋 UserData from Firestore:', userData);
+        
         if (firebaseUser.email === "admin@gmail.com") {
+          console.log('👑 Detectado como ADMIN principal');
           setIsAdmin(true);
           setIsSubAdmin(false);
           
@@ -157,15 +164,22 @@ export const AdminPanel: React.FC = () => {
           } else {
             setShowOnboarding(true);
           }
-        } else if (userData?.subCuenta === "si") {
+        } else if (userData?.subCuenta === "si" || userData?.subCuenta === "pos-employee" || userData?.role === "cajero") {
+          console.log('🔑 Detectado como SUBCUENTA - isSubAdmin = true');
+          console.log('   - subCuenta:', userData?.subCuenta);
+          console.log('   - role:', userData?.role);
           setIsAdmin(false);
           setIsSubAdmin(true);
         } else {
+          console.log('❌ Usuario sin permisos - No es admin ni subcuenta');
+          console.log('   - Email:', firebaseUser.email);
+          console.log('   - subCuenta:', userData?.subCuenta);
           setIsAdmin(false);
           setIsSubAdmin(false);
         }
         setSessionStart(new Date());
       } else {
+        console.log('❌ No hay usuario logueado');
         setIsAdmin(false);
         setIsSubAdmin(false);
       }
@@ -627,6 +641,14 @@ export const AdminPanel: React.FC = () => {
     return <SaasOnboarding onComplete={handleSaasConfigComplete} />;
   }
 
+  console.log('🔐 Verificación de acceso:');
+  console.log('   - isAdmin:', isAdmin);
+  console.log('   - isSubAdmin:', isSubAdmin);
+  console.log('   - currentMode:', currentMode);
+  console.log('   - Condición (!isAdmin && !isSubAdmin):', !isAdmin && !isSubAdmin);
+  console.log('   - Condición para mostrar pos-sales:', ((currentMode === 'pos' || currentMode === 'hybrid') || (isSubAdmin && !isAdmin)));
+  console.log('   - Es cajero (isSubAdmin && !isAdmin):', (isSubAdmin && !isAdmin));
+
   if (!isAdmin && !isSubAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
@@ -1035,8 +1057,17 @@ export const AdminPanel: React.FC = () => {
               </TabsContent>
             )}
 
-            {/* Tab de Corte de Caja - Solo para POS */}
-            {(currentMode === 'pos' || currentMode === 'hybrid') && (
+            {/* Tab de Ventas POS - Siempre disponible para cajeros o cuando es modo POS/hybrid */}
+            {((currentMode === 'pos' || currentMode === 'hybrid') || (isSubAdmin && !isAdmin)) && (
+              <TabsContent value="pos-sales" className="space-y-6">
+                <div className="bg-white rounded-xl shadow p-4 md:p-6">
+                  <POSSalesSystem />
+                </div>
+              </TabsContent>
+            )}
+
+            {/* Tab de Corte de Caja - Siempre disponible para cajeros o cuando es modo POS/hybrid */}
+            {((currentMode === 'pos' || currentMode === 'hybrid') || (isSubAdmin && !isAdmin)) && (
               <TabsContent value="cash-register" className="space-y-6">
                 <div className="bg-white rounded-xl shadow p-4 md:p-6">
                   <CashRegisterSystem />
