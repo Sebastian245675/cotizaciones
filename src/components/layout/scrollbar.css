@@ -27,3 +27,76 @@
 .category-dropdown-content {
   padding-right: 24px; /* Espacio para los botones de navegación */
 }
+
+/* ===== SCROLLBAR PARA BARRA LATERAL ADMIN ===== */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:active {
+  background: #6b7280;
+}
+
+/* Para Firefox - scrollbar de la barra lateral */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f8fafc;
+}
+
+/* Smooth scrolling para la barra lateral */
+.sidebar-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Versión que se muestra al hacer hover */
+.sidebar-scroll-auto::-webkit-scrollbar {
+  width: 4px;
+  transition: width 0.2s ease;
+}
+
+.sidebar-scroll-auto:hover::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-scroll-auto::-webkit-scrollbar-track {
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.sidebar-scroll-auto::-webkit-scrollbar-thumb {
+  background: rgba(209, 213, 219, 0.7);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-scroll-auto:hover::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.9);
+}
+
+/* Para Firefox - versión auto */
+.sidebar-scroll-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(209, 213, 219, 0.7) rgba(248, 250, 252, 0.8);
+}
+
+/* Transición suave */
+.sidebar-scroll-auto {
+  scroll-behavior: smooth;
+}

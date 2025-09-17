@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import '@/components/admin/admin-layout.css'; // Importar CSS para admin-main-content
 import { 
   Users, 
   Package, 
@@ -800,7 +801,7 @@ export const AdminPanel: React.FC = () => {
         />
         
         {/* Main content area */}
-        <div className="flex-1 p-4 md:p-6 overflow-auto">
+        <div className="admin-main-content flex-1 p-4 md:p-6 overflow-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
             {/* Hidden tabs list for state management - visual only */}
             <TabsList className="hidden">

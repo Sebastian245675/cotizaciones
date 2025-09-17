@@ -341,11 +341,19 @@ export const CashRegisterSystem: React.FC = () => {
       return new Date();
     }
   };
+  // Helper function para obtener fecha local en formato YYYY-MM-DD
+  const getLocalDateString = (date: Date = new Date()): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [currentReport, setCurrentReport] = useState<DailyCashReport | null>(null);
   const [reports, setReports] = useState<DailyCashReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(true);
   const [isCreatingReport, setIsCreatingReport] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString()); // 🔧 CORREGIDO: usar fecha local
   const [activeTab, setActiveTab] = useState('dashboard');
   const [liveMode, setLiveMode] = useState(true); // Activado por defecto para actualización en tiempo real
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -391,6 +399,21 @@ export const CashRegisterSystem: React.FC = () => {
 
   // Funciones de depuración
   useEffect(() => {
+    // 🚨 DEPURACIÓN DE FECHAS - Detectar problema de zona horaria
+    const ahora = new Date();
+    const fechaLocal = ahora.toLocaleDateString('es-ES');
+    const fechaISO = ahora.toISOString().split('T')[0];
+    const fechaToDateString = ahora.toDateString();
+    
+    console.log('🗓️ === DIAGNÓSTICO DE FECHAS ===');
+    console.log('⏰ Fecha/Hora actual:', ahora);
+    console.log('📅 Fecha local (es-ES):', fechaLocal);
+    console.log('🌐 Fecha ISO (UTC):', fechaISO);
+    console.log('📋 selectedDate actual:', selectedDate);
+    console.log('🔄 toDateString():', fechaToDateString);
+    console.log('⚠️ Zona horaria offset:', ahora.getTimezoneOffset());
+    console.log('===============================');
+
     (window as any).debugAdvancedCash = () => {
       console.log('🔍 DEPURACIÓN ADVANCED CASH SYSTEM');
       console.log('📊 currentReport:', currentReport);
@@ -597,15 +620,44 @@ export const CashRegisterSystem: React.FC = () => {
           setClosedReports(closedReportsData);
           console.log(`📋 Reportes cerrados actualizados en tiempo real: ${closedReportsData.length}`);
           
-          // Encontrar reporte actual
-          const today = new Date(selectedDate);
-          const todayReport = reportsData.find(report => 
-            report.date.toDateString() === today.toDateString()
+          // Encontrar reporte actual - PRIORIZAR TURNOS ABIERTOS DE HOY
+          // 🔧 CORREGIDO: usar fecha local consistente
+          const [year, month, day] = selectedDate.split('-').map(Number);
+          const today = new Date(year, month - 1, day);
+          const todayStr = today.toDateString(); // Usar toDateString() para comparar
+          
+          console.log('📅 Buscando reporte del día:', { selectedDate, todayStr });
+          
+          // 1. Buscar turnos abiertos del día actual (incluye turnos de POS)
+          let todayReport = reportsData.find(report => 
+            report.status === 'open' && 
+            report.date.toDateString() === todayStr
           );
+          
+          // 2. Si no hay turno abierto de hoy, buscar cualquier reporte del día
+          if (!todayReport) {
+            todayReport = reportsData.find(report => 
+              report.date.toDateString() === todayStr
+            );
+          }
+          
           if (todayReport) {
-            setCurrentReport(todayReport);
+            // Solo actualizar si cambió el reporte o si es la primera carga
+            if (!currentReport || currentReport.id !== todayReport.id) {
+              console.log(`✅ TURNO DETECTADO en tiempo real: ${todayReport.status} - $${todayReport.openingBalance}`);
+              setCurrentReport(todayReport);
+              
+              // Mostrar notificación para turnos recién detectados
+              if (todayReport.status === 'open' && !currentReport) {
+                toast({
+                  title: "🔄 Turno Activo Detectado",
+                  description: `Sistema sincronizado con turno de $${todayReport.openingBalance?.toLocaleString()}`,
+                  duration: 3000
+                });
+              }
+            }
             
-            // Efectos de sonido y visuales
+            // Efectos de sonido y visuales para movimientos nuevos
             if (soundEnabled && todayReport.movements.length > (currentReport?.movements.length || 0)) {
               playNotificationSound();
             }
@@ -619,15 +671,21 @@ export const CashRegisterSystem: React.FC = () => {
         async (ventasSnapshot) => {
           console.log('🔄 Detectados cambios en ventas...');
           
-          // Filtrar ventas de hoy
-          const today = new Date(selectedDate);
-          const todayStr = today.toISOString().split('T')[0];
+          // Filtrar ventas de hoy - CORREGIDO: usar fecha local directamente
+          console.log('📅 selectedDate para filtro:', selectedDate);
           
           const todaySales = ventasSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as any))
             .filter((sale: any) => {
               const saleDate = sale.fechaVenta || sale.timestamp?.toDate?.()?.toISOString().split('T')[0] || sale.fecha?.split('T')[0];
-              return saleDate === todayStr;
+              const matches = saleDate === selectedDate;
+              
+              // Debug: mostrar fechas para entender el filtrado
+              if (!matches && sale.numeroVenta) {
+                console.log(`❌ Venta ${sale.numeroVenta} excluida - Fecha venta: ${saleDate}, Fecha filtro: ${selectedDate}`);
+              }
+              
+              return matches;
             })
             .map((sale: any) => ({
               ...sale,
@@ -691,7 +749,60 @@ export const CashRegisterSystem: React.FC = () => {
 
   const loadTodayReport = async () => {
     try {
-      // Primero buscar reportes abiertos (más confiable)
+      console.log('🔍 BUSCANDO TURNOS ACTIVOS - Detectando automáticamente turnos de POS...');
+      console.log('📅 Fecha seleccionada:', selectedDate);
+      
+      // PASO 1: Buscar CUALQUIER reporte abierto del día actual (sin filtro de usuario)
+      // Esto permite detectar turnos creados desde POS automáticamente
+      
+      // 🔧 CORREGIDO: Crear fecha local del día seleccionado
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const today = new Date(year, month - 1, day); // month - 1 porque los meses en JS van de 0-11
+      const tomorrow = new Date(year, month - 1, day + 1);
+      
+      console.log('📅 Rango de búsqueda:', {
+        desde: today.toLocaleString('es-ES'),
+        hasta: tomorrow.toLocaleString('es-ES'),
+        selectedDate
+      });
+      
+      const openTodayQuery = query(
+        collection(db, "cash_reports"),
+        where("status", "==", "open"),
+        where("date", ">=", today),
+        where("date", "<", tomorrow),
+        orderBy("date", "desc"),
+        limit(1)
+      );
+      
+      let querySnapshot = await getDocs(openTodayQuery);
+      
+      if (!querySnapshot.empty) {
+        console.log('✅ TURNO ABIERTO DETECTADO del día actual');
+        const reportData = querySnapshot.docs[0].data();
+        console.log(`📋 Turno encontrado - CreatedBy: ${reportData.createdBy} - Balance: $${reportData.openingBalance}`);
+        
+        const report = {
+          id: querySnapshot.docs[0].id,
+          ...reportData,
+          date: reportData.date?.toDate() || new Date(),
+          movements: reportData.movements || [],
+          alerts: reportData.alerts || []
+        } as DailyCashReport;
+        
+        setCurrentReport(report);
+        
+        toast({
+          title: "✅ Turno Activo Detectado",
+          description: `Turno con $${report.openingBalance?.toLocaleString()} en progreso`,
+          duration: 3000
+        });
+        
+        return;
+      }
+      
+      // PASO 2: Si no hay turnos abiertos de hoy, buscar cualquier reporte abierto
+      console.log('🔍 No hay turnos abiertos de hoy, buscando turnos abiertos generales...');
       const openReportsQuery = query(
         collection(db, "cash_reports"),
         where("status", "==", "open"),
@@ -699,17 +810,15 @@ export const CashRegisterSystem: React.FC = () => {
         limit(1)
       );
       
-      let querySnapshot = await getDocs(openReportsQuery);
+      querySnapshot = await getDocs(openReportsQuery);
       
-      // Si no hay reportes abiertos, buscar por fecha
+      // PASO 3: Si no hay reportes abiertos, buscar por fecha
       if (querySnapshot.empty) {
-        const today = new Date(selectedDate);
-        today.setHours(0, 0, 0, 0);
-        
+        console.log('🔍 No hay turnos abiertos, buscando reportes cerrados del día...');
         const dateQuery = query(
           collection(db, "cash_reports"),
           where("date", ">=", today),
-          where("date", "<", new Date(today.getTime() + 24 * 60 * 60 * 1000)),
+          where("date", "<", tomorrow),
           orderBy("date", "desc"),
           limit(1)
         );
@@ -727,14 +836,14 @@ export const CashRegisterSystem: React.FC = () => {
           alerts: reportData.alerts || []
         } as DailyCashReport;
         
-        console.log('📊 Reporte cargado:', report);
+        console.log('📊 Reporte cargado:', report.status, '- Balance:', report.openingBalance);
         setCurrentReport(report);
       } else {
         console.log('❌ No se encontró reporte para hoy');
         setCurrentReport(null);
       }
     } catch (error) {
-      console.error("Error loading today's report:", error);
+      console.error("❌ Error loading today's report:", error);
     }
   };
 
@@ -1048,7 +1157,15 @@ export const CashRegisterSystem: React.FC = () => {
 
   // Crear nuevo reporte con inicialización avanzada
   const createNewReport = async (openingBalance: number) => {
-    const today = new Date(selectedDate);
+    // 🔧 CORREGIDO: Crear fecha local del día seleccionado
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const today = new Date(year, month - 1, day); // month - 1 porque los meses en JS van de 0-11
+    
+    console.log('📅 Creando reporte para fecha local:', {
+      selectedDate,
+      fechaLocal: today.toLocaleString('es-ES'),
+      fechaToSave: today
+    });
     
     const defaultMetrics: AdvancedMetrics = {
       efficiency: 85,

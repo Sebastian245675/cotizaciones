@@ -1,0 +1,19 @@
+/* SOLUCION DEFINITIVA - CSS SIMPLE Y DIRECTO */
+
+/* Contenido principal SIEMPRE con margen de 256px y padding-top para el header */
+.admin-main-content {
+  margin-left: 256px !important;
+  width: calc(100vw - 256px) !important;
+  background: #f8fafc;
+  padding-top: 4rem !important; /* Espacio para el header (64px) */
+  min-height: calc(100vh - 4rem) !important; /* Altura mínima considerando el header */
+}
+
+/* En pantallas pequeñas, sin margen pero manteniendo el padding-top */
+@media (max-width: 768px) {
+  .admin-main-content {
+    margin-left: 0 !important;
+    width: 100vw !important;
+    padding-top: 4rem !important; /* Mantener espacio para el header en móvil */
+  }
+}

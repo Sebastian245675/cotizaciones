@@ -207,7 +207,7 @@ const WhatsAppSimple: React.FC = () => {
 
   // Estados para Telegram Bot
   const [telegramBotToken, setTelegramBotToken] = useState('');
-  const [openaiApiKey, setOpenaiApiKey] = useState(process.env.VITE_OPENAI_API_KEY || '');
+  const [openaiApiKey, setOpenaiApiKey] = useState(import.meta.env.VITE_OPENAI_API_KEY || '');
   const [telegramBotConnected, setTelegramBotConnected] = useState(false);
   const [telegramBotStatus, setTelegramBotStatus] = useState('Desconectado');
   const [telegramMessages, setTelegramMessages] = useState(0);
@@ -2912,7 +2912,7 @@ INSTRUCCIONES CRÍTICAS:
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openaiApiKey || process.env.VITE_OPENAI_API_KEY || ''}`
+              'Authorization': `Bearer ${openaiApiKey || import.meta.env.VITE_OPENAI_API_KEY || ''}`
             },
             body: JSON.stringify({
               model: model,

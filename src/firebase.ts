@@ -21,13 +21,13 @@ import { simulatedDB } from "./lib/simulatedDB";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyAg-e1g49FHAYfpEk6WdA6pfKAHJzmvjYM",
-  authDomain: "demos-d2610.firebaseapp.com",
-  projectId: "demos-d2610",
-  storageBucket: "demos-d2610.firebasestorage.app",
-  messagingSenderId: "545908718406",
-  appId: "1:545908718406:web:ec34672bc8894f90fb8347",
-  measurementId: "G-N7GKR55VN9"
+  apiKey: "AIzaSyD4Qi6WY1o0_i0e4fzkKUBa30y5RQRJDE0",
+  authDomain: "cumpleaos-d73b0.firebaseapp.com",
+  projectId: "cumpleaos-d73b0",
+  storageBucket: "cumpleaos-d73b0.firebasestorage.app",
+  messagingSenderId: "606342014715",
+  appId: "1:606342014715:web:accc621eb961eb85a1725e",
+  measurementId: "G-JEE4WT4CT2"
 };
 
 // Initialize Firebase only if it hasn't been initialized
@@ -70,7 +70,7 @@ let persistenceEnabled = false;
 
 // Determinar si usar el emulador de Firestore (solo en desarrollo)
 const isEmulatorEnabled = false; // Cambiar a true para usar el emulador local
-const shouldUseEmulator = isEmulatorEnabled && process.env.NODE_ENV !== 'production';
+const shouldUseEmulator = isEmulatorEnabled && import.meta.env.MODE !== 'production';
 
 // Configurar emulador si está habilitado
 if (shouldUseEmulator) {
@@ -162,6 +162,9 @@ if (shouldUseEmulator) {
 
 // Exportar función para ejecutar diagnóstico Firebase
 export { FirebaseDebugger, diagnosticarFirebase } from './lib/firebase-debug';
+
+// Importar script de inicialización
+import './scripts/initializeFirestore';
 
 // Añadir diagnóstico a la ventana para acceso fácil desde la consola de desarrollador
 console.log("%c🔧 Tip de depuración: Usa diagnosticarFirebase() en la consola para diagnosticar problemas con Firebase", 

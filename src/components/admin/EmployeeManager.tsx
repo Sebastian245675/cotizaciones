@@ -110,6 +110,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isSharedAccess = fals
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [searchCategory, setSearchCategory] = useState<string>('nombre');
+  const [birthdayMonth, setBirthdayMonth] = useState<string>(''); // Nuevo estado para filtro por mes
   const [loading, setLoading] = useState<boolean>(true);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -178,48 +179,114 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isSharedAccess = fals
     }
   };
 
-  // Función para filtrar empleados basado en el término de búsqueda
+  // Función para filtrar empleados basado en el término de búsqueda y mes de cumpleaños
+  const applyFilters = () => {
+    let filtered = [...employees];
+
+    // Filtrar por búsqueda de texto
+    if (searchTerm.trim()) {
+      const lowerTerm = searchTerm.toLowerCase();
+      
+      filtered = filtered.filter(employee => {
+        switch (searchCategory) {
+          case 'nombre':
+            return employee.nombre.toLowerCase().includes(lowerTerm);
+          case 'telefono':
+            return employee.telefono.toLowerCase().includes(lowerTerm);
+          case 'email':
+            return employee.email?.toLowerCase().includes(lowerTerm);
+          case 'direccion':
+            return employee.direccion.toLowerCase().includes(lowerTerm) || 
+                   employee.colonia.toLowerCase().includes(lowerTerm);
+          case 'empleo':
+            return employee.empleo?.toLowerCase().includes(lowerTerm);
+          case 'todo':
+          default:
+            return (
+              employee.nombre.toLowerCase().includes(lowerTerm) ||
+              employee.telefono.toLowerCase().includes(lowerTerm) ||
+              (employee.email && employee.email.toLowerCase().includes(lowerTerm)) ||
+              employee.direccion.toLowerCase().includes(lowerTerm) ||
+              employee.colonia.toLowerCase().includes(lowerTerm) ||
+              (employee.empleo && employee.empleo.toLowerCase().includes(lowerTerm))
+            );
+        }
+      });
+    }
+
+    // Filtrar por mes de cumpleaños
+    if (birthdayMonth) {
+      filtered = filtered.filter(employee => {
+        if (!employee.cumpleanos) return false;
+        
+        let birthdayDate: Date | null = null;
+        
+        // Manejar diferentes formatos de fecha
+        if (typeof employee.cumpleanos === 'string') {
+          if (employee.cumpleanos.includes('-')) {
+            // Formato YYYY-MM-DD o MM-DD-YYYY
+            birthdayDate = new Date(employee.cumpleanos);
+          } else if (employee.cumpleanos.includes('/')) {
+            // Formato MM/DD/YYYY o DD/MM/YYYY
+            birthdayDate = new Date(employee.cumpleanos);
+          }
+        } else if (employee.cumpleanos && typeof employee.cumpleanos === 'object' && employee.cumpleanos.toDate) {
+          // Timestamp de Firebase
+          birthdayDate = employee.cumpleanos.toDate();
+        }
+
+        if (!birthdayDate || isNaN(birthdayDate.getTime())) {
+          return false;
+        }
+
+        // Comparar el mes (0-11 en JavaScript, pero queremos 1-12)
+        const employeeBirthMonth = (birthdayDate.getMonth() + 1).toString();
+        return employeeBirthMonth === birthdayMonth;
+      });
+    }
+
+    setFilteredEmployees(filtered);
+  };
+
+  // Función original de handleSearch para compatibilidad
   const handleSearch = (term: string, category: string) => {
     setSearchTerm(term);
-    
-    if (!term.trim()) {
-      // Si no hay término de búsqueda, mostrar todos los empleados
-      setFilteredEmployees(employees);
-      return;
-    }
-    
-    // Convertir término de búsqueda a minúsculas para comparación insensible a mayúsculas/minúsculas
-    const lowerTerm = term.toLowerCase();
-    
-    // Filtrar empleados basados en la categoría seleccionada
-    const filtered = employees.filter(employee => {
-      switch (category) {
-        case 'nombre':
-          return employee.nombre.toLowerCase().includes(lowerTerm);
-        case 'telefono':
-          return employee.telefono.toLowerCase().includes(lowerTerm);
-        case 'email':
-          return employee.email?.toLowerCase().includes(lowerTerm);
-        case 'direccion':
-          return employee.direccion.toLowerCase().includes(lowerTerm) || 
-                 employee.colonia.toLowerCase().includes(lowerTerm);
-        case 'empleo':
-          return employee.empleo?.toLowerCase().includes(lowerTerm);
-        case 'todo':
-        default:
-          // Buscar en todos los campos
-          return (
-            employee.nombre.toLowerCase().includes(lowerTerm) ||
-            employee.telefono.toLowerCase().includes(lowerTerm) ||
-            (employee.email && employee.email.toLowerCase().includes(lowerTerm)) ||
-            employee.direccion.toLowerCase().includes(lowerTerm) ||
-            employee.colonia.toLowerCase().includes(lowerTerm) ||
-            (employee.empleo && employee.empleo.toLowerCase().includes(lowerTerm))
-          );
+    setSearchCategory(category);
+  };
+
+  // Función para manejar cambio de mes de cumpleaños
+  const handleBirthdayMonthChange = (month: string) => {
+    setBirthdayMonth(month);
+  };
+
+  // Función para obtener estadísticas de cumpleaños del mes seleccionado
+  const getBirthdayStats = () => {
+    if (!birthdayMonth) return null;
+
+    const monthName = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][parseInt(birthdayMonth)];
+    const employeesInMonth = filteredEmployees.filter(emp => {
+      if (!emp.cumpleanos) return false;
+      
+      let birthdayDate: Date | null = null;
+      
+      if (typeof emp.cumpleanos === 'string') {
+        birthdayDate = new Date(emp.cumpleanos);
+      } else if (emp.cumpleanos && typeof emp.cumpleanos === 'object' && emp.cumpleanos.toDate) {
+        birthdayDate = emp.cumpleanos.toDate();
       }
+
+      if (!birthdayDate || isNaN(birthdayDate.getTime())) {
+        return false;
+      }
+
+      return (birthdayDate.getMonth() + 1).toString() === birthdayMonth;
     });
-    
-    setFilteredEmployees(filtered);
+
+    return {
+      monthName,
+      count: employeesInMonth.length,
+      employees: employeesInMonth
+    };
   };
 
   // Cargar al iniciar
@@ -254,16 +321,10 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isSharedAccess = fals
     }
   };
   
-  // Actualizar empleados filtrados cuando cambia la lista de empleados o el término de búsqueda
+  // Aplicar filtros cuando cambien los parámetros de búsqueda o la lista de empleados
   useEffect(() => {
-    if (searchTerm) {
-      // Si hay un término de búsqueda, aplicar el filtro
-      handleSearch(searchTerm, searchCategory);
-    } else {
-      // Si no hay término de búsqueda, mostrar todos los empleados
-      setFilteredEmployees(employees);
-    }
-  }, [employees]);
+    applyFilters();
+  }, [employees, searchTerm, searchCategory, birthdayMonth]);
   
   // Cargar plantillas de notificaciones guardadas
   const loadNotificationTemplates = async () => {
@@ -1162,7 +1223,8 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isSharedAccess = fals
                   pelicula: '',
                   libro: '',
                   fechaInscripcion: format(new Date(), 'yyyy-MM-dd'),
-                  empleo: ''
+                  empleo: '',
+                  notas: ''
                 });
               }
             }}
@@ -1186,7 +1248,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isSharedAccess = fals
       
       {/* Barra de búsqueda */}
       <div className="bg-white rounded-lg shadow-sm border border-blue-100 p-4 mb-6 search-container">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div className="sm:col-span-2">
             <div className="relative">
               <Input 
@@ -1216,16 +1278,116 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isSharedAccess = fals
               <option value="todo">Buscar en todo</option>
             </select>
           </div>
+          <div className="flex-1">
+            <select 
+              className="w-full h-10 px-3 py-2 text-sm border border-blue-200 rounded-md focus:outline-none focus:border-blue-400 bg-white"
+              value={birthdayMonth}
+              onChange={(e) => handleBirthdayMonthChange(e.target.value)}
+              aria-label="Filtrar por mes de cumpleaños"
+            >
+              <option value="">Todos los meses</option>
+              <option value="1">Enero</option>
+              <option value="2">Febrero</option>
+              <option value="3">Marzo</option>
+              <option value="4">Abril</option>
+              <option value="5">Mayo</option>
+              <option value="6">Junio</option>
+              <option value="7">Julio</option>
+              <option value="8">Agosto</option>
+              <option value="9">Septiembre</option>
+              <option value="10">Octubre</option>
+              <option value="11">Noviembre</option>
+              <option value="12">Diciembre</option>
+            </select>
+          </div>
         </div>
-        {searchTerm && (
+        
+        {/* Información de filtros activos */}
+        {(searchTerm || birthdayMonth) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {searchTerm && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                Buscando: "{searchTerm}"
+                <button 
+                  onClick={() => handleSearch('', searchCategory)}
+                  className="ml-2 text-blue-600 hover:text-blue-800"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {birthdayMonth && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                🎂 {['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][parseInt(birthdayMonth)]}
+                <button 
+                  onClick={() => handleBirthdayMonthChange('')}
+                  className="ml-2 text-green-600 hover:text-green-800"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+        
+        {/* Panel de estadísticas de cumpleaños por mes */}
+        {birthdayMonth && (() => {
+          const stats = getBirthdayStats();
+          return stats && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-green-800 flex items-center">
+                  <Gift className="h-4 w-4 mr-2" />
+                  Cumpleaños en {stats.monthName}
+                </h3>
+                <span className="text-lg font-bold text-green-600">
+                  {stats.count} {stats.count === 1 ? 'persona' : 'personas'}
+                </span>
+              </div>
+              {stats.employees.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {stats.employees.map((emp) => {
+                    let birthdayDate: Date | null = null;
+                    
+                    if (typeof emp.cumpleanos === 'string') {
+                      birthdayDate = new Date(emp.cumpleanos);
+                    } else if (emp.cumpleanos && typeof emp.cumpleanos === 'object' && emp.cumpleanos.toDate) {
+                      birthdayDate = emp.cumpleanos.toDate();
+                    }
+                    
+                    const day = birthdayDate ? birthdayDate.getDate() : '?';
+                    
+                    return (
+                      <div key={emp.id} className="flex items-center p-2 bg-white rounded border border-green-100">
+                        <span className="text-lg mr-2">🎂</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{emp.nombre}</p>
+                          <p className="text-xs text-gray-500">{day} de {stats.monthName}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        
+        {(searchTerm || birthdayMonth) && (
           <div className="mt-3 flex justify-between items-center">
             <div className="text-sm text-blue-600 search-results-count">
               <span className="font-medium">{filteredEmployees.length}</span> {filteredEmployees.length === 1 ? 'resultado' : 'resultados'} encontrados
+              {birthdayMonth && !searchTerm && (
+                <span className="ml-2 text-green-600">
+                  • Cumpleaños en {['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][parseInt(birthdayMonth)]}
+                </span>
+              )}
             </div>
             {filteredEmployees.length > 0 && (
               <Button
                 onClick={() => {
                   setSearchTerm('');
+                  setBirthdayMonth('');
                   setFilteredEmployees(employees);
                 }}
                 variant="outline"
@@ -1233,7 +1395,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isSharedAccess = fals
                 className="h-8 text-xs border-blue-200 text-blue-700 search-clear-button"
               >
                 <X className="h-3.5 w-3.5 mr-1" />
-                Limpiar
+                Limpiar filtros
               </Button>
             )}
           </div>
