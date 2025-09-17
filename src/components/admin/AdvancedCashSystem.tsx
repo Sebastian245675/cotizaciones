@@ -620,6 +620,7 @@ export const CashRegisterSystem: React.FC = () => {
           setClosedReports(closedReportsData);
           console.log(`📋 Reportes cerrados actualizados en tiempo real: ${closedReportsData.length}`);
           
+<<<<<<< HEAD
           // Encontrar reporte actual - PRIORIZAR TURNOS ABIERTOS DE HOY
           // 🔧 CORREGIDO: usar fecha local consistente
           const [year, month, day] = selectedDate.split('-').map(Number);
@@ -632,6 +633,12 @@ export const CashRegisterSystem: React.FC = () => {
           let todayReport = reportsData.find(report => 
             report.status === 'open' && 
             report.date.toDateString() === todayStr
+=======
+          // Encontrar reporte actual
+          const today = new Date(selectedDate);
+          const todayReport = reportsData.find(report => 
+            report.date.toDateString() === today.toDateString()
+>>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
           );
           
           // 2. Si no hay turno abierto de hoy, buscar cualquier reporte del día
@@ -671,13 +678,20 @@ export const CashRegisterSystem: React.FC = () => {
         async (ventasSnapshot) => {
           console.log('🔄 Detectados cambios en ventas...');
           
+<<<<<<< HEAD
           // Filtrar ventas de hoy - CORREGIDO: usar fecha local directamente
           console.log('📅 selectedDate para filtro:', selectedDate);
+=======
+          // Filtrar ventas de hoy
+          const today = new Date(selectedDate);
+          const todayStr = today.toISOString().split('T')[0];
+>>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
           
           const todaySales = ventasSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as any))
             .filter((sale: any) => {
               const saleDate = sale.fechaVenta || sale.timestamp?.toDate?.()?.toISOString().split('T')[0] || sale.fecha?.split('T')[0];
+<<<<<<< HEAD
               const matches = saleDate === selectedDate;
               
               // Debug: mostrar fechas para entender el filtrado
@@ -686,6 +700,9 @@ export const CashRegisterSystem: React.FC = () => {
               }
               
               return matches;
+=======
+              return saleDate === todayStr;
+>>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
             })
             .map((sale: any) => ({
               ...sale,

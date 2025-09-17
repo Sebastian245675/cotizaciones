@@ -93,7 +93,11 @@ export const processMultimedia = async (messageData, WHATSAPP_API_URL) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+<<<<<<< HEAD
         'Authorization': `Bearer ${process.env.VITE_OPENAI_API_KEY || ''}`
+=======
+        'Authorization': `Bearer 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`
+>>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
       },
       body: JSON.stringify({
         model: model,

@@ -5253,6 +5253,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
               ) : (
                 <div className="space-y-1">
                   {cart.map((item, index) => (
+<<<<<<< HEAD
                     <div key={item.product.id} className="bg-white border border-gray-200 rounded p-1.5 flex items-center gap-2">
                       <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded font-medium">#{index + 1}</span>
                       {item.product.image && (
@@ -5273,6 +5274,129 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       <Button variant="ghost" size="sm" onClick={() => removeFromCart(item.product.id)} className="text-red-500 hover:text-red-700 h-5 w-5 p-0">
                         <Trash2 className="h-2.5 w-2.5" />
                       </Button>
+=======
+                    <div key={item.product.id} className="bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          {item.product.image && (
+                            <img
+                              src={item.product.image}
+                              alt={item.product.name}
+                              className="w-8 h-8 object-cover rounded border"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1 mb-1">
+                              <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium">
+                                #{index + 1}
+                              </span>
+                              <h4 className="font-medium text-gray-800 truncate text-sm">{item.product.name}</h4>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                              <span>💰 ${(item.product.price || 0).toLocaleString('es-ES')} 
+                                {item.product.tipoVenta === 'kilos' ? '/kg' : ' c/u'}
+                              </span>
+                              {item.product.category && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Tag className="h-2.5 w-2.5" />
+                                  {item.product.category}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromCart(item.product.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-100 h-6 w-6 p-0"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateQuantity(item.product.id, item.quantity - (item.product.tipoVenta === 'kilos' ? 0.1 : 1))}
+                            className="h-6 w-6 p-0 hover:bg-red-50 border-red-200"
+                            disabled={item.quantity <= (item.product.tipoVenta === 'kilos' ? 0.1 : 1)}
+                          >
+                            <Minus className="h-2.5 w-2.5" />
+                          </Button>
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const newQty = item.product.tipoVenta === 'kilos' 
+                                ? parseFloat(e.target.value) || 0
+                                : parseInt(e.target.value) || 1;
+                              if (newQty > 0 && newQty <= (item.product.stock || 0)) {
+                                updateQuantity(item.product.id, newQty);
+                              }
+                            }}
+                            className="w-12 h-6 text-center font-bold text-xs"
+                            min={item.product.tipoVenta === 'kilos' ? "0.01" : "1"}
+                            max={item.product.stock || 999}
+                            step={item.product.tipoVenta === 'kilos' ? "0.01" : "1"}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateQuantity(item.product.id, item.quantity + (item.product.tipoVenta === 'kilos' ? 0.1 : 1))}
+                            className="h-6 w-6 p-0 hover:bg-green-50 border-green-200"
+                            disabled={item.quantity >= (item.product.stock || 0)}
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                          </Button>
+                          <span className="text-xs text-gray-500 ml-1">
+                            📦{item.product.stock || 0}{item.product.tipoVenta === 'kilos' ? 'kg' : ''}
+                          </span>
+                        </div>
+                        
+                        <div className="text-right">
+                          <p className="font-bold text-green-600 text-lg">
+                            ${(item.subtotal || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                          </p>
+                          {mode === 'advanced' && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                value={item.discount || ''}
+                                onChange={(e) => updateItemDiscount(item.product.id, Number(e.target.value) || 0, item.discountType)}
+                                className="w-12 h-5 text-xs"
+                                min="0"
+                              />
+                              <Select value={item.discountType} onValueChange={(value: string) => updateItemDiscount(item.product.id, item.discount, value as 'percentage' | 'amount')}>
+                                <SelectTrigger className="w-8 h-5 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="z-[10010] bg-white shadow-lg border">
+                                  <SelectItem value="percentage">%</SelectItem>
+                                  <SelectItem value="amount">$</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Mostrar ahorro si hay descuento */}
+                      {item.discount > 0 && (
+                        <div className="mt-1 pt-1 border-t border-gray-100">
+                          <div className="flex justify-between text-xs text-green-600">
+                            <span>Ahorro:</span>
+                            <span>
+                              -${(((item.product.price || 0) * item.quantity) - (item.subtotal || 0)).toLocaleString('es-ES')}
+                              ({item.discountType === 'percentage' ? `${item.discount}%` : `$${item.discount}`})
+                            </span>
+                          </div>
+                        </div>
+                      )}
+>>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
                     </div>
                   ))}
                   

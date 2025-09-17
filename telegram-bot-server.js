@@ -13,7 +13,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Variables globales
 let BOT_TOKEN = '';
-let OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+let OPENAI_API_KEY = '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';
 
 // Estadísticas
 let stats = {
