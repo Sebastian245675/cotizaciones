@@ -1,0 +1,8 @@
+Covenant POS v1.0 FINAL 
+Fecha: s b 20/09/2025 20:30:10,12 
+ 
+CONTENIDO: 
+- Sistema completo offline 
+- Instalador automatico 
+- Accesos directos 
+- Integracion con Windows 

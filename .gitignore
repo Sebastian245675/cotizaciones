@@ -7,10 +7,47 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+builds/
+build/
 dist-ssr
 *.local
+
+# Executables
+*.exe
+*.app
+*.dmg
+*.deb
+*.rpm
+
+# Electron build artifacts
+*.asar
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# WhatsApp auth data
+backend/data/auth_wa_*/
+
+# Package distribution folders
+covenant-pos-dist/
+Covenant-POS-DESKTOP/
+Covenant-POS-SIMPLE/
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +59,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary files
+*.tmp
+*.temp

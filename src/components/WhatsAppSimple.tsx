@@ -57,17 +57,17 @@ import {
   Eye,
   Download,
   BookOpen,
-  Search,
-  Send as TelegramIcon
+  Search
 } from 'lucide-react';
 
 const WHATSAPP_API_URL = 'http://localhost:3001/api/whatsapp';
 
 interface WhatsAppInstance {
   instanceId: string;
-  status: 'connected' | 'disconnected' | 'qr_ready' | 'error';
-  phoneNumber?: string;
+  status: 'connected' | 'disconnected' | 'error' | 'connecting' | 'qr_ready' | 'loading';
   qr?: string;
+  phone?: string;
+  phoneNumber?: string;
 }
 
 interface Chat {
@@ -1645,25 +1645,18 @@ Documento procesado y disponible para contexto de IA.`;
     };
   };
 
-  // Check service status and setup WebSocket
+  // ✅ HABILITADO - Check service status inicial (SIN LOOPS)
   useEffect(() => {
+    // Solo ejecutar una vez al montar, sin setInterval
     checkServiceStatus();
-    const interval = setInterval(checkServiceStatus, 5000);
     
     // Cargar flujos básicos, documentos y agentes IA al inicializar
     loadBasicFlows();
     loadAIDocuments();
     loadAIAgents();
     
-    // Configurar WebSocket
-    setupWebSocket();
-    
-    return () => {
-      clearInterval(interval);
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-    };
+    // ❌ NO configurar WebSocket automáticamente para evitar loops
+    // setupWebSocket();
   }, []);
 
   // Setup WebSocket connection
@@ -1868,43 +1861,43 @@ Documento procesado y disponible para contexto de IA.`;
     facebookMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [facebookMessages]);
 
-  useEffect(() => {
-    if (serviceStatus === 'online') {
-      loadInstances();
-      loadFacebookInstances();
-    }
-  }, [serviceStatus]);
+  // ❌ DESHABILITADO TEMPORALMENTE - useEffect(() => {
+  //   if (serviceStatus === 'online') {
+  //     loadInstances();
+  //     loadFacebookInstances();
+  //   }
+  // }, [serviceStatus]);
 
-  useEffect(() => {
-    if (selectedInstance) {
-      loadChats(selectedInstance);
-    }
-  }, [selectedInstance]);
+  // ❌ DESHABILITADO TEMPORALMENTE - useEffect(() => {
+  //   if (selectedInstance) {
+  //     loadChats(selectedInstance);
+  //   }
+  // }, [selectedInstance]);
 
-  useEffect(() => {
-    if (selectedFacebookInstance) {
-      loadFacebookChats(selectedFacebookInstance);
-    }
-  }, [selectedFacebookInstance]);
+  // ❌ DESHABILITADO TEMPORALMENTE - useEffect(() => {
+  //   if (selectedFacebookInstance) {
+  //     loadFacebookChats(selectedFacebookInstance);
+  //   }
+  // }, [selectedFacebookInstance]);
 
-  useEffect(() => {
-    if (selectedChat && selectedInstance) {
-      loadMessages(selectedInstance, selectedChat.phone_number);
-    }
-  }, [selectedChat, selectedInstance]);
+  // ❌ DESHABILITADO TEMPORALMENTE - useEffect(() => {
+  //   if (selectedChat && selectedInstance) {
+  //     loadMessages(selectedInstance, selectedChat.phone_number);
+  //   }
+  // }, [selectedChat, selectedInstance]);
 
-  useEffect(() => {
-    if (selectedFacebookChat && selectedFacebookInstance) {
-      loadFacebookMessages(selectedFacebookInstance, selectedFacebookChat.chat_id);
-    }
-  }, [selectedFacebookChat, selectedFacebookInstance]);
+  // ❌ DESHABILITADO TEMPORALMENTE - useEffect(() => {
+  //   if (selectedFacebookChat && selectedFacebookInstance) {
+  //     loadFacebookMessages(selectedFacebookInstance, selectedFacebookChat.chat_id);
+  //   }
+  // }, [selectedFacebookChat, selectedFacebookInstance]);
 
-  // Recargar documentos cuando se cierre el diálogo de documentos (para actualizar la lista en el agente)
-  useEffect(() => {
-    if (!showDocumentDialog) {
-      loadAIDocuments();
-    }
-  }, [showDocumentDialog]);
+  // ❌ DESHABILITADO PARA PARAR EL SPAM - Recargar documentos cuando se cierre el diálogo de documentos (para actualizar la lista en el agente)
+  // useEffect(() => {
+  //   if (!showDocumentDialog) {
+  //     loadAIDocuments();
+  //   }
+  // }, [showDocumentDialog]);
 
   // Funciones para manejar el formulario de agente IA
   const loadAIAgents = () => {
@@ -2065,10 +2058,10 @@ Documento procesado y disponible para contexto de IA.`;
     console.log('🧹 Estadísticas de costos limpiadas');
   };
 
-  // Cargar registros al inicializar
-  useEffect(() => {
-    loadAIUsageRecords();
-  }, []);
+  // ❌ DESHABILITADO TEMPORALMENTE - Cargar registros al inicializar
+  // useEffect(() => {
+  //   loadAIUsageRecords();
+  // }, []);
 
   // 🔧 FUNCIÓN DE DEBUG GLOBAL - Se puede ejecutar desde consola del navegador
   useEffect(() => {
@@ -2894,7 +2887,7 @@ INSTRUCCIONES CRÍTICAS:
             ];
           } else {
             console.log('📝 Sin imagen real - usando respuesta alternativa');
-            // SIN IMAGEN REAL - respuesta útil
+            // SIN IMAGEN REAL - preparar mensajes para texto
             openaiMessages = [
               {
                 role: "system",
@@ -2902,21 +2895,17 @@ INSTRUCCIONES CRÍTICAS:
               },
               {
                 role: "user",
-                content: "Envié una imagen con ejercicios matemáticos. Quiero que me ayudes a resolverlos de la forma más rápida y efectiva posible."
+                content: `El usuario no proporcionó la imagen correctamente. Pide que escriba los ejercicios por texto o que reenvíe la imagen.`
               }
             ];
           }
-          
-          // PASO 3: LLAMAR A OPENAI
+
+          // Llamar a OpenAI con el mensaje construido
           const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-<<<<<<< HEAD
               'Authorization': `Bearer ${openaiApiKey || import.meta.env.VITE_OPENAI_API_KEY || ''}`
-=======
-              'Authorization': `Bearer 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`
->>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
             },
             body: JSON.stringify({
               model: model,
@@ -4316,10 +4305,10 @@ ${analysis}
     // La primera actualización se hará cuando se ejecute el interval
     
     // Actualizar cada 5 segundos
-    telegramStatsIntervalRef.current = setInterval(updateTelegramStats, 5000);
+    // telegramStatsIntervalRef.current = setInterval(updateTelegramStats, 60000); // 1 minuto en lugar de 5 segundos
     
     // Hacer la primera actualización después de 1 segundo para evitar problemas de orden de hooks
-    setTimeout(updateTelegramStats, 1000);
+    // setTimeout(updateTelegramStats, 1000);
   };
 
   // Función para agregar logs
@@ -5025,7 +5014,7 @@ ${analysis}
                 Chat
               </TabsTrigger>
               <TabsTrigger value="telegram" className="flex items-center gap-2">
-                <TelegramIcon className="w-4 h-4" />
+                <MessageCircle className="w-4 h-4" />
                 Telegram
               </TabsTrigger>
               <TabsTrigger value="facebook" className="flex items-center gap-2">
@@ -6400,7 +6389,7 @@ RESPUESTA: Se desarrolla mediante análisis de mercado, definición de objetivos
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <TelegramIcon className="w-5 h-5" />
+                      <MessageCircle className="w-5 h-5" />
                       Configuración Bot Telegram
                     </CardTitle>
                   </CardHeader>

@@ -19,8 +19,16 @@ import {
   Rocket, Globe, Infinity, Layers, Maximize2, MousePointer, Move3D,
   Volume2, VolumeX, Settings, Bell, BellRing, ChevronUp, PlayCircle,
   StopCircle, PauseCircle, RotateCcw, Share2, Link2, Camera, Video,
-  Headphones, Coffee, Zap as Lightning, Sun, Moon, Cloud, Umbrella, Wind, History
+  Headphones, Coffee, Zap as Lightning, Sun, Moon, Cloud, Umbrella, Wind, History,
+  BarChart
 } from 'lucide-react';
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
+  BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Pie, Cell,
+  AreaChart, Area
+} from 'recharts';
+import { format, subDays, subMonths, startOfDay, endOfDay, eachDayOfInterval, eachMonthOfInterval } from 'date-fns';
+import { es } from 'date-fns/locale';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -178,16 +186,19 @@ const AnimatedStat: React.FC<{
       const stepValue = numericValue / steps;
       let currentStep = 0;
 
-      const timer = setInterval(() => {
-        currentStep++;
-        setAnimatedValue(Math.min(stepValue * currentStep, numericValue));
-        
-        if (currentStep >= steps) {
-          clearInterval(timer);
-        }
-      }, duration / steps);
+      // const timer = setInterval(() => {
+      //   currentStep++;
+      //   setAnimatedValue(Math.min(stepValue * currentStep, numericValue));
+      //   
+      //   if (currentStep >= steps) {
+      //     clearInterval(timer);
+      //   }
+      // }, duration / steps);
 
-      return () => clearInterval(timer);
+      // Set value directly without animation
+      setAnimatedValue(numericValue);
+
+      return () => {}; // clearInterval(timer);
     }
   }, [isVisible, numericValue]);
 
@@ -373,6 +384,22 @@ export const CashRegisterSystem: React.FC = () => {
   const [daySales, setDaySales] = useState<any[]>([]);
   const [loadingSales, setLoadingSales] = useState(false);
   
+  // Estados para análisis avanzado
+  const [analyticsFilter, setAnalyticsFilter] = useState<'7days' | '30days' | '3months' | '6months' | '1year'>('30days');
+  const [chartType, setChartType] = useState<'daily' | 'monthly' | 'payment' | 'products'>('daily');
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState({
+    totalSales: 0,
+    totalTransactions: 0,
+    averageSale: 0,
+    bestDay: { date: '', amount: 0 },
+    growth: 0,
+    dailyData: [] as any[],
+    monthlyData: [] as any[],
+    paymentMethods: [] as any[],
+    topProducts: [] as any[]
+  });
+  
   // Estados para historial de cortes cerrados
   const [closedReports, setClosedReports] = useState<DailyCashReport[]>([]);
   const [loadingClosedReports, setLoadingClosedReports] = useState(false);
@@ -480,8 +507,10 @@ export const CashRegisterSystem: React.FC = () => {
 
   // Actualizar hora cada segundo
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    // const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    // Set time once without interval
+    setCurrentTime(new Date());
+    return () => {}; // clearInterval(timer);
   }, []);
 
   // Función para sincronizar ventas del POS con el reporte de caja
@@ -619,26 +648,19 @@ export const CashRegisterSystem: React.FC = () => {
           const closedReportsData = reportsData.filter(report => report.status === 'closed');
           setClosedReports(closedReportsData);
           console.log(`📋 Reportes cerrados actualizados en tiempo real: ${closedReportsData.length}`);
-          
-<<<<<<< HEAD
+
           // Encontrar reporte actual - PRIORIZAR TURNOS ABIERTOS DE HOY
           // 🔧 CORREGIDO: usar fecha local consistente
           const [year, month, day] = selectedDate.split('-').map(Number);
           const today = new Date(year, month - 1, day);
           const todayStr = today.toDateString(); // Usar toDateString() para comparar
-          
+
           console.log('📅 Buscando reporte del día:', { selectedDate, todayStr });
-          
+
           // 1. Buscar turnos abiertos del día actual (incluye turnos de POS)
           let todayReport = reportsData.find(report => 
             report.status === 'open' && 
             report.date.toDateString() === todayStr
-=======
-          // Encontrar reporte actual
-          const today = new Date(selectedDate);
-          const todayReport = reportsData.find(report => 
-            report.date.toDateString() === today.toDateString()
->>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
           );
           
           // 2. Si no hay turno abierto de hoy, buscar cualquier reporte del día
@@ -677,32 +699,22 @@ export const CashRegisterSystem: React.FC = () => {
         query(collection(db, "ventas"), orderBy("fecha", "desc")),
         async (ventasSnapshot) => {
           console.log('🔄 Detectados cambios en ventas...');
-          
-<<<<<<< HEAD
+
           // Filtrar ventas de hoy - CORREGIDO: usar fecha local directamente
           console.log('📅 selectedDate para filtro:', selectedDate);
-=======
-          // Filtrar ventas de hoy
-          const today = new Date(selectedDate);
-          const todayStr = today.toISOString().split('T')[0];
->>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
-          
+
           const todaySales = ventasSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as any))
             .filter((sale: any) => {
               const saleDate = sale.fechaVenta || sale.timestamp?.toDate?.()?.toISOString().split('T')[0] || sale.fecha?.split('T')[0];
-<<<<<<< HEAD
               const matches = saleDate === selectedDate;
-              
+
               // Debug: mostrar fechas para entender el filtrado
               if (!matches && sale.numeroVenta) {
                 console.log(`❌ Venta ${sale.numeroVenta} excluida - Fecha venta: ${saleDate}, Fecha filtro: ${selectedDate}`);
               }
-              
+
               return matches;
-=======
-              return saleDate === todayStr;
->>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
             })
             .map((sale: any) => ({
               ...sale,
@@ -1065,6 +1077,401 @@ export const CashRegisterSystem: React.FC = () => {
     audio.play().catch(() => {});
   };
 
+  // === FUNCIONES DE ANÁLISIS AVANZADO ===
+  
+  // Función para cargar datos de análisis
+  const loadAnalyticsData = async () => {
+    setLoadingAnalytics(true);
+    try {
+      console.log('📊 Cargando datos de análisis avanzado...');
+      
+      // Determinar rango de fechas según el filtro
+      const endDate = new Date();
+      let startDate = new Date();
+      
+      switch (analyticsFilter) {
+        case '7days':
+          startDate = subDays(endDate, 7);
+          break;
+        case '30days':
+          startDate = subDays(endDate, 30);
+          break;
+        case '3months':
+          startDate = subMonths(endDate, 3);
+          break;
+        case '6months':
+          startDate = subMonths(endDate, 6);
+          break;
+        case '1year':
+          startDate = subMonths(endDate, 12);
+          break;
+      }
+
+      // Cargar todas las ventas
+      const allSalesSnapshot = await getDocs(collection(db, 'ventas'));
+      const allSales = allSalesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp || data.fecha),
+          total: data.resumen?.total || data.total || 0,
+          paymentMethod: data.pago?.method || data.paymentMethod || 'cash',
+          items: data.productos || data.items || []
+        };
+      });
+
+      // Filtrar ventas por rango de fechas
+      const filteredSales = allSales.filter(sale => {
+        const saleDate = new Date(sale.timestamp);
+        return saleDate >= startDate && saleDate <= endDate;
+      });
+
+      // Calcular métricas básicas
+      const totalSales = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+      const totalTransactions = filteredSales.length;
+      const averageSale = totalTransactions > 0 ? totalSales / totalTransactions : 0;
+
+      // Calcular crecimiento vs período anterior
+      const previousStartDate = new Date(startDate);
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      previousStartDate.setDate(previousStartDate.getDate() - daysDiff);
+      
+      const previousSales = allSales.filter(sale => {
+        const saleDate = new Date(sale.timestamp);
+        return saleDate >= previousStartDate && saleDate < startDate;
+      });
+      
+      const previousTotal = previousSales.reduce((sum, sale) => sum + sale.total, 0);
+      const growth = previousTotal > 0 ? ((totalSales - previousTotal) / previousTotal) * 100 : 0;
+
+      // Encontrar mejor día
+      const dailyTotals = new Map();
+      filteredSales.forEach(sale => {
+        const dateKey = format(new Date(sale.timestamp), 'yyyy-MM-dd');
+        dailyTotals.set(dateKey, (dailyTotals.get(dateKey) || 0) + sale.total);
+      });
+      
+      let bestDay = { date: '', amount: 0 };
+      for (const [date, amount] of dailyTotals.entries()) {
+        if (amount > bestDay.amount) {
+          bestDay = { 
+            date: format(new Date(date), 'dd MMM', { locale: es }), 
+            amount 
+          };
+        }
+      }
+
+      // Generar datos para gráficos diarios
+      const dailyData = eachDayOfInterval({ start: startDate, end: endDate }).map(date => {
+        const dateKey = format(date, 'yyyy-MM-dd');
+        const dayTotal = dailyTotals.get(dateKey) || 0;
+        const dayTransactions = filteredSales.filter(sale => 
+          format(new Date(sale.timestamp), 'yyyy-MM-dd') === dateKey
+        ).length;
+        
+        return {
+          date: format(date, 'dd/MM', { locale: es }),
+          fullDate: format(date, 'yyyy-MM-dd'),
+          ventas: dayTotal,
+          transacciones: dayTransactions,
+          promedio: dayTransactions > 0 ? dayTotal / dayTransactions : 0
+        };
+      });
+
+      // Generar datos para gráficos mensuales
+      const monthlyTotals = new Map();
+      filteredSales.forEach(sale => {
+        const monthKey = format(new Date(sale.timestamp), 'yyyy-MM');
+        monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey) || 0) + sale.total);
+      });
+
+      const monthlyData = eachMonthOfInterval({ start: startDate, end: endDate }).map(date => {
+        const monthKey = format(date, 'yyyy-MM');
+        const monthTotal = monthlyTotals.get(monthKey) || 0;
+        const monthTransactions = filteredSales.filter(sale => 
+          format(new Date(sale.timestamp), 'yyyy-MM') === monthKey
+        ).length;
+        
+        return {
+          mes: format(date, 'MMM yyyy', { locale: es }),
+          ventas: monthTotal,
+          transacciones: monthTransactions
+        };
+      });
+
+      // Análisis por método de pago
+      const paymentMethods = ['cash', 'card', 'transfer'];
+      const paymentData = paymentMethods.map(method => {
+        const methodSales = filteredSales.filter(sale => sale.paymentMethod === method);
+        const methodTotal = methodSales.reduce((sum, sale) => sum + sale.total, 0);
+        
+        return {
+          metodo: method === 'cash' ? 'Efectivo' : method === 'card' ? 'Tarjeta' : 'Transferencia',
+          ventas: methodTotal,
+          transacciones: methodSales.length,
+          porcentaje: totalSales > 0 ? (methodTotal / totalSales) * 100 : 0
+        };
+      });
+
+      // Top productos
+      const productTotals = new Map();
+      filteredSales.forEach(sale => {
+        sale.items.forEach((item: any) => {
+          const productName = item.nombre || item.product?.name || 'Producto';
+          const quantity = item.cantidad || item.quantity || 0;
+          const total = item.subtotal || (item.quantity * item.product?.price) || 0;
+          
+          if (productTotals.has(productName)) {
+            const existing = productTotals.get(productName);
+            productTotals.set(productName, {
+              quantity: existing.quantity + quantity,
+              total: existing.total + total
+            });
+          } else {
+            productTotals.set(productName, { quantity, total });
+          }
+        });
+      });
+
+      const topProducts = Array.from(productTotals.entries())
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10);
+
+      // Actualizar estado
+      setAnalyticsData({
+        totalSales,
+        totalTransactions,
+        averageSale,
+        bestDay,
+        growth,
+        dailyData,
+        monthlyData,
+        paymentMethods: paymentData,
+        topProducts
+      });
+
+      console.log('✅ Datos de análisis cargados correctamente');
+      
+    } catch (error) {
+      console.error('❌ Error cargando datos de análisis:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudieron cargar los datos de análisis"
+      });
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
+  // Función para obtener título del gráfico
+  const getChartTitle = () => {
+    switch (chartType) {
+      case 'daily':
+        return 'Ventas por Día';
+      case 'monthly':
+        return 'Ventas por Mes';
+      case 'payment':
+        return 'Ventas por Método de Pago';
+      case 'products':
+        return 'Productos Más Vendidos';
+      default:
+        return 'Análisis de Ventas';
+    }
+  };
+
+  // Función para renderizar gráfico principal
+  const renderChart = () => {
+    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+    
+    switch (chartType) {
+      case 'daily':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={analyticsData.dailyData}>
+              <defs>
+                <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis 
+                dataKey="date" 
+                stroke="#6B7280"
+                fontSize={12}
+              />
+              <YAxis 
+                stroke="#6B7280"
+                fontSize={12}
+                tickFormatter={(value) => `$${value.toLocaleString()}`}
+              />
+              <RechartsTooltip 
+                formatter={(value: any, name: any) => [`$${value.toLocaleString()}`, name]}
+                labelFormatter={(label) => `Fecha: ${label}`}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="ventas" 
+                stroke="#3B82F6" 
+                strokeWidth={2}
+                fillOpacity={1} 
+                fill="url(#colorVentas)" 
+                name="Ventas"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+        
+      case 'monthly':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsBarChart data={analyticsData.monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis 
+                dataKey="mes" 
+                stroke="#6B7280"
+                fontSize={12}
+              />
+              <YAxis 
+                stroke="#6B7280"
+                fontSize={12}
+                tickFormatter={(value) => `$${value.toLocaleString()}`}
+              />
+              <RechartsTooltip 
+                formatter={(value: any, name: any) => [`$${value.toLocaleString()}`, name]}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Bar dataKey="ventas" fill="#10B981" name="Ventas" radius={[4, 4, 0, 0]} />
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        );
+        
+      case 'payment':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsPieChart>
+              <Pie
+                data={analyticsData.paymentMethods}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ metodo, porcentaje }) => `${metodo}: ${porcentaje.toFixed(1)}%`}
+                outerRadius={120}
+                fill="#8884d8"
+                dataKey="ventas"
+              >
+                {analyticsData.paymentMethods.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                ))}
+              </Pie>
+              <RechartsTooltip 
+                formatter={(value: any) => [`$${value.toLocaleString()}`, 'Ventas']}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+            </RechartsPieChart>
+          </ResponsiveContainer>
+        );
+        
+      case 'products':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsBarChart data={analyticsData.topProducts.slice(0, 8)} layout="horizontal">
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis 
+                type="number"
+                stroke="#6B7280"
+                fontSize={12}
+                tickFormatter={(value) => `$${value.toLocaleString()}`}
+              />
+              <YAxis 
+                type="category"
+                dataKey="name" 
+                stroke="#6B7280"
+                fontSize={12}
+                width={150}
+              />
+              <RechartsTooltip 
+                formatter={(value: any, name: any) => [`$${value.toLocaleString()}`, name]}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Bar dataKey="total" fill="#8B5CF6" name="Ventas" radius={[0, 4, 4, 0]} />
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        );
+        
+      default:
+        return <div className="text-center text-gray-500">Selecciona un tipo de gráfico</div>;
+    }
+  };
+
+  // Función para renderizar gráfico de métodos de pago
+  const renderPaymentMethodChart = () => {
+    const colors = ['#10B981', '#3B82F6', '#F59E0B'];
+    
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <RechartsPieChart>
+          <Pie
+            data={analyticsData.paymentMethods}
+            cx="50%"
+            cy="50%"
+            innerRadius={40}
+            outerRadius={80}
+            paddingAngle={5}
+            dataKey="ventas"
+          >
+            {analyticsData.paymentMethods.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+            ))}
+          </Pie>
+          <RechartsTooltip 
+            formatter={(value: any) => [`$${value.toLocaleString()}`, 'Ventas']}
+            contentStyle={{
+              backgroundColor: 'white',
+              border: '1px solid #E5E7EB',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}
+          />
+          <Legend />
+        </RechartsPieChart>
+      </ResponsiveContainer>
+    );
+  };
+
+  // Cargar datos de análisis al montar el componente o cambiar filtros
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      loadAnalyticsData();
+    }
+  }, [analyticsFilter, activeTab]);
+
+  // === FIN FUNCIONES DE ANÁLISIS AVANZADO ===
+
   const triggerSuccessEffect = () => {
     setShowConfetti(true);
     setPulseEffect(true);
@@ -1387,42 +1794,33 @@ export const CashRegisterSystem: React.FC = () => {
         </div>
       )}
 
-      <div className="relative z-10 p-8 space-y-8">
-        {/* Header futurista */}
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center space-x-3 bg-white/80 backdrop-blur-lg rounded-full px-8 py-4 shadow-2xl border border-white/50">
-            <div className="relative">
-              <Calculator className="h-10 w-10 text-blue-600" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Sistema de Corte de Caja
-              </h1>
-              <p className="text-gray-600">Covenant Argentina • Centro de Control Avanzado</p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-800">
-                  {currentTime.toLocaleTimeString('es-ES')}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {currentTime.toLocaleDateString('es-ES')}
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-1">
-                <div className={`w-3 h-3 rounded-full ${currentReport?.status === 'open' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                <span className="text-xs text-gray-500">Caja</span>
-              </div>
-              <div className="flex flex-col items-center space-y-1">
-                <div className={`w-3 h-3 rounded-full ${daySales.length > 0 ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                <span className="text-xs text-gray-500">POS ({daySales.length})</span>
-              </div>
-            </div>
+      {/* Compact Header */}
+      <div className="flex items-center justify-between bg-white/80 backdrop-blur-lg rounded-lg px-6 py-3 shadow-lg border border-white/50 mx-4 mt-4">
+        <div className="flex items-center gap-3">
+          <Calculator className="h-6 w-6 text-slate-700" />
+          <div>
+            <h2 className="text-xl font-semibold text-slate-800">Corte de Caja</h2>
+            <p className="text-xs text-slate-500">Centro de Control</p>
           </div>
+        </div>
+        <div className="flex items-center gap-4 text-sm text-slate-600">
+          <div className="text-right">
+            <div>{currentTime.toLocaleTimeString('es-ES')}</div>
+            <div className="text-xs text-slate-500">{currentTime.toLocaleDateString('es-ES')}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${currentReport?.status === 'open' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-xs text-slate-500">{currentReport?.status === 'open' ? 'Abierta' : 'Cerrada'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${daySales.length > 0 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
+            <span className="text-xs text-slate-500">POS ({daySales.length})</span>
+          </div>
+        </div>
+      </div>
 
-          {/* Controles principales */}
-          <div className="flex flex-wrap justify-center gap-4">
+      {/* Controles principales */}
+      <div className="flex flex-wrap justify-center gap-4 p-4">
             <div className="flex items-center space-x-2">
               <Label htmlFor="date" className="text-sm font-medium">Fecha:</Label>
               <Input
@@ -1495,7 +1893,6 @@ export const CashRegisterSystem: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
 
         {/* Estadísticas principales con animación */}
         {currentReport && dayStats && (
@@ -1832,10 +2229,212 @@ export const CashRegisterSystem: React.FC = () => {
 
               {/* Analytics Tab */}
               <TabsContent value="analytics" className="p-8">
-                <div className="text-center py-16">
-                  <PieChart className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-2xl font-bold text-gray-700 mb-2">Análisis Avanzado</h3>
-                  <p className="text-gray-600">Gráficos interactivos y métricas detalladas próximamente...</p>
+                <div className="space-y-8">
+                  {/* Header */}
+                  <div className="text-center mb-8">
+                    <TrendingUp className="h-16 w-16 mx-auto mb-4 text-blue-500" />
+                    <h3 className="text-2xl font-bold text-gray-700 mb-2">Análisis Avanzado</h3>
+                    <p className="text-gray-600">Gráficos interactivos y métricas detalladas de ventas</p>
+                  </div>
+
+                  {/* Controles de filtro para gráficos */}
+                  <Card className="bg-white/90 backdrop-blur-xl shadow-lg border-0 p-6">
+                    <div className="flex flex-wrap gap-4 items-center justify-between">
+                      <div className="flex gap-4 items-center">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Período de Análisis</Label>
+                          <Select value={analyticsFilter} onValueChange={(value) => setAnalyticsFilter(value as any)}>
+                            <SelectTrigger className="w-48 bg-white">
+                              <SelectValue placeholder="Seleccionar período" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="7days">Últimos 7 días</SelectItem>
+                              <SelectItem value="30days">Últimos 30 días</SelectItem>
+                              <SelectItem value="3months">Últimos 3 meses</SelectItem>
+                              <SelectItem value="6months">Últimos 6 meses</SelectItem>
+                              <SelectItem value="1year">Último año</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Tipo de Gráfico</Label>
+                          <Select value={chartType} onValueChange={(value) => setChartType(value as any)}>
+                            <SelectTrigger className="w-48 bg-white">
+                              <SelectValue placeholder="Tipo de gráfico" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">Ventas por Día</SelectItem>
+                              <SelectItem value="monthly">Ventas por Mes</SelectItem>
+                              <SelectItem value="payment">Por Método de Pago</SelectItem>
+                              <SelectItem value="products">Productos Más Vendidos</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        onClick={loadAnalyticsData}
+                        disabled={loadingAnalytics}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        {loadingAnalytics ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <BarChart className="h-4 w-4 mr-2" />
+                        )}
+                        Actualizar Datos
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {/* Métricas principales */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <Card className="bg-gradient-to-br from-blue-50 to-cyan-100 border-blue-200">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-blue-700 flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" />
+                          Ventas Totales
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-blue-800">
+                          ${analyticsData.totalSales.toLocaleString()}
+                        </div>
+                        <p className="text-xs text-blue-600 mt-1">
+                          {analyticsData.totalTransactions} transacciones
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-green-700 flex items-center gap-2">
+                          <DollarSign className="h-4 w-4" />
+                          Promedio por Venta
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-green-800">
+                          ${analyticsData.averageSale.toLocaleString()}
+                        </div>
+                        <p className="text-xs text-green-600 mt-1">
+                          Ticket promedio
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-purple-700 flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Mejor Día
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-lg font-bold text-purple-800">
+                          {analyticsData.bestDay.date}
+                        </div>
+                        <p className="text-xs text-purple-600 mt-1">
+                          ${analyticsData.bestDay.amount.toLocaleString()}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-orange-50 to-amber-100 border-orange-200">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-orange-700 flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Crecimiento
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-orange-800">
+                          {analyticsData.growth > 0 ? '+' : ''}{analyticsData.growth.toFixed(1)}%
+                        </div>
+                        <p className="text-xs text-orange-600 mt-1">
+                          vs período anterior
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Gráfico principal */}
+                  <Card className="bg-white/95 backdrop-blur-xl shadow-lg border-0">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart className="h-5 w-5 text-blue-600" />
+                        {getChartTitle()}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingAnalytics ? (
+                        <div className="flex items-center justify-center h-96">
+                          <div className="text-center">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+                            <p className="text-gray-600">Cargando datos analíticos...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-96">
+                          {renderChart()}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Gráfico secundario - Métodos de pago */}
+                  {chartType !== 'payment' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <Card className="bg-white/95 backdrop-blur-xl shadow-lg border-0">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <PieChart className="h-5 w-5 text-purple-600" />
+                            Distribución por Método de Pago
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-64">
+                            {renderPaymentMethodChart()}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-white/95 backdrop-blur-xl shadow-lg border-0">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Package className="h-5 w-5 text-green-600" />
+                            Top 5 Productos
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {analyticsData.topProducts.slice(0, 5).map((product, index) => (
+                              <div key={product.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                                    index === 0 ? 'bg-yellow-500' : 
+                                    index === 1 ? 'bg-gray-400' : 
+                                    index === 2 ? 'bg-orange-600' : 'bg-blue-500'
+                                  }`}>
+                                    {index + 1}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-gray-800">{product.name}</p>
+                                    <p className="text-sm text-gray-600">{product.quantity} unidades</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-gray-800">${product.total.toLocaleString()}</p>
+                                  <p className="text-sm text-gray-600">{((product.quantity / analyticsData.totalTransactions) * 100).toFixed(1)}%</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
@@ -2506,7 +3105,6 @@ export const CashRegisterSystem: React.FC = () => {
             </Card>
           </div>
         )}
-      </div>
 
       {/* Modal para ver Ticket Completo */}
       <AlertDialog open={showTicketModal} onOpenChange={setShowTicketModal}>

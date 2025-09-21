@@ -1,0 +1,1402 @@
+{
+  "sales": [
+    {
+      "id": "1758418824698",
+      "firebase_id": "7AjzlPaxzm5QJ5wJ3QHU",
+      "resumen": {
+        "total": 551221.55,
+        "impuestos": 95666.55,
+        "totalProductos": 1,
+        "valorDescuentoGlobal": 0,
+        "tipoDescuentoGlobal": "percentage",
+        "totalUnidades": 1,
+        "descuentoGlobal": 0,
+        "baseImponible": 455555,
+        "tasaImpuesto": 21,
+        "subtotal": 455555
+      },
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758197369,
+        "nanoseconds": 767000000
+      },
+      "fechaVenta": "2025-09-18",
+      "cliente": {
+        "name": "Cliente General",
+        "dni": null,
+        "taxId": null,
+        "points": 0,
+        "totalPurchases": 0,
+        "creditLimit": 0,
+        "phone": null,
+        "email": null,
+        "id": null,
+        "address": null,
+        "clientCode": null,
+        "customerType": "individual"
+      },
+      "status": "completed",
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "timestamp": "2025-09-21T01:40:24.698Z",
+      "saleNumber": "INV-1758197369767-019",
+      "turno": {
+        "reporteId": "kBWO0e2weRQABbZZID9W",
+        "balanceInicialTurno": 679,
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758194855,
+          "nanoseconds": 397000000
+        }
+      },
+      "productos": [
+        {
+          "subtotal": 455555,
+          "tipoDescuento": "percentage",
+          "precio": 455555,
+          "tipoRecompensa": "fijo",
+          "codigoBarras": "",
+          "notas": "",
+          "precioCosto": 55,
+          "categoria": "hola",
+          "descuento": 0,
+          "cantidad": 1,
+          "nombre": "prueba",
+          "marca": "",
+          "puntosRecompensa": 0,
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "margen": 0,
+          "proveedor": "",
+          "descripcion": "fgfg",
+          "orden": 1
+        }
+      ],
+      "mes": 9,
+      "horaVenta": "07:09:29",
+      "cashier": "admin@gmail.com",
+      "auditoria": {
+        "creadoPor": "admin@gmail.com",
+        "fechaModificacion": null,
+        "modificadoPor": null,
+        "version": 1,
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758197369,
+          "nanoseconds": 767000000
+        }
+      },
+      "año": 2025,
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758194855,
+        "nanoseconds": 397000000
+      },
+      "reportId": "kBWO0e2weRQABbZZID9W",
+      "sistema": {
+        "dispositivo": "web",
+        "version": "2.0",
+        "pos": true,
+        "ip": "local",
+        "ubicacion": "Argentina",
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+      },
+      "numeroVenta": "INV-1758197369767-019",
+      "operador": {
+        "nombre": "admin",
+        "email": "admin@gmail.com",
+        "turno": "diurno",
+        "rol": "cajero"
+      },
+      "pago": {
+        "processedAt": "2025-09-18T12:09:29.767Z",
+        "change": 122545.44999999995,
+        "cashAmount": 551221.55,
+        "receivedAmount": 673767,
+        "method": "cash",
+        "currency": "ARS"
+      },
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758197369,
+        "nanoseconds": 767000000
+      },
+      "estado": "completada",
+      "diaSemanaN": 4,
+      "modo": "advanced",
+      "diaSemana": "Jueves",
+      "created_at": "2025-09-21T01:40:24.692Z",
+      "updated_at": "2025-09-21T01:40:24.692Z"
+    },
+    {
+      "id": "1758418824839",
+      "firebase_id": "7JP4GdpbLqce9qSaAxy1",
+      "productos": [
+        {
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "precioCosto": 55,
+          "descuento": 0,
+          "notas": "",
+          "margen": 0,
+          "subtotal": 455555,
+          "orden": 1,
+          "categoria": "hola",
+          "puntosRecompensa": 0,
+          "precio": 455555,
+          "tipoRecompensa": "fijo",
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "nombre": "prueba",
+          "proveedor": "",
+          "marca": "",
+          "tipoDescuento": "percentage",
+          "descripcion": "fgfg",
+          "cantidad": 1,
+          "codigoBarras": ""
+        }
+      ],
+      "operador": {
+        "nombre": "admin",
+        "turno": "diurno",
+        "email": "admin@gmail.com",
+        "rol": "cajero"
+      },
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305661,
+        "nanoseconds": 832000000
+      },
+      "resumen": {
+        "valorDescuentoGlobal": 0,
+        "total": 551221.55,
+        "totalUnidades": 1,
+        "baseImponible": 455555,
+        "subtotal": 455555,
+        "totalProductos": 1,
+        "tasaImpuesto": 21,
+        "tipoDescuentoGlobal": "percentage",
+        "descuentoGlobal": 0,
+        "impuestos": 95666.55
+      },
+      "turno": {
+        "reporteId": "gCNQ71K6xkh7puyyTiuz",
+        "balanceInicialTurno": 6000,
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758304628,
+          "nanoseconds": 771000000
+        }
+      },
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305661,
+        "nanoseconds": 832000000
+      },
+      "diaSemana": "Viernes",
+      "cliente": {
+        "email": null,
+        "id": null,
+        "totalPurchases": 0,
+        "taxId": null,
+        "clientCode": null,
+        "dni": null,
+        "points": 0,
+        "phone": null,
+        "creditLimit": 0,
+        "address": null,
+        "name": "Cliente General",
+        "customerType": "individual"
+      },
+      "auditoria": {
+        "creadoPor": "admin@gmail.com",
+        "fechaModificacion": null,
+        "version": 1,
+        "modificadoPor": null,
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758305661,
+          "nanoseconds": 832000000
+        }
+      },
+      "fechaVenta": "2025-09-19",
+      "reportId": "gCNQ71K6xkh7puyyTiuz",
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "cashier": "admin@gmail.com",
+      "pago": {
+        "processedAt": "2025-09-19T18:14:21.832Z",
+        "change": 5004333.45,
+        "receivedAmount": 5555555,
+        "currency": "ARS",
+        "cashAmount": 551221.55,
+        "method": "cash"
+      },
+      "timestamp": "2025-09-21T01:40:24.839Z",
+      "diaSemanaN": 5,
+      "numeroVenta": "INV-1758305661832-303",
+      "horaVenta": "13:14:21",
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758304628,
+        "nanoseconds": 771000000
+      },
+      "saleNumber": "INV-1758305661832-303",
+      "mes": 9,
+      "estado": "completada",
+      "año": 2025,
+      "status": "completed",
+      "sistema": {
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "version": "2.0",
+        "ubicacion": "Argentina",
+        "pos": true,
+        "dispositivo": "web",
+        "ip": "local"
+      },
+      "modo": "advanced",
+      "created_at": "2025-09-21T01:40:24.692Z",
+      "updated_at": "2025-09-21T01:40:24.692Z"
+    },
+    {
+      "id": "1758418824843",
+      "firebase_id": "DB8GzMKqiXmOc1zWUym6",
+      "cliente": {
+        "address": null,
+        "dni": null,
+        "totalPurchases": 0,
+        "clientCode": null,
+        "points": 0,
+        "email": null,
+        "creditLimit": 0,
+        "name": "Cliente General",
+        "taxId": null,
+        "phone": null,
+        "id": null,
+        "customerType": "individual"
+      },
+      "año": 2025,
+      "sistema": {
+        "ubicacion": "Argentina",
+        "pos": true,
+        "dispositivo": "web",
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "ip": "local",
+        "version": "2.0"
+      },
+      "resumen": {
+        "totalProductos": 1,
+        "total": 551221.55,
+        "descuentoGlobal": 0,
+        "baseImponible": 455555,
+        "tasaImpuesto": 21,
+        "tipoDescuentoGlobal": "percentage",
+        "valorDescuentoGlobal": 0,
+        "totalUnidades": 1,
+        "subtotal": 455555,
+        "impuestos": 95666.55
+      },
+      "mes": 9,
+      "estado": "completada",
+      "timestamp": "2025-09-21T01:40:24.843Z",
+      "cashier": "admin@gmail.com",
+      "pago": {
+        "change": 4444444443893222.5,
+        "currency": "ARS",
+        "cashAmount": 551221.55,
+        "receivedAmount": 4444444444444444,
+        "processedAt": "2025-09-19T18:12:57.621Z",
+        "method": "cash"
+      },
+      "horaVenta": "13:12:57",
+      "diaSemana": "Viernes",
+      "modo": "advanced",
+      "diaSemanaN": 5,
+      "fechaVenta": "2025-09-19",
+      "saleNumber": "INV-1758305577621-132",
+      "numeroVenta": "INV-1758305577621-132",
+      "status": "completed",
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758304628,
+        "nanoseconds": 771000000
+      },
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "operador": {
+        "nombre": "admin",
+        "email": "admin@gmail.com",
+        "turno": "diurno",
+        "rol": "cajero"
+      },
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305577,
+        "nanoseconds": 621000000
+      },
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305577,
+        "nanoseconds": 621000000
+      },
+      "reportId": "gCNQ71K6xkh7puyyTiuz",
+      "turno": {
+        "reporteId": "gCNQ71K6xkh7puyyTiuz",
+        "balanceInicialTurno": 6000,
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758304628,
+          "nanoseconds": 771000000
+        }
+      },
+      "productos": [
+        {
+          "notas": "",
+          "puntosRecompensa": 0,
+          "descripcion": "fgfg",
+          "tipoDescuento": "percentage",
+          "proveedor": "",
+          "margen": 0,
+          "precioCosto": 55,
+          "tipoRecompensa": "fijo",
+          "nombre": "prueba",
+          "precio": 455555,
+          "descuento": 0,
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "codigoBarras": "",
+          "marca": "",
+          "cantidad": 1,
+          "categoria": "hola",
+          "subtotal": 455555,
+          "orden": 1,
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC"
+        }
+      ],
+      "auditoria": {
+        "modificadoPor": null,
+        "creadoPor": "admin@gmail.com",
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758305577,
+          "nanoseconds": 621000000
+        },
+        "version": 1,
+        "fechaModificacion": null
+      },
+      "created_at": "2025-09-21T01:40:24.692Z",
+      "updated_at": "2025-09-21T01:40:24.692Z"
+    },
+    {
+      "id": "1758418824847",
+      "firebase_id": "LvwWeMLrVLm6d64QNIh6",
+      "resumen": {
+        "descuentoGlobal": 0,
+        "impuestos": 95666.55,
+        "total": 551221.55,
+        "subtotal": 455555
+      },
+      "pago": {
+        "method": "cash",
+        "receivedAmount": 4343565,
+        "change": 3792343.45
+      },
+      "numeroVenta": "INV-1758412046336-908",
+      "productos": [
+        {
+          "precio": 455555,
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "subtotal": 455555,
+          "cantidad": 1,
+          "nombre": "prueba"
+        }
+      ],
+      "reportId": "48X2iYxOj9dX1ImHKoFe",
+      "notas": "Venta POS - 1 productos",
+      "cliente": {
+        "dni": "",
+        "clientCode": "",
+        "address": "",
+        "name": "Cliente",
+        "phone": "",
+        "email": "",
+        "id": null
+      },
+      "modo": "advanced",
+      "cashier": "admin@gmail.com",
+      "estado": "completed",
+      "timestamp": "2025-09-21T01:40:24.847Z",
+      "created_at": "2025-09-21T01:40:24.692Z",
+      "updated_at": "2025-09-21T01:40:24.692Z"
+    },
+    {
+      "id": "1758418824850",
+      "firebase_id": "Vah1iUkfGSOarNAZeltV",
+      "productos": [
+        {
+          "subtotal": 455555,
+          "nombre": "prueba",
+          "precio": 455555,
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "cantidad": 1
+        }
+      ],
+      "resumen": {
+        "total": 551221.55,
+        "impuestos": 95666.55,
+        "descuentoGlobal": 0,
+        "subtotal": 455555
+      },
+      "pago": {
+        "method": "cash",
+        "change": 5.555555555555556e+34,
+        "receivedAmount": 5.555555555555556e+34
+      },
+      "notas": "Venta POS - 1 productos",
+      "cliente": {
+        "dni": "",
+        "id": null,
+        "email": "",
+        "name": "Cliente",
+        "clientCode": "",
+        "phone": "",
+        "address": ""
+      },
+      "cashier": "admin@gmail.com",
+      "estado": "completed",
+      "reportId": "48X2iYxOj9dX1ImHKoFe",
+      "modo": "advanced",
+      "numeroVenta": "INV-1758412105429-109",
+      "timestamp": "2025-09-21T01:40:24.850Z",
+      "created_at": "2025-09-21T01:40:24.692Z",
+      "updated_at": "2025-09-21T01:40:24.692Z"
+    },
+    {
+      "id": "1758418835208",
+      "firebase_id": "7AjzlPaxzm5QJ5wJ3QHU",
+      "operador": {
+        "rol": "cajero",
+        "email": "admin@gmail.com",
+        "turno": "diurno",
+        "nombre": "admin"
+      },
+      "productos": [
+        {
+          "categoria": "hola",
+          "codigoBarras": "",
+          "descuento": 0,
+          "proveedor": "",
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "tipoDescuento": "percentage",
+          "tipoRecompensa": "fijo",
+          "margen": 0,
+          "precioCosto": 55,
+          "puntosRecompensa": 0,
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "descripcion": "fgfg",
+          "precio": 455555,
+          "orden": 1,
+          "subtotal": 455555,
+          "cantidad": 1,
+          "nombre": "prueba",
+          "notas": "",
+          "marca": ""
+        }
+      ],
+      "reportId": "kBWO0e2weRQABbZZID9W",
+      "modo": "advanced",
+      "fechaVenta": "2025-09-18",
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758197369,
+        "nanoseconds": 767000000
+      },
+      "diaSemana": "Jueves",
+      "estado": "completada",
+      "horaVenta": "07:09:29",
+      "turno": {
+        "balanceInicialTurno": 679,
+        "reporteId": "kBWO0e2weRQABbZZID9W",
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758194855,
+          "nanoseconds": 397000000
+        }
+      },
+      "numeroVenta": "INV-1758197369767-019",
+      "cliente": {
+        "clientCode": null,
+        "customerType": "individual",
+        "email": null,
+        "creditLimit": 0,
+        "address": null,
+        "name": "Cliente General",
+        "points": 0,
+        "dni": null,
+        "phone": null,
+        "totalPurchases": 0,
+        "id": null,
+        "taxId": null
+      },
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758197369,
+        "nanoseconds": 767000000
+      },
+      "sistema": {
+        "pos": true,
+        "ubicacion": "Argentina",
+        "ip": "local",
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "version": "2.0",
+        "dispositivo": "web"
+      },
+      "pago": {
+        "processedAt": "2025-09-18T12:09:29.767Z",
+        "change": 122545.44999999995,
+        "currency": "ARS",
+        "receivedAmount": 673767,
+        "method": "cash",
+        "cashAmount": 551221.55
+      },
+      "timestamp": "2025-09-21T01:40:35.208Z",
+      "auditoria": {
+        "creadoPor": "admin@gmail.com",
+        "fechaModificacion": null,
+        "version": 1,
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758197369,
+          "nanoseconds": 767000000
+        },
+        "modificadoPor": null
+      },
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758194855,
+        "nanoseconds": 397000000
+      },
+      "mes": 9,
+      "resumen": {
+        "descuentoGlobal": 0,
+        "tasaImpuesto": 21,
+        "subtotal": 455555,
+        "tipoDescuentoGlobal": "percentage",
+        "totalUnidades": 1,
+        "impuestos": 95666.55,
+        "total": 551221.55,
+        "valorDescuentoGlobal": 0,
+        "baseImponible": 455555,
+        "totalProductos": 1
+      },
+      "saleNumber": "INV-1758197369767-019",
+      "cashier": "admin@gmail.com",
+      "diaSemanaN": 4,
+      "año": 2025,
+      "status": "completed",
+      "created_at": "2025-09-21T01:40:35.207Z",
+      "updated_at": "2025-09-21T01:40:35.207Z"
+    },
+    {
+      "id": "1758418835212",
+      "firebase_id": "7JP4GdpbLqce9qSaAxy1",
+      "auditoria": {
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758305661,
+          "nanoseconds": 832000000
+        },
+        "creadoPor": "admin@gmail.com",
+        "version": 1,
+        "fechaModificacion": null,
+        "modificadoPor": null
+      },
+      "reportId": "gCNQ71K6xkh7puyyTiuz",
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758304628,
+        "nanoseconds": 771000000
+      },
+      "estado": "completada",
+      "saleNumber": "INV-1758305661832-303",
+      "mes": 9,
+      "sistema": {
+        "ip": "local",
+        "pos": true,
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "ubicacion": "Argentina",
+        "version": "2.0",
+        "dispositivo": "web"
+      },
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "operador": {
+        "turno": "diurno",
+        "email": "admin@gmail.com",
+        "nombre": "admin",
+        "rol": "cajero"
+      },
+      "modo": "advanced",
+      "fechaVenta": "2025-09-19",
+      "timestamp": "2025-09-21T01:40:35.212Z",
+      "status": "completed",
+      "pago": {
+        "processedAt": "2025-09-19T18:14:21.832Z",
+        "change": 5004333.45,
+        "method": "cash",
+        "receivedAmount": 5555555,
+        "currency": "ARS",
+        "cashAmount": 551221.55
+      },
+      "diaSemanaN": 5,
+      "turno": {
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758304628,
+          "nanoseconds": 771000000
+        },
+        "reporteId": "gCNQ71K6xkh7puyyTiuz",
+        "balanceInicialTurno": 6000
+      },
+      "resumen": {
+        "subtotal": 455555,
+        "descuentoGlobal": 0,
+        "tipoDescuentoGlobal": "percentage",
+        "total": 551221.55,
+        "baseImponible": 455555,
+        "valorDescuentoGlobal": 0,
+        "impuestos": 95666.55,
+        "tasaImpuesto": 21,
+        "totalUnidades": 1,
+        "totalProductos": 1
+      },
+      "cashier": "admin@gmail.com",
+      "productos": [
+        {
+          "precioCosto": 55,
+          "tipoRecompensa": "fijo",
+          "nombre": "prueba",
+          "categoria": "hola",
+          "precio": 455555,
+          "tipoDescuento": "percentage",
+          "margen": 0,
+          "subtotal": 455555,
+          "orden": 1,
+          "descripcion": "fgfg",
+          "proveedor": "",
+          "codigoBarras": "",
+          "notas": "",
+          "puntosRecompensa": 0,
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "descuento": 0,
+          "marca": "",
+          "cantidad": 1,
+          "id": "wWnhoPiktiaD93HRHMMO"
+        }
+      ],
+      "horaVenta": "13:14:21",
+      "numeroVenta": "INV-1758305661832-303",
+      "diaSemana": "Viernes",
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305661,
+        "nanoseconds": 832000000
+      },
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305661,
+        "nanoseconds": 832000000
+      },
+      "año": 2025,
+      "cliente": {
+        "name": "Cliente General",
+        "customerType": "individual",
+        "creditLimit": 0,
+        "email": null,
+        "taxId": null,
+        "clientCode": null,
+        "id": null,
+        "phone": null,
+        "totalPurchases": 0,
+        "points": 0,
+        "address": null,
+        "dni": null
+      },
+      "created_at": "2025-09-21T01:40:35.207Z",
+      "updated_at": "2025-09-21T01:40:35.207Z"
+    },
+    {
+      "id": "1758418835215",
+      "firebase_id": "DB8GzMKqiXmOc1zWUym6",
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758304628,
+        "nanoseconds": 771000000
+      },
+      "resumen": {
+        "valorDescuentoGlobal": 0,
+        "tipoDescuentoGlobal": "percentage",
+        "totalProductos": 1,
+        "impuestos": 95666.55,
+        "total": 551221.55,
+        "totalUnidades": 1,
+        "subtotal": 455555,
+        "baseImponible": 455555,
+        "descuentoGlobal": 0,
+        "tasaImpuesto": 21
+      },
+      "mes": 9,
+      "status": "completed",
+      "cashier": "admin@gmail.com",
+      "fechaVenta": "2025-09-19",
+      "pago": {
+        "method": "cash",
+        "processedAt": "2025-09-19T18:12:57.621Z",
+        "receivedAmount": 4444444444444444,
+        "change": 4444444443893222.5,
+        "currency": "ARS",
+        "cashAmount": 551221.55
+      },
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "productos": [
+        {
+          "tipoRecompensa": "fijo",
+          "puntosRecompensa": 0,
+          "tipoDescuento": "percentage",
+          "precio": 455555,
+          "subtotal": 455555,
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "margen": 0,
+          "notas": "",
+          "cantidad": 1,
+          "orden": 1,
+          "categoria": "hola",
+          "codigoBarras": "",
+          "precioCosto": 55,
+          "descripcion": "fgfg",
+          "proveedor": "",
+          "marca": "",
+          "descuento": 0,
+          "nombre": "prueba",
+          "id": "wWnhoPiktiaD93HRHMMO"
+        }
+      ],
+      "auditoria": {
+        "creadoPor": "admin@gmail.com",
+        "modificadoPor": null,
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758305577,
+          "nanoseconds": 621000000
+        },
+        "version": 1,
+        "fechaModificacion": null
+      },
+      "operador": {
+        "nombre": "admin",
+        "email": "admin@gmail.com",
+        "rol": "cajero",
+        "turno": "diurno"
+      },
+      "cliente": {
+        "name": "Cliente General",
+        "taxId": null,
+        "points": 0,
+        "totalPurchases": 0,
+        "dni": null,
+        "email": null,
+        "creditLimit": 0,
+        "address": null,
+        "id": null,
+        "clientCode": null,
+        "customerType": "individual",
+        "phone": null
+      },
+      "año": 2025,
+      "saleNumber": "INV-1758305577621-132",
+      "timestamp": "2025-09-21T01:40:35.215Z",
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305577,
+        "nanoseconds": 621000000
+      },
+      "estado": "completada",
+      "diaSemana": "Viernes",
+      "diaSemanaN": 5,
+      "sistema": {
+        "dispositivo": "web",
+        "version": "2.0",
+        "pos": true,
+        "ip": "local",
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "ubicacion": "Argentina"
+      },
+      "reportId": "gCNQ71K6xkh7puyyTiuz",
+      "horaVenta": "13:12:57",
+      "turno": {
+        "reporteId": "gCNQ71K6xkh7puyyTiuz",
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758304628,
+          "nanoseconds": 771000000
+        },
+        "balanceInicialTurno": 6000
+      },
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305577,
+        "nanoseconds": 621000000
+      },
+      "modo": "advanced",
+      "numeroVenta": "INV-1758305577621-132",
+      "created_at": "2025-09-21T01:40:35.208Z",
+      "updated_at": "2025-09-21T01:40:35.208Z"
+    },
+    {
+      "id": "1758418835218",
+      "firebase_id": "LvwWeMLrVLm6d64QNIh6",
+      "cliente": {
+        "clientCode": "",
+        "address": "",
+        "email": "",
+        "dni": "",
+        "phone": "",
+        "name": "Cliente",
+        "id": null
+      },
+      "modo": "advanced",
+      "cashier": "admin@gmail.com",
+      "reportId": "48X2iYxOj9dX1ImHKoFe",
+      "pago": {
+        "method": "cash",
+        "receivedAmount": 4343565,
+        "change": 3792343.45
+      },
+      "productos": [
+        {
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "precio": 455555,
+          "cantidad": 1,
+          "nombre": "prueba",
+          "subtotal": 455555
+        }
+      ],
+      "timestamp": "2025-09-21T01:40:35.218Z",
+      "estado": "completed",
+      "numeroVenta": "INV-1758412046336-908",
+      "resumen": {
+        "subtotal": 455555,
+        "total": 551221.55,
+        "impuestos": 95666.55,
+        "descuentoGlobal": 0
+      },
+      "notas": "Venta POS - 1 productos",
+      "created_at": "2025-09-21T01:40:35.208Z",
+      "updated_at": "2025-09-21T01:40:35.208Z"
+    },
+    {
+      "id": "1758418835221",
+      "firebase_id": "Vah1iUkfGSOarNAZeltV",
+      "numeroVenta": "INV-1758412105429-109",
+      "reportId": "48X2iYxOj9dX1ImHKoFe",
+      "resumen": {
+        "impuestos": 95666.55,
+        "total": 551221.55,
+        "subtotal": 455555,
+        "descuentoGlobal": 0
+      },
+      "cashier": "admin@gmail.com",
+      "cliente": {
+        "address": "",
+        "clientCode": "",
+        "dni": "",
+        "id": null,
+        "email": "",
+        "phone": "",
+        "name": "Cliente"
+      },
+      "pago": {
+        "receivedAmount": 5.555555555555556e+34,
+        "change": 5.555555555555556e+34,
+        "method": "cash"
+      },
+      "productos": [
+        {
+          "precio": 455555,
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "nombre": "prueba",
+          "cantidad": 1,
+          "subtotal": 455555
+        }
+      ],
+      "estado": "completed",
+      "timestamp": "2025-09-21T01:40:35.221Z",
+      "notas": "Venta POS - 1 productos",
+      "modo": "advanced",
+      "created_at": "2025-09-21T01:40:35.208Z",
+      "updated_at": "2025-09-21T01:40:35.208Z"
+    },
+    {
+      "id": "1758418876059",
+      "firebase_id": "7AjzlPaxzm5QJ5wJ3QHU",
+      "sistema": {
+        "ubicacion": "Argentina",
+        "ip": "local",
+        "dispositivo": "web",
+        "pos": true,
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "version": "2.0"
+      },
+      "fechaVenta": "2025-09-18",
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758197369,
+        "nanoseconds": 767000000
+      },
+      "estado": "completada",
+      "mes": 9,
+      "saleNumber": "INV-1758197369767-019",
+      "diaSemana": "Jueves",
+      "turno": {
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758194855,
+          "nanoseconds": 397000000
+        },
+        "reporteId": "kBWO0e2weRQABbZZID9W",
+        "balanceInicialTurno": 679
+      },
+      "año": 2025,
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758194855,
+        "nanoseconds": 397000000
+      },
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758197369,
+        "nanoseconds": 767000000
+      },
+      "operador": {
+        "email": "admin@gmail.com",
+        "rol": "cajero",
+        "nombre": "admin",
+        "turno": "diurno"
+      },
+      "resumen": {
+        "baseImponible": 455555,
+        "tipoDescuentoGlobal": "percentage",
+        "total": 551221.55,
+        "totalProductos": 1,
+        "tasaImpuesto": 21,
+        "impuestos": 95666.55,
+        "totalUnidades": 1,
+        "descuentoGlobal": 0,
+        "subtotal": 455555,
+        "valorDescuentoGlobal": 0
+      },
+      "pago": {
+        "currency": "ARS",
+        "receivedAmount": 673767,
+        "change": 122545.44999999995,
+        "cashAmount": 551221.55,
+        "processedAt": "2025-09-18T12:09:29.767Z",
+        "method": "cash"
+      },
+      "auditoria": {
+        "modificadoPor": null,
+        "version": 1,
+        "creadoPor": "admin@gmail.com",
+        "fechaModificacion": null,
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758197369,
+          "nanoseconds": 767000000
+        }
+      },
+      "cashier": "admin@gmail.com",
+      "productos": [
+        {
+          "margen": 0,
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "nombre": "prueba",
+          "puntosRecompensa": 0,
+          "categoria": "hola",
+          "descuento": 0,
+          "precioCosto": 55,
+          "codigoBarras": "",
+          "orden": 1,
+          "subtotal": 455555,
+          "proveedor": "",
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "tipoDescuento": "percentage",
+          "marca": "",
+          "precio": 455555,
+          "cantidad": 1,
+          "notas": "",
+          "tipoRecompensa": "fijo",
+          "descripcion": "fgfg"
+        }
+      ],
+      "modo": "advanced",
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "reportId": "kBWO0e2weRQABbZZID9W",
+      "numeroVenta": "INV-1758197369767-019",
+      "cliente": {
+        "taxId": null,
+        "customerType": "individual",
+        "email": null,
+        "phone": null,
+        "dni": null,
+        "creditLimit": 0,
+        "totalPurchases": 0,
+        "points": 0,
+        "id": null,
+        "name": "Cliente General",
+        "address": null,
+        "clientCode": null
+      },
+      "timestamp": "2025-09-21T01:41:16.059Z",
+      "horaVenta": "07:09:29",
+      "status": "completed",
+      "diaSemanaN": 4,
+      "created_at": "2025-09-21T01:41:16.058Z",
+      "updated_at": "2025-09-21T01:41:16.058Z"
+    },
+    {
+      "id": "1758418876062",
+      "firebase_id": "7JP4GdpbLqce9qSaAxy1",
+      "modo": "advanced",
+      "turno": {
+        "reporteId": "gCNQ71K6xkh7puyyTiuz",
+        "balanceInicialTurno": 6000,
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758304628,
+          "nanoseconds": 771000000
+        }
+      },
+      "diaSemana": "Viernes",
+      "resumen": {
+        "total": 551221.55,
+        "descuentoGlobal": 0,
+        "baseImponible": 455555,
+        "valorDescuentoGlobal": 0,
+        "totalProductos": 1,
+        "tipoDescuentoGlobal": "percentage",
+        "impuestos": 95666.55,
+        "totalUnidades": 1,
+        "subtotal": 455555,
+        "tasaImpuesto": 21
+      },
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "status": "completed",
+      "pago": {
+        "receivedAmount": 5555555,
+        "change": 5004333.45,
+        "currency": "ARS",
+        "method": "cash",
+        "cashAmount": 551221.55,
+        "processedAt": "2025-09-19T18:14:21.832Z"
+      },
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758304628,
+        "nanoseconds": 771000000
+      },
+      "fechaVenta": "2025-09-19",
+      "año": 2025,
+      "timestamp": "2025-09-21T01:41:16.062Z",
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305661,
+        "nanoseconds": 832000000
+      },
+      "productos": [
+        {
+          "descripcion": "fgfg",
+          "marca": "",
+          "precio": 455555,
+          "precioCosto": 55,
+          "margen": 0,
+          "nombre": "prueba",
+          "descuento": 0,
+          "subtotal": 455555,
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "orden": 1,
+          "codigoBarras": "",
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "puntosRecompensa": 0,
+          "tipoDescuento": "percentage",
+          "cantidad": 1,
+          "tipoRecompensa": "fijo",
+          "categoria": "hola",
+          "proveedor": "",
+          "notas": ""
+        }
+      ],
+      "diaSemanaN": 5,
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305661,
+        "nanoseconds": 832000000
+      },
+      "horaVenta": "13:14:21",
+      "reportId": "gCNQ71K6xkh7puyyTiuz",
+      "numeroVenta": "INV-1758305661832-303",
+      "operador": {
+        "turno": "diurno",
+        "rol": "cajero",
+        "email": "admin@gmail.com",
+        "nombre": "admin"
+      },
+      "saleNumber": "INV-1758305661832-303",
+      "cashier": "admin@gmail.com",
+      "estado": "completada",
+      "mes": 9,
+      "auditoria": {
+        "modificadoPor": null,
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758305661,
+          "nanoseconds": 832000000
+        },
+        "version": 1,
+        "fechaModificacion": null,
+        "creadoPor": "admin@gmail.com"
+      },
+      "sistema": {
+        "ubicacion": "Argentina",
+        "pos": true,
+        "dispositivo": "web",
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "version": "2.0",
+        "ip": "local"
+      },
+      "cliente": {
+        "taxId": null,
+        "dni": null,
+        "address": null,
+        "customerType": "individual",
+        "creditLimit": 0,
+        "name": "Cliente General",
+        "id": null,
+        "clientCode": null,
+        "email": null,
+        "phone": null,
+        "totalPurchases": 0,
+        "points": 0
+      },
+      "created_at": "2025-09-21T01:41:16.058Z",
+      "updated_at": "2025-09-21T01:41:16.058Z"
+    },
+    {
+      "id": "1758418876065",
+      "firebase_id": "DB8GzMKqiXmOc1zWUym6",
+      "notas": "Venta procesada desde POS avanzado. Cliente: . 1 productos, 1 unidades totales.",
+      "estado": "completada",
+      "sistema": {
+        "navegador": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "ubicacion": "Argentina",
+        "pos": true,
+        "dispositivo": "web",
+        "version": "2.0",
+        "ip": "local"
+      },
+      "año": 2025,
+      "numeroVenta": "INV-1758305577621-132",
+      "turno.fechaApertura": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758304628,
+        "nanoseconds": 771000000
+      },
+      "auditoria": {
+        "modificadoPor": null,
+        "fechaModificacion": null,
+        "creadoPor": "admin@gmail.com",
+        "fechaCreacion": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758305577,
+          "nanoseconds": 621000000
+        },
+        "version": 1
+      },
+      "modo": "advanced",
+      "resumen": {
+        "baseImponible": 455555,
+        "impuestos": 95666.55,
+        "totalProductos": 1,
+        "tasaImpuesto": 21,
+        "totalUnidades": 1,
+        "tipoDescuentoGlobal": "percentage",
+        "total": 551221.55,
+        "descuentoGlobal": 0,
+        "subtotal": 455555,
+        "valorDescuentoGlobal": 0
+      },
+      "reportId": "gCNQ71K6xkh7puyyTiuz",
+      "cashier": "admin@gmail.com",
+      "status": "completed",
+      "turno": {
+        "fechaApertura": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1758304628,
+          "nanoseconds": 771000000
+        },
+        "reporteId": "gCNQ71K6xkh7puyyTiuz",
+        "balanceInicialTurno": 6000
+      },
+      "diaSemana": "Viernes",
+      "pago": {
+        "currency": "ARS",
+        "processedAt": "2025-09-19T18:12:57.621Z",
+        "change": 4444444443893222.5,
+        "receivedAmount": 4444444444444444,
+        "method": "cash",
+        "cashAmount": 551221.55
+      },
+      "fecha": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305577,
+        "nanoseconds": 621000000
+      },
+      "diaSemanaN": 5,
+      "auditoria.fechaCreacion": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1758305577,
+        "nanoseconds": 621000000
+      },
+      "saleNumber": "INV-1758305577621-132",
+      "cliente": {
+        "dni": null,
+        "id": null,
+        "clientCode": null,
+        "customerType": "individual",
+        "phone": null,
+        "address": null,
+        "creditLimit": 0,
+        "points": 0,
+        "email": null,
+        "totalPurchases": 0,
+        "taxId": null,
+        "name": "Cliente General"
+      },
+      "operador": {
+        "turno": "diurno",
+        "email": "admin@gmail.com",
+        "rol": "cajero",
+        "nombre": "admin"
+      },
+      "mes": 9,
+      "productos": [
+        {
+          "descripcion": "fgfg",
+          "nombre": "prueba",
+          "puntosRecompensa": 0,
+          "categoriaId": "BVJ1deHhshLUMD9ngLNC",
+          "cantidad": 1,
+          "categoria": "hola",
+          "descuento": 0,
+          "margen": 0,
+          "orden": 1,
+          "precio": 455555,
+          "tipoDescuento": "percentage",
+          "precioCosto": 55,
+          "marca": "",
+          "proveedor": "",
+          "notas": "",
+          "tipoRecompensa": "fijo",
+          "id": "wWnhoPiktiaD93HRHMMO",
+          "codigoBarras": "",
+          "subtotal": 455555
+        }
+      ],
+      "timestamp": "2025-09-21T01:41:16.065Z",
+      "fechaVenta": "2025-09-19",
+      "horaVenta": "13:12:57",
+      "created_at": "2025-09-21T01:41:16.058Z",
+      "updated_at": "2025-09-21T01:41:16.058Z"
+    },
+    {
+      "id": "1758418876069",
+      "firebase_id": "LvwWeMLrVLm6d64QNIh6",
+      "notas": "Venta POS - 1 productos",
+      "pago": {
+        "change": 3792343.45,
+        "method": "cash",
+        "receivedAmount": 4343565
+      },
+      "cliente": {
+        "id": null,
+        "address": "",
+        "name": "Cliente",
+        "phone": "",
+        "dni": "",
+        "email": "",
+        "clientCode": ""
+      },
+      "modo": "advanced",
+      "timestamp": "2025-09-21T01:41:16.069Z",
+      "numeroVenta": "INV-1758412046336-908",
+      "productos": [
+        {
+          "nombre": "prueba",
+          "precio": 455555,
+          "subtotal": 455555,
+          "cantidad": 1,
+          "id": "wWnhoPiktiaD93HRHMMO"
+        }
+      ],
+      "estado": "completed",
+      "cashier": "admin@gmail.com",
+      "reportId": "48X2iYxOj9dX1ImHKoFe",
+      "resumen": {
+        "impuestos": 95666.55,
+        "total": 551221.55,
+        "descuentoGlobal": 0,
+        "subtotal": 455555
+      },
+      "created_at": "2025-09-21T01:41:16.058Z",
+      "updated_at": "2025-09-21T01:41:16.058Z"
+    },
+    {
+      "id": "1758418876073",
+      "firebase_id": "Vah1iUkfGSOarNAZeltV",
+      "reportId": "48X2iYxOj9dX1ImHKoFe",
+      "pago": {
+        "method": "cash",
+        "receivedAmount": 5.555555555555556e+34,
+        "change": 5.555555555555556e+34
+      },
+      "productos": [
+        {
+          "subtotal": 455555,
+          "nombre": "prueba",
+          "precio": 455555,
+          "cantidad": 1,
+          "id": "wWnhoPiktiaD93HRHMMO"
+        }
+      ],
+      "cliente": {
+        "dni": "",
+        "clientCode": "",
+        "address": "",
+        "id": null,
+        "phone": "",
+        "email": "",
+        "name": "Cliente"
+      },
+      "notas": "Venta POS - 1 productos",
+      "cashier": "admin@gmail.com",
+      "modo": "advanced",
+      "timestamp": "2025-09-21T01:41:16.073Z",
+      "estado": "completed",
+      "numeroVenta": "INV-1758412105429-109",
+      "resumen": {
+        "descuentoGlobal": 0,
+        "subtotal": 455555,
+        "total": 551221.55,
+        "impuestos": 95666.55
+      },
+      "created_at": "2025-09-21T01:41:16.058Z",
+      "updated_at": "2025-09-21T01:41:16.058Z"
+    }
+  ],
+  "products": [],
+  "clients": [],
+  "lastUpdate": "2025-09-21T01:42:32.224Z"
+}

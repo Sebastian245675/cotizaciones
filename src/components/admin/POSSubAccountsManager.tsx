@@ -54,7 +54,6 @@ import {
   CreditCard,
   BarChart3,
   AlertCircle,
-  Crown,
   User
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
@@ -287,7 +286,7 @@ const ROLES_CONFIG = {
   adminpos: {
     label: 'Administrador POS',
     description: 'Acceso completo al sistema POS',
-    icon: Crown,
+  icon: Shield,
     color: 'bg-purple-100 text-purple-800'
   },
   supervisor: {
@@ -726,7 +725,7 @@ export const POSSubAccountsManager: React.FC = () => {
 
       <TabsContent value="administracion" className="space-y-4">
         <div className="flex items-center gap-2 mb-4">
-          <Crown className="h-5 w-5 text-primary" />
+          <Shield className="h-5 w-5 text-primary" />
           <h4 className="font-semibold">Permisos de Administración</h4>
           <Badge variant="outline">
             {countActivePermissions(formData.permissions.administracion)} activos

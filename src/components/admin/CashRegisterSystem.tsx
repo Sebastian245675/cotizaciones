@@ -2,13 +2,75 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { 
-  ArrowUpCircle, RefreshCw, Loader2, Eye, ChevronUp, Package
+  ArrowUpCircle, RefreshCw, Loader2, Eye, ChevronUp, Package, Calendar, Filter, Wifi, WifiOff
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { collection, getDocs, query, orderBy, where, Timestamp } from "firebase/firestore";
 import { db } from "@/firebase";
+import { 
+  NetworkDetector, 
+  withTimeout, 
+  retryWithBackoff, 
+  checkServerConnectivity,
+  defaultNetworkConfig 
+} from '@/utils/networkConfig';
+
+// Interfaz para estado de conexión
+interface ConnectionStatus {
+  isOnline: boolean;
+  lastSync: Date | null;
+  syncInProgress: boolean;
+}
+
+// Clase para manejo de datos offline
+class OfflineStorage {
+  private static instance: OfflineStorage;
+
+  static getInstance(): OfflineStorage {
+    if (!OfflineStorage.instance) {
+      OfflineStorage.instance = new OfflineStorage();
+    }
+    return OfflineStorage.instance;
+  }
+
+  // Guardar datos en localStorage
+  setItem(key: string, data: any): boolean {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.error(`Error saving to localStorage (${key}):`, error);
+      return false;
+    }
+  }
+
+  // Obtener datos de localStorage
+  getItem<T>(key: string, defaultValue: T): T {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading from localStorage (${key}):`, error);
+      return defaultValue;
+    }
+  }
+
+  // Remover datos de localStorage
+  removeItem(key: string): boolean {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.error(`Error removing from localStorage (${key}):`, error);
+      return false;
+    }
+  }
+}
 
 // Interfaces básicas - Compatible con ambas estructuras: ventas y pos_sales
 export interface POSSale {
@@ -102,8 +164,318 @@ const CashRegisterSystem: React.FC = () => {
   const [loadingSales, setLoadingSales] = useState(false);
   const [expandedSales, setExpandedSales] = useState<{[key: string]: boolean}>({});
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Estados para filtros de ventas
+  const [showAllSales, setShowAllSales] = useState(false);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [salesFilter, setSalesFilter] = useState<'today' | 'date-range' | 'all'>('today');
 
-  // Función para cargar ventas
+  // Estados para conexión offline
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
+    isOnline: navigator.onLine,
+    lastSync: null,
+    syncInProgress: false
+  });
+
+  const offlineStorage = OfflineStorage.getInstance();
+  const [networkDetector] = useState(() => new NetworkDetector());
+
+  // Detectar cambios en la conexión con NetworkDetector
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('🌐 Conexión restaurada');
+      setConnectionStatus(prev => ({ ...prev, isOnline: true, lastSync: new Date() }));
+      
+      toast({
+        title: "🌐 Conexión Restaurada",
+        description: "Sincronizando datos con el servidor...",
+        variant: "default"
+      });
+      fetchSalesWithFilters();
+    };
+
+    const handleOffline = () => {
+      console.log('📱 Modo sin conexión activado');
+      setConnectionStatus(prev => ({ ...prev, isOnline: false }));
+      toast({
+        title: "📱 Modo Sin Conexión",
+        description: "Mostrando datos guardados localmente",
+        variant: "default"
+      });
+    };
+
+    // Configurar callbacks del detector de red
+    networkDetector.onOnline(handleOnline);
+    networkDetector.onOffline(handleOffline);
+
+    // Establecer estado inicial
+    setConnectionStatus(prev => ({ 
+      ...prev, 
+      isOnline: networkDetector.getStatus() 
+    }));
+
+    return () => {
+      networkDetector.destroy();
+    };
+  }, []);
+
+  // Función para cargar ventas offline
+  const loadOfflineSales = (): POSSale[] => {
+    try {
+      console.log('💾 Cargando ventas desde almacenamiento local...');
+      const cachedSales = offlineStorage.getItem<POSSale[]>('pos_sales_cache', []);
+      const offlineSales = offlineStorage.getItem<POSSale[]>('pos_offline_sales', []);
+      
+      // Combinar ventas cache y offline
+      const allSales = [...cachedSales, ...offlineSales];
+      console.log(`📦 Ventas cargadas del cache: ${cachedSales.length}`);
+      console.log(`📱 Ventas offline: ${offlineSales.length}`);
+      console.log(`📊 Total ventas offline: ${allSales.length}`);
+      
+      return allSales;
+    } catch (error) {
+      console.error('❌ Error cargando ventas offline:', error);
+      return [];
+    }
+  };
+
+  // Función para guardar ventas en cache
+  const cacheSales = (sales: POSSale[]) => {
+    try {
+      offlineStorage.setItem('pos_sales_cache', sales);
+      offlineStorage.setItem('pos_sales_cache_timestamp', Date.now());
+      console.log(`💾 ${sales.length} ventas guardadas en cache`);
+    } catch (error) {
+      console.error('❌ Error guardando cache de ventas:', error);
+    }
+  };
+
+  // Función para cargar ventas con filtros
+  const fetchSalesWithFilters = async () => {
+    setLoadingSales(true);
+    setConnectionStatus(prev => ({ ...prev, syncInProgress: true }));
+    
+    try {
+      console.log('🔍 Cargando ventas con filtros:', salesFilter);
+      let allSalesWithTimestamps: POSSale[] = [];
+
+      // Si hay conexión, intentar cargar desde Firebase
+      if (connectionStatus.isOnline) {
+        try {
+          console.log('🌐 Modo online: Cargando desde Firebase...');
+          
+          // Test de conectividad antes de intentar cargar datos
+          const hasConnectivity = await checkServerConnectivity();
+          if (!hasConnectivity) {
+            throw new Error('No hay conectividad con el servidor');
+          }
+          
+          const parseTimestamp = (timestamp: any): Date => {
+            if (!timestamp) {
+              console.log('⚠️ Timestamp vacío, usando fecha actual');
+              return new Date();
+            }
+            
+            // Si ya es una fecha válida
+            if (timestamp instanceof Date && !isNaN(timestamp.getTime())) {
+              return timestamp;
+            }
+            
+            // Si es un Firestore Timestamp
+            if (timestamp && typeof timestamp.toDate === 'function') {
+              try {
+                return timestamp.toDate();
+              } catch (error) {
+                console.error('❌ Error convirtiendo Firestore timestamp:', error);
+              }
+            }
+            
+            // Si es un string (formato ISO)
+            if (typeof timestamp === 'string') {
+              const parsed = new Date(timestamp);
+              if (!isNaN(parsed.getTime())) {
+                return parsed;
+              }
+            }
+            
+            // Si es un número (Unix timestamp)
+            if (typeof timestamp === 'number') {
+              const date = timestamp < 4102444800000 ? new Date(timestamp * 1000) : new Date(timestamp);
+              return date;
+            }
+            
+            // Si es un objeto con seconds (Firestore timestamp object)
+            if (timestamp && typeof timestamp === 'object' && typeof timestamp.seconds === 'number') {
+              return new Date(timestamp.seconds * 1000);
+            }
+            
+            console.error('❌ Tipo de timestamp no reconocido:', typeof timestamp, timestamp);
+            return new Date();
+          };
+
+          // Obtener todas las ventas desde Firebase con timeout
+          console.log('🔍 Intentando conectar con Firebase...');
+          
+          const allSalesSnapshot = await withTimeout(
+            getDocs(collection(db, 'ventas')),
+            defaultNetworkConfig.firebaseTimeout
+          );
+          console.log(`📦 Total documentos obtenidos de Firebase: ${allSalesSnapshot.docs.length}`);
+
+          allSalesWithTimestamps = allSalesSnapshot.docs.map(doc => {
+            const data = doc.data();
+            const timestamp = parseTimestamp(data.timestamp || data.fecha);
+            
+            // Adaptar la estructura de "ventas" al formato POSSale
+            const adaptedSale: POSSale = {
+              id: doc.id,
+              numeroVenta: data.numeroVenta,
+              cliente: data.cliente,
+              productos: data.productos,
+              resumen: data.resumen,
+              pago: data.pago,
+              estado: data.estado,
+              fecha: data.fecha,
+              operador: data.operador,
+              modo: data.modo,
+              notas: data.notas,
+              
+              saleNumber: data.numeroVenta || data.saleNumber || doc.id,
+              customer: data.customer || {
+                name: data.cliente?.name || 'Cliente',
+                phone: data.cliente?.phone,
+                email: data.cliente?.email,
+              },
+              items: data.items || (data.productos?.map((producto: any) => ({
+                product: {
+                  id: producto.id,
+                  name: producto.nombre,
+                  price: producto.precio,
+                },
+                quantity: producto.cantidad,
+                subtotal: producto.subtotal,
+              })) || []),
+              subtotal: data.resumen?.subtotal || data.subtotal || 0,
+              discounts: data.resumen?.descuentoGlobal || data.discounts || 0,
+              tax: data.resumen?.impuestos || data.tax || 0,
+              total: data.resumen?.total || data.total || 0,
+              paymentMethod: data.pago?.method || data.paymentMethod || 'cash',
+              paymentDetails: data.paymentDetails || {
+                receivedAmount: data.pago?.receivedAmount || data.pago?.cash,
+                cardAmount: data.pago?.card,
+                transferAmount: data.pago?.transfer,
+              },
+              status: data.status || data.estado || 'completed',
+              timestamp,
+              cashier: data.cashier || data.operador?.email || 'admin@pos.local',
+              mode: data.mode || data.modo,
+              notes: data.notes || data.notas,
+            };
+            
+            return adaptedSale;
+          });
+
+          // Guardar en cache para uso offline
+          cacheSales(allSalesWithTimestamps);
+          setConnectionStatus(prev => ({ ...prev, lastSync: new Date() }));
+          
+        } catch (error) {
+          console.error('❌ Error cargando desde Firebase, usando cache offline:', error);
+          
+          // Actualizar estado de conexión como offline
+          setConnectionStatus(prev => ({ ...prev, isOnline: false }));
+          
+          // Cargar desde cache offline
+          allSalesWithTimestamps = loadOfflineSales();
+          
+          // Mostrar mensaje apropiado según el tipo de error
+          if (error.message.includes('Timeout')) {
+            toast({
+              title: "⏱️ Conexión Lenta",
+              description: "Firebase no responde, mostrando datos locales",
+              variant: "default"
+            });
+          } else if (error.message.includes('No hay conectividad')) {
+            toast({
+              title: "📡 Sin Conexión al Servidor",
+              description: "Mostrando datos guardados localmente",
+              variant: "default"
+            });
+          } else {
+            toast({
+              title: "⚠️ Error de Conexión",
+              description: "Mostrando datos guardados localmente",
+              variant: "default"
+            });
+          }
+        }
+      } else {
+        // Modo offline: cargar desde cache local
+        console.log('📱 Modo offline: Cargando desde cache local...');
+        allSalesWithTimestamps = loadOfflineSales();
+        
+        if (allSalesWithTimestamps.length === 0) {
+          toast({
+            title: "📱 Sin Datos Offline",
+            description: "No hay ventas guardadas para mostrar sin conexión",
+            variant: "default"
+          });
+        }
+      }
+
+      // Aplicar filtros según el tipo seleccionado
+      let filteredSales = allSalesWithTimestamps;
+
+      if (salesFilter === 'today') {
+        const today = new Date();
+        filteredSales = allSalesWithTimestamps.filter(sale => {
+          const saleDate = new Date(sale.timestamp);
+          return saleDate.toDateString() === today.toDateString();
+        });
+        console.log(`📅 Filtrado por hoy: ${filteredSales.length} ventas`);
+      } else if (salesFilter === 'date-range') {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Incluir todo el día final
+        
+        filteredSales = allSalesWithTimestamps.filter(sale => {
+          const saleDate = new Date(sale.timestamp);
+          return saleDate >= start && saleDate <= end;
+        });
+        console.log(`📅 Filtrado por rango ${startDate} - ${endDate}: ${filteredSales.length} ventas`);
+      } else if (salesFilter === 'all') {
+        filteredSales = allSalesWithTimestamps;
+        console.log(`📅 Mostrando todas las ventas: ${filteredSales.length} ventas`);
+      }
+
+      // Ordenar por timestamp descendente (más recientes primero)
+      filteredSales.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      setDaySales(filteredSales);
+      console.log(`✅ Ventas cargadas exitosamente: ${filteredSales.length} ventas (${connectionStatus.isOnline ? 'online' : 'offline'})`);
+      
+      return filteredSales;
+    } catch (error) {
+      console.error('❌ Error cargando ventas:', error);
+      
+      // En caso de error, intentar cargar desde cache
+      const cachedSales = loadOfflineSales();
+      setDaySales(cachedSales);
+      
+      toast({
+        title: "⚠️ Error",
+        description: connectionStatus.isOnline ? "Error cargando ventas, mostrando cache" : "No se pudieron cargar las ventas offline",
+        variant: "default"
+      });
+      return cachedSales;
+    } finally {
+      setLoadingSales(false);
+      setConnectionStatus(prev => ({ ...prev, syncInProgress: false }));
+    }
+  };
+
+  // Función para cargar ventas (mantener compatibilidad)
   const fetchDaySales = async (filterDate?: Date) => {
     setLoadingSales(true);
     try {
@@ -373,9 +745,29 @@ const CashRegisterSystem: React.FC = () => {
     fetchDaySales(); // Cargar todas las ventas sin filtro de fecha
   }, []);
 
-  // Cargar ventas cuando cambie la fecha seleccionada
+  // Cargar ventas cuando cambie el filtro o las fechas
   useEffect(() => {
-    if (selectedDate) {
+    console.log('🔄 Filtro o fechas cambiaron, recargando ventas...');
+    fetchSalesWithFilters();
+  }, [salesFilter, startDate, endDate]);
+
+  // Cargar datos iniciales inmediatamente
+  useEffect(() => {
+    console.log('🚀 Carga inicial de datos...');
+    // Si estamos offline, cargar inmediatamente desde cache
+    if (!connectionStatus.isOnline) {
+      console.log('📱 Modo offline detectado, cargando desde cache...');
+      const offlineSales = loadOfflineSales();
+      setDaySales(offlineSales);
+    } else {
+      // Si estamos online, intentar cargar desde Firebase
+      fetchSalesWithFilters();
+    }
+  }, []); // Solo ejecutar una vez al montar el componente
+
+  // Cargar ventas cuando cambie la fecha seleccionada (mantener compatibilidad)
+  useEffect(() => {
+    if (selectedDate && salesFilter === 'today') {
       console.log('📅 Fecha seleccionada cambiada:', selectedDate);
       fetchDaySales(new Date(selectedDate));
     }
@@ -471,6 +863,124 @@ const CashRegisterSystem: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Filtros avanzados de ventas */}
+        <Card className="bg-white/90 backdrop-blur-xl shadow-xl border-0">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Filter className="h-5 w-5 text-blue-600" />
+                Filtros Avanzados de Ventas
+              </CardTitle>
+              
+              {/* Indicador de estado de conexión */}
+              <div className="flex items-center gap-3">
+                {connectionStatus.isOnline ? (
+                  <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
+                    <Wifi className="h-4 w-4" />
+                    <span className="text-sm font-medium">Conectado</span>
+                    {connectionStatus.syncInProgress && (
+                      <Loader2 className="h-3 w-3 animate-spin ml-1" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
+                    <WifiOff className="h-4 w-4" />
+                    <span className="text-sm font-medium">Sin conexión</span>
+                  </div>
+                )}
+                
+                {connectionStatus.lastSync && !connectionStatus.isOnline && (
+                  <div className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-md">
+                    Última sync: {connectionStatus.lastSync.toLocaleTimeString()}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              {/* Tipo de filtro */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Tipo de Filtro
+                </label>
+                <Select value={salesFilter} onValueChange={(value: 'today' | 'date-range' | 'all') => setSalesFilter(value)}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Seleccionar filtro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Hoy</SelectItem>
+                    <SelectItem value="date-range">Rango de Fechas</SelectItem>
+                    <SelectItem value="all">Todas las Ventas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Fecha de inicio (solo visible para rango de fechas) */}
+              {salesFilter === 'date-range' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Fecha de Inicio
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+              )}
+
+              {/* Fecha de fin (solo visible para rango de fechas) */}
+              {salesFilter === 'date-range' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Fecha de Fin
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+              )}
+
+              {/* Botón de aplicar filtros */}
+              <Button
+                onClick={() => fetchSalesWithFilters()}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={loadingSales}
+              >
+                {loadingSales ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    <Filter className="h-4 w-4 mr-2" />
+                    Aplicar Filtros
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {/* Información adicional offline */}
+            {!connectionStatus.isOnline && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <div className="flex items-center gap-2">
+                  <WifiOff className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm text-amber-800">
+                    <strong>Modo Offline:</strong> Mostrando datos guardados localmente. 
+                    Los filtros funcionan sobre los datos disponibles en cache.
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Estadísticas resumidas */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
@@ -525,20 +1035,85 @@ const CashRegisterSystem: React.FC = () => {
                   {stats.totalVentas} ventas
                 </Badge>
               </CardTitle>
-              <Button
-                onClick={() => fetchDaySales(new Date(selectedDate))}
-                variant="outline"
-                size="sm"
-                className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                disabled={loadingSales}
-              >
-                {loadingSales ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
+              
+              {/* Controles de Filtro */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  <Select value={salesFilter} onValueChange={(value: 'today' | 'date-range' | 'all') => setSalesFilter(value)}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Filtro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="today">📅 Hoy</SelectItem>
+                      <SelectItem value="date-range">📆 Rango</SelectItem>
+                      <SelectItem value="all">📋 Todas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {salesFilter === 'date-range' && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="start-date" className="text-sm">Desde:</Label>
+                      <Input
+                        id="start-date"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-36"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="end-date" className="text-sm">Hasta:</Label>
+                      <Input
+                        id="end-date"
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-36"
+                      />
+                    </div>
+                  </>
                 )}
-                Actualizar
-              </Button>
+                
+                <Button
+                  onClick={fetchSalesWithFilters}
+                  variant="outline"
+                  size="sm"
+                  className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                  disabled={loadingSales}
+                >
+                  {loadingSales ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Actualizar
+                </Button>
+              </div>
+            </div>
+            
+            {/* Información del filtro actual */}
+            <div className="mt-3 text-sm text-gray-600">
+              {salesFilter === 'today' && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Mostrando ventas de hoy ({new Date().toLocaleDateString('es-ES')})
+                </div>
+              )}
+              {salesFilter === 'date-range' && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Mostrando ventas desde {new Date(startDate).toLocaleDateString('es-ES')} hasta {new Date(endDate).toLocaleDateString('es-ES')}
+                </div>
+              )}
+              {salesFilter === 'all' && (
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Mostrando todas las ventas del sistema
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>

@@ -1,14 +1,40 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "covenant-pos-desktop",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
+  "main": "pos-desktop.js",
+  "pkg": {
+    "scripts": [
+      "backend/src/server.js"
+    ],
+    "assets": [
+      "dist/**/*",
+      "backend/data.json",
+      "backend/src/**/*",
+      "backend/node_modules/sqlite3/lib/binding/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "executable"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron": "electron covenant-desktop.js",
+    "electron:dev": "npm run build && electron covenant-desktop.js",
+    "build:electron": "npm run build && electron covenant-desktop.js",
+    "start:electron": "electron covenant-desktop.js",
+    "desktop": "npm run build && electron covenant-desktop.js",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "build:exe": "npm run build && electron-builder --win --publish=never",
+    "build:executable": "npm run build && electron-builder --win --publish=never"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.2",
@@ -63,7 +89,6 @@
     "date-fns": "^3.6.0",
     "docx": "^9.5.1",
     "embla-carousel-react": "^8.3.0",
-    "express": "^5.1.0",
     "file-saver": "^2.0.5",
     "firebase": "^11.10.0",
     "framer-motion": "^12.23.12",
@@ -72,6 +97,7 @@
     "jspdf": "^3.0.2",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.462.0",
+    "moment": "^2.30.1",
     "next-themes": "^0.3.0",
     "puppeteer": "^24.18.0",
     "react": "^18.3.1",
@@ -101,15 +127,59 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.0.0",
+    "electron": "^38.1.2",
+    "electron-builder": "^26.0.12",
+    "electron-is-dev": "^3.0.1",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
+    "express": "^5.1.0",
     "globals": "^15.9.0",
     "lovable-tagger": "^1.1.7",
+    "nexe": "^5.0.0-beta.4",
+    "pkg": "^5.8.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "wait-on": "^9.0.1"
+  },
+  "build": {
+    "appId": "com.covenant.pos",
+    "productName": "Covenant POS",
+    "files": [
+      "pos-desktop.js",
+      "dist/**/*",
+      "backend/src/**/*",
+      "backend/data/**/*",
+      "backend/package.json",
+      "backend/node_modules/**/*"
+    ],
+    "directories": {
+      "output": "builds"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "forceCodeSigning": false,
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "CovenantPOS.exe"
+    },
+    "extraResources": [
+      {
+        "from": "backend/",
+        "to": "backend/",
+        "filter": ["**/*"]
+      }
+    ]
   }
 }

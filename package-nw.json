@@ -1,0 +1,15 @@
+{
+  "name": "covenant-pos-desktop",
+  "version": "1.0.0",
+  "main": "pos-app.html",
+  "window": {
+    "title": "Covenant POS",
+    "width": 1200,
+    "height": 800,
+    "min_width": 800,
+    "min_height": 600,
+    "toolbar": false,
+    "show": true,
+    "resizable": true
+  }
+}

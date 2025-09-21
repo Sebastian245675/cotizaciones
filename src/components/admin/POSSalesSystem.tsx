@@ -63,9 +63,10 @@ import {
   LogOut,
   Scale
 } from 'lucide-react';
-import { collection, getDocs, doc, setDoc, addDoc, query, orderBy, limit, updateDoc, where, Timestamp, onSnapshot, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, addDoc, query, orderBy, limit, updateDoc, where, Timestamp, onSnapshot, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useAuth } from "@/contexts/AuthContext";
+import internalDB from '@/services/InternalDatabaseService';
 
 // Tipos para el sistema offline
 interface OfflineOperation {
@@ -357,13 +358,32 @@ const POSSalesSystem: React.FC = () => {
     openingBalance: number;
     openedAt?: Date | null;
     justClosed?: boolean;
+    totalSales?: number;
+    cashInBox?: number;
+    closingBalance?: number;
   }>({
     isOpen: false,
     isLoading: true,
     reportId: null,
     openingBalance: 0,
     openedAt: null,
-    justClosed: false
+    justClosed: false,
+    totalSales: 0,
+    cashInBox: 0,
+    closingBalance: 0
+  });
+
+  // Estados para auto-cierre
+  const [autoCloseStatus, setAutoCloseStatus] = useState<{
+    shouldAutoClose: boolean;
+    reason: string;
+    timeRemaining: string;
+    warningShown: boolean;
+  }>({
+    shouldAutoClose: false,
+    reason: '',
+    timeRemaining: '',
+    warningShown: false
   });
   const [showCashRegisterModal, setShowCashRegisterModal] = useState(false);
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
@@ -775,6 +795,136 @@ const POSSalesSystem: React.FC = () => {
   }, [cart, customer, customerCodeInput, globalDiscount, globalDiscountType, 
       paymentMethod, receivedAmount, cardAmount, transferAmount, creditDueDate, creditNotes]);
 
+  // Auto-cierre de turnos: Verificar y cerrar turnos antiguos automáticamente
+  useEffect(() => {
+    const checkAndAutoCloseShifts = async () => {
+      try {
+        if (!user?.email) return;
+        
+        console.log('🔄 Verificando turnos para auto-cierre...');
+        
+        // Buscar turnos abiertos del usuario actual
+        const openQuery = query(
+          collection(db, 'cash_reports'),
+          where('status', '==', 'open'),
+          where('createdBy', '==', user.email),
+          orderBy('shiftStart', 'desc'),
+          limit(5)
+        );
+        
+        const querySnapshot = await getDocs(openQuery);
+        
+        if (querySnapshot.empty) {
+          console.log('✅ No hay turnos abiertos para verificar');
+          return;
+        }
+        
+        const now = new Date();
+        let closedCount = 0;
+        
+        for (const docSnap of querySnapshot.docs) {
+          const shift = docSnap.data();
+          const shiftId = docSnap.id;
+          
+          // Obtener fecha de apertura
+          let openedAt;
+          const dateField = shift.shiftStart || shift.date;
+          
+          if (dateField?.toDate) {
+            openedAt = dateField.toDate();
+          } else if (dateField?.seconds) {
+            openedAt = new Date(dateField.seconds * 1000);
+          } else if (dateField) {
+            openedAt = new Date(dateField);
+          } else {
+            continue; // Saltar si no hay fecha válida
+          }
+          
+          const hoursOpen = (now.getTime() - openedAt.getTime()) / (1000 * 60 * 60);
+          const isFromYesterday = openedAt.toDateString() !== now.toDateString();
+          
+          // Condiciones para auto-cierre
+          let shouldClose = false;
+          let reason = '';
+          
+          if (hoursOpen >= 12) {
+            shouldClose = true;
+            reason = `Auto-cierre por ${hoursOpen.toFixed(1)} horas abierto`;
+          } else if (isFromYesterday && hoursOpen >= 2) {
+            shouldClose = true;
+            reason = 'Auto-cierre por turno del día anterior';
+          }
+          
+          if (shouldClose) {
+            console.log(`🏁 Auto-cerrando turno ${shiftId}: ${reason}`);
+            
+            try {
+              const theoreticalBalance = parseFloat(shift.closingBalance || shift.cashInBox || shift.openingBalance || 0);
+              
+              await updateDoc(doc(db, 'cash_reports', shiftId), {
+                status: 'closed',
+                closed_at: Timestamp.now(),
+                closingBalance: theoreticalBalance,
+                actual_cash: theoreticalBalance,
+                discrepancy: 0,
+                notes: `${shift.notes || ''}\n${reason} - Cerrado automáticamente el ${now.toLocaleString()}`.trim(),
+                updated_at: Timestamp.now(),
+                lastUpdated: Timestamp.now()
+              });
+              
+              closedCount++;
+              console.log(`✅ Turno ${shiftId} cerrado automáticamente`);
+              
+              // Si es el turno actualmente mostrado, actualizar el estado
+              if (cashRegisterStatus.reportId === shiftId) {
+                setCashRegisterStatus(prev => ({
+                  ...prev,
+                  isOpen: false,
+                  reportId: null
+                }));
+                
+                // Mostrar notificación al usuario
+                toast({
+                  title: "🔒 Turno Cerrado Automáticamente",
+                  description: reason,
+                  variant: "default"
+                });
+              }
+              
+            } catch (error) {
+              console.error(`❌ Error al cerrar turno ${shiftId}:`, error);
+            }
+          }
+        }
+        
+        if (closedCount > 0) {
+          console.log(`🎉 Auto-cierre completado: ${closedCount} turnos cerrados`);
+          // Refrescar estado después del auto-cierre
+          setTimeout(() => {
+            checkCashRegisterStatus(true, user.email);
+          }, 2000);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error en auto-cierre de turnos:', error);
+      }
+    };
+    
+    // Ejecutar verificación inmediatamente
+    if (user?.email) {
+      checkAndAutoCloseShifts();
+    }
+    
+    // Configurar intervalo para verificar cada 5 minutos
+    const interval = setInterval(() => {
+      if (user?.email) {
+        checkAndAutoCloseShifts();
+      }
+    }, 5 * 60 * 1000); // 5 minutos
+    
+    return () => clearInterval(interval);
+  }, [user?.email, cashRegisterStatus.reportId]);
+
   // Función para verificar si hay un corte de caja abierto
   const checkCashRegisterStatus = async (forceCheck = false, userEmail?: string) => {
     try {
@@ -929,6 +1079,185 @@ const POSSalesSystem: React.FC = () => {
         console.log('🎯 Mostrando modal automáticamente debido a error...');
         setShowCashRegisterModal(true);
       }
+    }
+  };
+
+  // Función para verificar si el turno debe cerrarse automáticamente
+  const checkAutoCloseConditions = () => {
+    if (!cashRegisterStatus.isOpen || !cashRegisterStatus.openedAt) {
+      return {
+        shouldAutoClose: false,
+        reason: '',
+        timeRemaining: '',
+        hoursOpen: 0
+      };
+    }
+
+    const now = new Date();
+    const openedAt = new Date(cashRegisterStatus.openedAt);
+    const timeDiff = now.getTime() - openedAt.getTime();
+    const hoursOpen = timeDiff / (1000 * 60 * 60);
+    const minutesOpen = timeDiff / (1000 * 60);
+
+    // Regla 1: Más de 12 horas abierto
+    if (hoursOpen >= 12) {
+      return {
+        shouldAutoClose: true,
+        reason: `Turno abierto por más de 12 horas (${Math.floor(hoursOpen)}h ${Math.floor((hoursOpen % 1) * 60)}m)`,
+        timeRemaining: 'Cierre inmediato requerido',
+        hoursOpen: Math.floor(hoursOpen)
+      };
+    }
+
+    // Regla 2: Cambio de día (después de medianoche)
+    const openedDate = openedAt.toDateString();
+    const currentDate = now.toDateString();
+    if (openedDate !== currentDate) {
+      return {
+        shouldAutoClose: true,
+        reason: 'Turno del día anterior (pasó medianoche)',
+        timeRemaining: 'Cierre inmediato requerido',
+        hoursOpen: Math.floor(hoursOpen)
+      };
+    }
+
+    // Calcular tiempo restante hasta 12 horas
+    const remainingMs = (12 * 60 * 60 * 1000) - timeDiff;
+    const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
+    const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    // Advertir si queda menos de 1 hora
+    if (remainingHours < 1) {
+      return {
+        shouldAutoClose: false,
+        reason: `Advertencia: Turno se cerrará automáticamente en ${remainingMinutes} minutos`,
+        timeRemaining: `${remainingMinutes} minutos`,
+        hoursOpen: Math.floor(hoursOpen),
+        warning: true
+      };
+    }
+
+    return {
+      shouldAutoClose: false,
+      reason: '',
+      timeRemaining: `${remainingHours}h ${remainingMinutes}m`,
+      hoursOpen: Math.floor(hoursOpen)
+    };
+  };
+
+  // Función para manejar auto-cierre en modo offline
+  const handleOfflineAutoClose = async (reason: string) => {
+    console.log('🏁 Ejecutando auto-cierre offline:', reason);
+    
+    try {
+      // Obtener datos del turno actual del cache
+      const currentData = {
+        reportId: cashRegisterStatus.reportId,
+        openingBalance: cashRegisterStatus.openingBalance,
+        openedAt: cashRegisterStatus.openedAt
+      };
+
+      // Calcular balance teórico basado en ventas locales
+      const localSales = allSalesHistory.filter(sale => 
+        sale.reportId === cashRegisterStatus.reportId || 
+        (cashRegisterStatus.openedAt && new Date(sale.timestamp) >= cashRegisterStatus.openedAt)
+      );
+
+      let totalCashSales = 0;
+      let totalSales = 0;
+      localSales.forEach(sale => {
+        const saleTotal = parseFloat(sale.total?.toString() || '0');
+        totalSales += saleTotal;
+        if (sale.paymentMethod === 'cash') {
+          totalCashSales += saleTotal;
+        }
+      });
+
+      const theoreticalBalance = currentData.openingBalance + totalCashSales;
+
+      // Crear registro de cierre automático local
+      const autoCloseData = {
+        id: currentData.reportId,
+        status: 'closed',
+        closedAt: new Date().toISOString(),
+        closing_balance: theoreticalBalance,
+        actual_cash: theoreticalBalance,
+        discrepancy: 0,
+        notes: `${reason} - Auto-cierre offline el ${new Date().toLocaleString()}`,
+        total_sales: totalSales,
+        total_cash_sales: totalCashSales,
+        auto_closed: true,
+        auto_close_reason: reason
+      };
+
+      // Guardar en localStorage para sincronización posterior
+      const autoClosedReports = JSON.parse(localStorage.getItem('auto_closed_reports') || '[]');
+      autoClosedReports.push(autoCloseData);
+      localStorage.setItem('auto_closed_reports', JSON.stringify(autoClosedReports));
+
+      // Actualizar estado
+      setCashRegisterStatus({
+        isOpen: false,
+        isLoading: false,
+        reportId: null,
+        openingBalance: 0,
+        openedAt: null,
+        justClosed: true
+      });
+
+      // Limpiar cache del turno
+      localStorage.removeItem('pos_cash_register_status');
+      localStorage.removeItem('pos_cash_register_date');
+      localStorage.removeItem('cash_register_status_cache');
+
+      // Mostrar notificación
+      toast({
+        title: "🏁 Turno Cerrado Automáticamente",
+        description: `${reason}. El turno se sincronizará cuando se restablezca la conexión.`,
+        className: "border-orange-200 bg-orange-50"
+      });
+
+      console.log('✅ Auto-cierre offline completado');
+      return true;
+
+    } catch (error) {
+      console.error('❌ Error en auto-cierre offline:', error);
+      toast({
+        variant: "destructive",
+        title: "Error en Auto-cierre",
+        description: "No se pudo cerrar el turno automáticamente. Por favor, ciérralo manualmente."
+      });
+      return false;
+    }
+  };
+
+  // Función para verificar auto-cierre online a través del servidor
+  const checkOnlineAutoClose = async () => {
+    if (!connectionStatus.isOnline || !cashRegisterStatus.reportId) {
+      return;
+    }
+
+    try {
+      // En modo online, el servidor manejará el auto-cierre automáticamente
+      // Esta función principalmente sirve para logging y puede disparar verificaciones adicionales
+      console.log('🔍 Verificando auto-cierre online para reportId:', cashRegisterStatus.reportId);
+      
+      // El backend ya tiene cron jobs que manejan el auto-cierre
+      // Si necesitamos verificación adicional, podemos checking Firebase directamente
+      const conditions = checkAutoCloseConditions();
+      if (conditions.shouldAutoClose) {
+        console.log('⚠️ Detectado que el turno debe cerrarse automáticamente:', conditions.reason);
+        
+        // Mostrar advertencia al usuario
+        toast({
+          title: "⚠️ Auto-cierre Requerido",
+          description: `${conditions.reason}. Por favor, cierra tu turno manualmente o espera al cierre automático.`,
+          className: "border-red-200 bg-red-50"
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Error verificando auto-cierre online:', error);
     }
   };
 
@@ -1632,6 +1961,130 @@ const POSSalesSystem: React.FC = () => {
     };
   }, [cashRegisterStatus.reportId, cashRegisterStatus.isOpen]);
 
+  // Auto-close monitoring - Verificar condiciones de auto-cierre cada minuto
+  useEffect(() => {
+    if (!cashRegisterStatus.isOpen || !cashRegisterStatus.openedAt) {
+      // Limpiar estado de auto-cierre si no hay turno activo
+      setAutoCloseStatus({
+        shouldAutoClose: false,
+        reason: '',
+        timeRemaining: '',
+        warningShown: false
+      });
+      return;
+    }
+
+    console.log('🕐 Iniciando monitoreo de auto-cierre para turno activo');
+
+    const checkInterval = setInterval(() => {
+      const conditions = checkAutoCloseConditions();
+      console.log('🔍 Verificación de auto-cierre:', conditions);
+
+      // Actualizar estado de auto-cierre
+      setAutoCloseStatus(prev => ({
+        shouldAutoClose: conditions.shouldAutoClose,
+        reason: conditions.reason,
+        timeRemaining: conditions.timeRemaining,
+        warningShown: prev.warningShown
+      }));
+
+      // Si debe cerrarse automáticamente
+      if (conditions.shouldAutoClose) {
+        console.log('🏁 Condiciones de auto-cierre cumplidas:', conditions.reason);
+        
+        if (connectionStatus.isOnline) {
+          // Online: El servidor manejará el auto-cierre
+          checkOnlineAutoClose();
+        } else {
+          // Offline: Manejar localmente
+          handleOfflineAutoClose(conditions.reason);
+        }
+        
+        return; // Salir del intervalo
+      }
+
+      // Mostrar advertencia si queda menos de 1 hora y no se ha mostrado antes
+      if (conditions.warning && !autoCloseStatus.warningShown) {
+        console.log('⚠️ Mostrando advertencia de auto-cierre');
+        toast({
+          title: "⚠️ Advertencia de Auto-cierre",
+          description: conditions.reason,
+          className: "border-yellow-200 bg-yellow-50"
+        });
+        
+        setAutoCloseStatus(prev => ({
+          ...prev,
+          warningShown: true
+        }));
+      }
+
+      // Reset warning flag si ya no es necesaria
+      if (!conditions.warning && autoCloseStatus.warningShown) {
+        setAutoCloseStatus(prev => ({
+          ...prev,
+          warningShown: false
+        }));
+      }
+
+    }, 60000); // Verificar cada minuto
+
+    // Verificación inicial inmediata
+    const initialConditions = checkAutoCloseConditions();
+    if (initialConditions.shouldAutoClose) {
+      console.log('🏁 Auto-cierre requerido inmediatamente:', initialConditions.reason);
+      
+      if (connectionStatus.isOnline) {
+        checkOnlineAutoClose();
+      } else {
+        handleOfflineAutoClose(initialConditions.reason);
+      }
+    }
+
+    return () => {
+      console.log('🔇 Desconectando monitoreo de auto-cierre');
+      clearInterval(checkInterval);
+    };
+  }, [cashRegisterStatus.isOpen, cashRegisterStatus.openedAt, connectionStatus.isOnline, autoCloseStatus.warningShown]);
+
+  // Socket.IO listener para auto-cierre desde servidor
+  useEffect(() => {
+    if (!connectionStatus.isOnline) return;
+
+    const handleAutoClose = (data: any) => {
+      console.log('📡 Recibido evento de auto-cierre del servidor:', data);
+      
+      if (data.userEmail === user?.email && data.registerId === cashRegisterStatus.reportId) {
+        toast({
+          title: "🏁 Turno Cerrado Automáticamente",
+          description: `${data.reason}. Tu turno se cerró automáticamente.`,
+          className: "border-red-200 bg-red-50"
+        });
+
+        // Actualizar estado local
+        setCashRegisterStatus({
+          isOpen: false,
+          isLoading: false,
+          reportId: null,
+          openingBalance: 0,
+          openedAt: null,
+          justClosed: true
+        });
+
+        // Limpiar cache
+        localStorage.removeItem('pos_cash_register_status');
+        localStorage.removeItem('pos_cash_register_date');
+        localStorage.removeItem('cash_register_status_cache');
+      }
+    };
+
+    // Suponiendo que tienes socket.io configurado
+    // socket?.on('cashRegisterAutoClosed', handleAutoClose);
+
+    return () => {
+      // socket?.off('cashRegisterAutoClosed', handleAutoClose);
+    };
+  }, [connectionStatus.isOnline, user?.email, cashRegisterStatus.reportId]);
+
   // ELIMINADO el useEffect problemático que causaba bucle infinito
 
   // Hotkeys para mejorar la eficiencia del POS
@@ -1981,35 +2434,35 @@ const POSSalesSystem: React.FC = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Verificar conexión periódicamente (cada 30 segundos)
-    const connectionInterval = setInterval(() => {
-      checkConnectionStatus();
-    }, 30000);
+    // ❌ DESHABILITADO PARA PARAR EL SPAM - Verificar conexión periódicamente (cada 30 segundos)
+    // const connectionInterval = setInterval(() => {
+    //   checkConnectionStatus();
+    // }, 180000); // 3 minutos en lugar de 30 segundos
 
-    // Sincronización automática cada 2 minutos si hay conexión
-    const syncInterval = setInterval(() => {
-      if (connectionStatus.isOnline && !connectionStatus.syncInProgress) {
-        syncPendingOperations();
-      }
-    }, 120000);
+    // ❌ DESHABILITADO PARA PARAR EL SPAM - Sincronización automática cada 10 minutos si hay conexión (en lugar de 2 minutos)
+    // const syncInterval = setInterval(() => {
+    //   if (connectionStatus.isOnline && !connectionStatus.syncInProgress) {
+    //     syncPendingOperations();
+    //   }
+    // }, 600000); // 10 minutos
 
-    // Verificar estado del turno en Firebase cada 10 minutos (solo si no hay turno activo)
-    const cashRegisterInterval = setInterval(async () => {
-      // Solo verificar si no hay turno activo
-      if (!cashRegisterStatus.isOpen) {
-        console.log('🔍 Verificación periódica - Sin turno activo, verificando...');
-        await checkCashRegisterStatus();
-      } else {
-        console.log('✅ Turno activo detectado - Saltando verificación periódica');
-      }
-    }, 600000); // 10 minutos
+    // ❌ DESHABILITADO PARA PARAR EL SPAM - Verificar estado del turno en Firebase cada 10 minutos (solo si no hay turno activo)
+    // const cashRegisterInterval = setInterval(async () => {
+    //   // Solo verificar si no hay turno activo
+    //   if (!cashRegisterStatus.isOpen) {
+    //     console.log('🔍 Verificación periódica - Sin turno activo, verificando...');
+    //     await checkCashRegisterStatus();
+    //   } else {
+    //     console.log('✅ Turno activo detectado - Saltando verificación periódica');
+    //   }
+    // }, 600000); // 10 minutos
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      clearInterval(connectionInterval);
-      clearInterval(syncInterval);
-      clearInterval(cashRegisterInterval);
+      // clearInterval(connectionInterval);
+      // clearInterval(syncInterval);
+      // clearInterval(cashRegisterInterval);
     };
   }, [connectionStatus.isOnline, connectionStatus.syncInProgress, cashRegisterStatus.isOpen, showCashRegisterModal]);
 
@@ -2129,11 +2582,98 @@ const POSSalesSystem: React.FC = () => {
 
   // Auto-cargar ventas cuando se abre el modal de historial
   useEffect(() => {
-    if (showSalesHistory && connectionStatus.isOnline) {
-      console.log('📋 Modal de historial abierto - Cargando ventas automáticamente...');
-      fetchAllSalesHistory();
-    }
+    // if (showSalesHistory && connectionStatus.isOnline) {
+    //   console.log('📋 Modal de historial abierto - Cargando ventas automáticamente...');
+    //   fetchAllSalesHistory();
+    // }
   }, [showSalesHistory]);
+
+  // 🔥 NUEVO: Listener en tiempo real para cambios de stock en Firebase
+  useEffect(() => {
+    if (!connectionStatus.isOnline) return;
+
+    console.log('🔄 Iniciando listener de productos en tiempo real...');
+    
+    const unsubscribe = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const changes = snapshot.docChanges();
+        const storage = OfflineStorage.getInstance();
+        
+        if (changes.length > 0) {
+          console.log(`🔔 Detectados ${changes.length} cambios en productos`);
+          
+          // Obtener productos actuales del cache
+          let cachedProducts = storage.getItem<Product[]>('pos_products_cache', []);
+          let hasChanges = false;
+          
+          changes.forEach((change) => {
+            const productData = change.doc.data();
+            const productId = change.doc.id;
+            
+            // Convertir datos de Firebase al formato Product
+            const updatedProduct: Product = {
+              id: productId,
+              name: productData.name || productData.nombre || 'Producto sin nombre',
+              description: productData.description || productData.descripcion || '',
+              price: Number(productData.price || productData.precio || productData.salePrice || productData.precioVenta || 0),
+              image: productData.image || productData.imagen,
+              category: productData.category || productData.categoria || 'Sin categoría',
+              stock: Number(productData.stock || productData.inventory || productData.inventario || 0),
+              barcode: productData.barcode || productData.codigoBarras,
+              brand: productData.brand || productData.marca,
+              supplier: productData.supplier || productData.proveedor,
+              costPrice: Number(productData.costPrice || productData.precioCosto || 0),
+              margin: Number(productData.margin || productData.margen || 0),
+              puntosRecompensa: Number(productData.puntosRecompensa || 0),
+              tipoRecompensa: (productData.tipoRecompensa === 'porcentaje' ? 'porcentaje' : 'fijo') as 'fijo' | 'porcentaje'
+            };
+
+            if (change.type === 'modified') {
+              // Actualizar producto existente
+              const existingIndex = cachedProducts.findIndex(p => p.id === productId);
+              if (existingIndex !== -1) {
+                const oldStock = cachedProducts[existingIndex].stock;
+                const newStock = updatedProduct.stock;
+                
+                if (oldStock !== newStock) {
+                  console.log(`📦 Stock actualizado en tiempo real - ${updatedProduct.name}: ${oldStock} → ${newStock}`);
+                  
+                  // Mostrar notificación solo si es una reducción significativa
+                  if (newStock < oldStock) {
+                    toast({
+                      title: "Stock actualizado",
+                      description: `${updatedProduct.name}: ${oldStock} → ${newStock} unidades`,
+                      variant: "default"
+                    });
+                  }
+                }
+                
+                cachedProducts[existingIndex] = updatedProduct;
+                hasChanges = true;
+              }
+            }
+          });
+          
+          if (hasChanges) {
+            // Actualizar cache y estado
+            storage.setItem('pos_products_cache', cachedProducts);
+            setProducts(cachedProducts);
+            console.log('💾 Cache de productos actualizado desde Firebase en tiempo real');
+          }
+        }
+      },
+      (error) => {
+        console.error('❌ Error en listener de productos:', error);
+      }
+    );
+
+    // Cleanup del listener
+    return () => {
+      console.log('🔇 Desconectando listener de productos...');
+      unsubscribe();
+    };
+  }, [connectionStatus.isOnline]);
 
   // Cargar datos locales al inicializar
   const initializeOfflineSystem = () => {
@@ -2307,18 +2847,58 @@ const POSSalesSystem: React.FC = () => {
     const storage = OfflineStorage.getInstance();
     const pendingOperations = storage.getPendingOperations();
     
-    if (pendingOperations.length === 0) {
+    // También sincronizar reportes auto-cerrados
+    const autoClosedReports = JSON.parse(localStorage.getItem('auto_closed_reports') || '[]');
+    
+    if (pendingOperations.length === 0 && autoClosedReports.length === 0) {
       console.log('✅ No hay operaciones pendientes para sincronizar');
       return;
     }
 
-    console.log(`🔄 Iniciando sincronización de ${pendingOperations.length} operaciones...`);
+    console.log(`🔄 Iniciando sincronización de ${pendingOperations.length} operaciones y ${autoClosedReports.length} reportes auto-cerrados...`);
     
     setConnectionStatus(prev => ({ ...prev, syncInProgress: true }));
 
     let successCount = 0;
     let errorCount = 0;
 
+    // Sincronizar reportes auto-cerrados primero
+    for (const autoClosedReport of autoClosedReports) {
+      try {
+        console.log(`📤 Sincronizando reporte auto-cerrado: ${autoClosedReport.id}`);
+        
+        if (autoClosedReport.id) {
+          const reportRef = doc(db, 'cash_reports', autoClosedReport.id);
+          await updateDoc(reportRef, {
+            status: 'closed',
+            closed_at: serverTimestamp(),
+            closing_balance: autoClosedReport.closing_balance,
+            actual_cash: autoClosedReport.actual_cash,
+            discrepancy: autoClosedReport.discrepancy,
+            notes: autoClosedReport.notes,
+            total_sales: autoClosedReport.total_sales || 0,
+            total_cash_sales: autoClosedReport.total_cash_sales || 0,
+            updated_at: serverTimestamp(),
+            auto_closed: true,
+            auto_close_reason: autoClosedReport.auto_close_reason
+          });
+          
+          console.log(`✅ Reporte auto-cerrado sincronizado: ${autoClosedReport.id}`);
+          successCount++;
+        }
+        
+      } catch (error) {
+        console.error(`❌ Error sincronizando reporte auto-cerrado:`, error);
+        errorCount++;
+      }
+    }
+
+    // Limpiar reportes auto-cerrados después de sincronizar
+    if (autoClosedReports.length > 0) {
+      localStorage.removeItem('auto_closed_reports');
+    }
+
+    // Sincronizar operaciones normales
     for (const operation of pendingOperations) {
       try {
         console.log(`📤 Sincronizando operación: ${operation.type} - ${operation.operation}`, operation.id);
@@ -2674,166 +3254,140 @@ const POSSalesSystem: React.FC = () => {
 
   const fetchRecentSales = async () => {
     try {
-      const salesQuery = query(
-        collection(db, 'ventas'),
-        where('cashier', '==', user?.email),
-        orderBy('timestamp', 'desc'),
-        limit(50)
-      );
-      const salesSnapshot = await getDocs(salesQuery);
-      const salesData = salesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Sale[];
+      console.log('🔍 Obteniendo ventas recientes desde BD interna...');
       
-      setRecentSales(salesData);
+      // Usar BD interna como fuente principal
+      const salesData = await internalDB.getSales({
+        status: 'completed',
+        cashier: user?.email,
+        endDate: new Date() // Solo ventas hasta hoy
+      });
+      
+      // Ordenar por fecha más reciente primero y limitar a 50
+      const recentSales = salesData
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 50)
+        .map(sale => ({
+          id: sale.id,
+          saleNumber: sale.saleNumber,
+          customer: sale.customer,
+          items: sale.items,
+          subtotal: sale.subtotal,
+          discounts: sale.discounts,
+          tax: sale.tax,
+          total: sale.total,
+          paymentMethod: sale.paymentMethod,
+          paymentDetails: sale.paymentDetails,
+          status: sale.status,
+          timestamp: new Date(sale.createdAt),
+          cashier: sale.cashier,
+          mode: sale.mode,
+          reportId: sale.reportId,
+          notes: sale.notes
+        })) as Sale[];
+      
+      setRecentSales(recentSales);
+      console.log(`✅ ${recentSales.length} ventas recientes cargadas desde BD interna`);
 
-      // Calcular estadísticas del día usando la función centralizada
-      calculateDailyStats(salesData);
+      // Calcular estadísticas del día
+      calculateDailyStats(recentSales);
       
     } catch (error) {
-      console.error('Error fetching recent sales:', error);
+      console.error('❌ Error obteniendo ventas recientes de BD interna:', error);
+      
+      // Fallback a localStorage
+      try {
+        const localSales = JSON.parse(localStorage.getItem('internal_sales') || '[]');
+        const recentSales = localSales.slice(0, 50);
+        setRecentSales(recentSales);
+        console.log(`� Fallback: ${recentSales.length} ventas desde localStorage`);
+      } catch (fallbackError) {
+        console.error('❌ Error en fallback localStorage:', fallbackError);
+        setRecentSales([]);
+      }
     }
   };
 
   const fetchAllSalesHistory = async () => {
     try {
       setLoadingSalesHistory(true);
-      console.log('🔍 Iniciando carga de historial de ventas del turno actual...');
-      console.log('🏪 Estado de caja:', {
-        isOpen: cashRegisterStatus.isOpen,
-        reportId: cashRegisterStatus.reportId,
-        openedAt: cashRegisterStatus.openedAt
-      });
+      console.log('🔍 Obteniendo historial completo desde BD interna...');
+
+      // Validar que hay un turno activo
+      if (!cashRegisterStatus.isOpen || !cashRegisterStatus.reportId) {
+        console.log('⚠️ No hay turno activo - mostrando lista vacía');
+        setAllSalesHistory([]);
+        return;
+      }
       
       let salesData: Sale[] = [];
 
-      // NUEVA ESTRATEGIA: Cargar todas las ventas y filtrar por múltiples criterios
-      console.log('� Cargando todas las ventas para filtrado robusto...');
-      
       try {
-        // Obtener todas las ventas DEL USUARIO ACTUAL sin filtros iniciales
-        const allSalesQuery = query(
-          collection(db, 'ventas'),
-          where('cashier', '==', user?.email),
-          orderBy('timestamp', 'desc'),
-          limit(500) // Limitamos a las últimas 500 ventas para rendimiento
-        );
-        
-        const allSalesSnapshot = await getDocs(allSalesQuery);
-        console.log('📊 Total de ventas obtenidas:', allSalesSnapshot.docs.length);
-        
-        const allSales = allSalesSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp)
-          } as Sale;
+        // PRIORIDAD 1: Usar BD interna
+        console.log('💾 Obteniendo ventas desde BD interna...');
+        const internalSales = await internalDB.getSales({
+          reportId: cashRegisterStatus.reportId,
+          cashier: user?.email || 'admin@pos.local'
         });
-
-        console.log('🛠️ Aplicando filtros para el turno actual...');
         
-        // Filtro 1: Por reportId Y cajero (más preciso y seguro)
-        if (cashRegisterStatus.reportId) {
-          const currentCashier = user?.email || 'admin@pos.local';
-          const salesByReportId = allSales.filter(sale => 
-            sale.reportId === cashRegisterStatus.reportId && 
-            sale.cashier === currentCashier
-          );
-          console.log(`📋 Ventas encontradas por reportId ${cashRegisterStatus.reportId} y cajero ${currentCashier}:`, salesByReportId.length);
-          
-          if (salesByReportId.length > 0) {
-            salesData = salesByReportId;
-            console.log('✅ Usando ventas filtradas por reportId y cajero');
-          }
-        }
-        
-        // Filtro 2: Si no hay ventas por reportId, filtrar por fecha Y cajero
-        if (salesData.length === 0 && cashRegisterStatus.openedAt) {
-          console.log('📅 Filtrando por fecha de apertura del turno y cajero...');
-          const turnStartTime = cashRegisterStatus.openedAt;
-          const currentCashier = user?.email || 'admin@pos.local';
-          
-          const salesByDate = allSales.filter(sale => {
-            const saleTime = sale.timestamp;
-            return saleTime >= turnStartTime && sale.cashier === currentCashier;
-          });
-          
-          console.log(`📅 Ventas encontradas desde ${turnStartTime} del cajero ${currentCashier}:`, salesByDate.length);
-          salesData = salesByDate;
-        }
-        
-        // Filtro 3: Si aún no hay ventas, usar ventas del día actual
-        if (salesData.length === 0) {
-          console.log('� Filtrando por día actual como respaldo...');
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          
-          const salesToday = allSales.filter(sale => {
-            const saleTime = sale.timestamp;
-            return saleTime >= today && saleTime < tomorrow;
-          });
-          
-          console.log(`📆 Ventas del día ${today.toDateString()}:`, salesToday.length);
-          salesData = salesToday;
-        }
-        
-        console.log('💾 Ventas finales cargadas:', salesData.length);
-        console.log('📋 Detalle de ventas:', salesData.map(sale => ({
+        // Convertir a formato de interfaz
+        salesData = internalSales.map(sale => ({
           id: sale.id,
           saleNumber: sale.saleNumber,
+          customer: sale.customer,
+          items: sale.items,
+          subtotal: sale.subtotal,
+          discounts: sale.discounts,
+          tax: sale.tax,
+          total: sale.total,
+          paymentMethod: sale.paymentMethod,
+          paymentDetails: sale.paymentDetails,
+          status: sale.status,
+          timestamp: new Date(sale.createdAt),
+          cashier: sale.cashier,
+          mode: sale.mode,
           reportId: sale.reportId,
-          timestamp: sale.timestamp.toISOString(),
-          total: (sale as any).total || (sale as any).resumen?.total || 0
-        })));
+          notes: sale.notes
+        })) as Sale[];
+
+        console.log(`✅ ${salesData.length} ventas cargadas desde BD interna`);
+
+      } catch (internalError) {
+        console.warn('⚠️ Error con BD interna, intentando localStorage...', internalError);
         
-        setAllSalesHistory(salesData);
-        calculateDailyStats(salesData);
+        // FALLBACK: localStorage
+        const localSalesKey = `pos_sales_${cashRegisterStatus.reportId}`;
+        const localSales = localStorage.getItem(localSalesKey);
         
-        // Guardar en cache local para persistencia
-        const storage = OfflineStorage.getInstance();
-        storage.setItem('sales_history_cache', salesData);
-        
-        return;
-        
-      } catch (queryError) {
-        console.error('❌ Error en consulta de ventas:', queryError);
-        
-        // Fallback: usar cache local si existe
-        const storage = OfflineStorage.getInstance();
-        const cachedSales = storage.getItem<Sale[]>('sales_history_cache', []);
-        
-        if (cachedSales.length > 0) {
-          console.log('📦 Usando ventas del cache local:', cachedSales.length);
-          setAllSalesHistory(cachedSales);
-          calculateDailyStats(cachedSales);
-        } else {
-          console.log('❌ No hay datos en cache, mostrando vacío');
-          setAllSalesHistory([]);
+        if (localSales) {
+          try {
+            const parsedSales = JSON.parse(localSales) as Sale[];
+            salesData = parsedSales.filter(sale => 
+              sale.reportId === cashRegisterStatus.reportId &&
+              sale.cashier === (user?.email || 'admin@pos.local')
+            );
+            console.log(`📱 ${salesData.length} ventas cargadas desde localStorage`);
+          } catch (parseError) {
+            console.error('❌ Error parseando localStorage:', parseError);
+            salesData = [];
+          }
         }
       }
+
+      // Ordenar por fecha más reciente
+      salesData = salesData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      setAllSalesHistory(salesData);
+      console.log(`✅ ${salesData.length} ventas cargadas en historial`);
       
     } catch (error) {
-      console.error('❌ Error fetching sales history:', error);
-      
-      // Último recurso: usar cache local
-      const storage = OfflineStorage.getInstance();
-      const cachedSales = storage.getItem<Sale[]>('sales_history_cache', []);
-      
-      if (cachedSales.length > 0) {
-        console.log('📦 Recuperando desde cache después de error:', cachedSales.length);
-        setAllSalesHistory(cachedSales);
-      } else {
-        setAllSalesHistory([]);
-        toast({
-          title: "Error al cargar historial",
-          description: "No se pudo cargar el historial de ventas del turno",
-          variant: "destructive"
-        });
-      }
+      console.error('❌ Error general cargando historial:', error);
+      setAllSalesHistory([]);
+      toast({
+        title: "❌ Error",
+        description: "Error cargando historial de ventas",
+        variant: "destructive"
+      });
     } finally {
       setLoadingSalesHistory(false);
     }
@@ -2921,7 +3475,7 @@ const POSSalesSystem: React.FC = () => {
     return categoryMatch && searchMatch;
   });
 
-  const addToCart = (product: Product) => {
+  const addToCart = async (product: Product) => {
     console.log('🛒 Intentando agregar producto al carrito:', {
       id: product.id,
       name: product.name,
@@ -2929,6 +3483,45 @@ const POSSalesSystem: React.FC = () => {
       stock: product.stock,
       tipoVenta: product.tipoVenta
     });
+
+    // 🔥 NUEVO: Verificar stock en tiempo real desde Firebase
+    try {
+      const productRef = doc(db, 'products', product.id);
+      const productSnap = await getDoc(productRef);
+      
+      if (productSnap.exists()) {
+        const realTimeStock = productSnap.data().stock || 0;
+        
+        // Si el stock en cache es diferente al de Firebase, actualizar
+        if (realTimeStock !== product.stock) {
+          console.log(`🔄 Stock desactualizado detectado - ${product.name}: cache=${product.stock}, firebase=${realTimeStock}`);
+          
+          // Actualizar cache local
+          const storage = OfflineStorage.getInstance();
+          const cachedProducts = storage.getItem<Product[]>('pos_products_cache', []);
+          const updatedProducts = cachedProducts.map(prod => {
+            if (prod.id === product.id) {
+              return { ...prod, stock: realTimeStock };
+            }
+            return prod;
+          });
+          storage.setItem('pos_products_cache', updatedProducts);
+          setProducts(updatedProducts);
+          
+          // Actualizar el producto con el stock real
+          product = { ...product, stock: realTimeStock };
+          
+          toast({
+            title: "Stock actualizado",
+            description: `Stock de ${product.name} actualizado a ${realTimeStock} unidades`,
+            variant: "default"
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ No se pudo verificar stock en tiempo real:', error);
+      // Continuar con el stock en cache si Firebase falla
+    }
 
     // Validar que el producto tenga los datos básicos
     if (!product.name) {
@@ -3236,7 +3829,7 @@ const POSSalesSystem: React.FC = () => {
 
   // Función para actualizar el corte de caja después de una venta
   const updateCashRegisterAfterSale = async (saleData: Sale) => {
-    console.log('🔥 INICIANDO updateCashRegisterAfterSale');
+    console.log('🔥 INICIANDO updateCashRegisterAfterSale con BD interna');
     console.log('📊 cashRegisterStatus:', cashRegisterStatus);
     console.log('💰 saleData:', saleData);
     
@@ -3251,42 +3844,39 @@ const POSSalesSystem: React.FC = () => {
     }
 
     try {
-      console.log('🔄 Actualizando corte de caja después de venta...', {
+      console.log('🔄 Actualizando corte de caja en BD interna después de venta...', {
         reportId: cashRegisterStatus.reportId,
         saleTotal: saleData.total,
         paymentMethod: saleData.paymentMethod
       });
 
-      const reportRef = doc(db, 'cash_reports', cashRegisterStatus.reportId);
-      console.log('📄 Referencia del documento:', reportRef.path);
+      // 🎯 USAR BD INTERNA en lugar de Firebase
+      const cashRegisters = await internalDB.getCashRegisters({ id: cashRegisterStatus.reportId });
+      const currentCashRegister = cashRegisters.find(cr => cr.id === cashRegisterStatus.reportId);
       
-      // Obtener el estado actual del reporte usando getDoc
-      const reportDoc = await getDoc(reportRef);
-      
-      if (!reportDoc.exists()) {
-        console.error('❌ No se encontró el reporte de caja con ID:', cashRegisterStatus.reportId);
+      if (!currentCashRegister) {
+        console.error('❌ No se encontró el corte de caja con ID:', cashRegisterStatus.reportId);
         toast({
           title: "❌ Error",
-          description: `No se encontró el reporte de caja activo: ${cashRegisterStatus.reportId}`,
+          description: `No se encontró el corte de caja activo: ${cashRegisterStatus.reportId}`,
           variant: "destructive"
         });
         return;
       }
 
-      const currentReport = reportDoc.data();
-      console.log('📋 Reporte actual:', currentReport);
+      console.log('📋 Corte de caja actual:', currentCashRegister);
       
       const saleTotal = saleData.total || 0;
       console.log('💵 Total de la venta:', saleTotal);
 
       // Calcular los nuevos totales
-      const newTotalSales = (currentReport.totalSales || 0) + saleTotal;
+      const newTotalSales = (currentCashRegister.totalSales || 0) + saleTotal;
       console.log('📈 Nuevo totalSales:', newTotalSales);
       
       // Preparar datos de actualización
       let updateData: any = {
         totalSales: newTotalSales,
-        lastUpdated: Timestamp.now()
+        lastUpdated: new Date().toISOString()
       };
 
       console.log('💳 Método de pago:', saleData.paymentMethod);
@@ -3297,8 +3887,8 @@ const POSSalesSystem: React.FC = () => {
       switch (saleData.paymentMethod) {
         case 'cash':
           cashAmount = saleTotal;
-          updateData.cashSales = (currentReport.cashSales || 0) + saleTotal;
-          updateData.cashInBox = (currentReport.cashInBox || currentReport.openingBalance || 0) + saleTotal;
+          updateData.cashSales = (currentCashRegister.cashSales || 0) + saleTotal;
+          updateData.cashInBox = (currentCashRegister.cashInBox || currentCashRegister.openingBalance || 0) + saleTotal;
           updateData.closingBalance = updateData.cashInBox;
           console.log('💰 Actualización efectivo:', { 
             cashSales: updateData.cashSales, 
@@ -3308,18 +3898,18 @@ const POSSalesSystem: React.FC = () => {
           break;
           
         case 'card':
-          updateData.creditCardSales = (currentReport.creditCardSales || 0) + saleTotal;
+          updateData.creditCardSales = (currentCashRegister.creditCardSales || 0) + saleTotal;
           console.log('💳 Actualización tarjeta:', { creditCardSales: updateData.creditCardSales });
           break;
           
         case 'transfer':
-          updateData.digitalPayments = (currentReport.digitalPayments || 0) + saleTotal;
+          updateData.digitalPayments = (currentCashRegister.digitalPayments || 0) + saleTotal;
           console.log('📱 Actualización transferencia:', { digitalPayments: updateData.digitalPayments });
           break;
           
         case 'credit':
-          updateData.creditSales = (currentReport.creditSales || 0) + saleTotal;
-          console.log('� Actualización crédito:', { creditSales: updateData.creditSales });
+          updateData.creditSales = (currentCashRegister.creditSales || 0) + saleTotal;
+          console.log('⏰ Actualización crédito:', { creditSales: updateData.creditSales });
           break;
           
         case 'mixed':
@@ -3331,79 +3921,87 @@ const POSSalesSystem: React.FC = () => {
           cashAmount = cashPart;
           
           if (cashPart > 0) {
-            updateData.cashSales = (currentReport.cashSales || 0) + cashPart;
-            updateData.cashInBox = (currentReport.cashInBox || currentReport.openingBalance || 0) + cashPart;
+            updateData.cashSales = (currentCashRegister.cashSales || 0) + cashPart;
+            updateData.cashInBox = (currentCashRegister.cashInBox || currentCashRegister.openingBalance || 0) + cashPart;
           }
           if (cardPart > 0) {
-            updateData.creditCardSales = (currentReport.creditCardSales || 0) + cardPart;
+            updateData.creditCardSales = (currentCashRegister.creditCardSales || 0) + cardPart;
           }
           if (transferPart > 0) {
-            updateData.digitalPayments = (currentReport.digitalPayments || 0) + transferPart;
+            updateData.digitalPayments = (currentCashRegister.digitalPayments || 0) + transferPart;
           }
           
-          if (cashPart > 0) {
-            updateData.closingBalance = updateData.cashInBox;
-          }
+          updateData.closingBalance = updateData.cashInBox || currentCashRegister.cashInBox || currentCashRegister.openingBalance || 0;
           
-          console.log('� Actualización pago mixto:', { 
-            cashPart, 
-            cardPart, 
-            transferPart, 
-            updateData 
+          console.log('🔄 Actualización pago mixto:', { 
+            cashPart, cardPart, transferPart,
+            cashSales: updateData.cashSales,
+            creditCardSales: updateData.creditCardSales,
+            digitalPayments: updateData.digitalPayments,
+            closingBalance: updateData.closingBalance
           });
+          break;
+          
+        default:
+          console.warn('⚠️ Método de pago no reconocido:', saleData.paymentMethod);
           break;
       }
 
-      // ✨ NUEVO: Crear movimiento de efectivo si es necesario
-      let newMovement = null;
-      if (cashAmount > 0) {
-        newMovement = {
-          id: `sale_${saleData.id || Date.now()}`,
-          type: 'sale_cash',
-          amount: cashAmount,
-          description: `Venta ${saleData.saleNumber} - Cliente: ${saleData.customer?.name || 'N/A'}`,
-          timestamp: saleData.timestamp || new Date(),
-          userId: saleData.cashier || user?.email || 'POS',
-          reference: saleData.saleNumber,
-          category: 'ventas',
-          urgent: false
-        };
-        
-        console.log('📝 Creando movimiento de efectivo:', newMovement);
-        
-        // Agregar el movimiento a la lista existente
-        const currentMovements = currentReport.movements || [];
-        updateData.movements = [...currentMovements, newMovement];
+      // Agregar información de la venta
+      const saleRecord = {
+        saleId: saleData.id,
+        amount: saleTotal,
+        paymentMethod: saleData.paymentMethod,
+        timestamp: new Date().toISOString(),
+        customer: saleData.customer?.name || 'Cliente General'
+      };
+
+      // Agregar a la lista de ventas del corte
+      const salesHistory = currentCashRegister.salesHistory || [];
+      salesHistory.push(saleRecord);
+      updateData.salesHistory = salesHistory;
+
+      console.log('📝 Datos finales de actualización:', updateData);
+
+      // 💾 ACTUALIZAR EN BD INTERNA
+      const updatedCashRegister = await internalDB.updateCashRegister(cashRegisterStatus.reportId, updateData);
+      console.log('✅ Corte de caja actualizado en BD interna:', updatedCashRegister);
+
+      // Actualizar estado local
+      setCashRegisterStatus(prev => ({
+        ...prev,
+        totalSales: newTotalSales,
+        cashInBox: updateData.cashInBox || prev.cashInBox,
+        closingBalance: updateData.closingBalance || prev.closingBalance
+      }));
+
+      // 🔥 SEGUNDO PLANO: Intentar sincronizar con Firebase (NO BLOQUEA)
+      try {
+        if (connectionStatus.isOnline) {
+          console.log('🌐 Sincronizando corte de caja con Firebase en segundo plano...');
+          // La sincronización se maneja automáticamente por el FirebaseSyncService
+        } else {
+          console.log('📱 Sin conexión - Firebase sync se realizará cuando se restaure la conexión');
+        }
+      } catch (firebaseError) {
+        console.warn('⚠️ Error sincronizando corte de caja con Firebase (no crítico):', firebaseError);
+        // No hacer nada - el corte ya está actualizado en BD interna
       }
 
-      // Actualizar en Firebase
-      await updateDoc(reportRef, updateData);
-      
-      console.log('✅ Corte de caja actualizado exitosamente:', updateData);
-      
-      // Mostrar confirmación
-      toast({
-        title: "💰 Venta registrada en caja",
-        description: `Venta de $${saleTotal.toLocaleString()} agregada al corte de caja`,
-      });
-      
-      // Refrescar el historial de ventas para mostrar la nueva venta
-      setTimeout(() => {
-        fetchAllSalesHistory();
-      }, 1000);
+      console.log('✅ Corte de caja actualizado exitosamente');
 
     } catch (error) {
       console.error('❌ Error actualizando corte de caja:', error);
       toast({
-        title: "❌ Error de sincronización",
-        description: "La venta se guardó pero no se pudo actualizar el corte de caja",
+        title: "❌ Error actualizando corte de caja",
+        description: "No se pudo actualizar el corte de caja, pero la venta está guardada",
         variant: "destructive"
       });
     }
   };
 
   const processSale = async () => {
-    console.log('🔄 Iniciando proceso de venta...', {
+    console.log('🔄 Iniciando proceso de venta con BD interna...', {
       cartLength: cart.length,
       customerName: customer.name,
       paymentMethod,
@@ -3508,7 +4106,6 @@ const POSSalesSystem: React.FC = () => {
       }
     }
 
-    // Para pagos con tarjeta o transferencia, no requiere monto específico
     console.log('✅ Todas las validaciones pasaron, procesando venta...');
 
     setProcessing(true);
@@ -3517,458 +4114,320 @@ const POSSalesSystem: React.FC = () => {
       const invoiceNumber = generateInvoiceNumber();
       const currentDateTime = new Date();
       
-      // 🔧 Helper para obtener fecha local en formato YYYY-MM-DD (sin UTC)
-      const getLocalDateString = (date: Date): string => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-      
-      console.log('📅 DEPURACIÓN FECHAS DE VENTA:');
-      console.log('⏰ currentDateTime:', currentDateTime.toLocaleString('es-ES'));
-      console.log('🌐 UTC ISO:', currentDateTime.toISOString().split('T')[0]);
-      console.log('📅 Local Date:', getLocalDateString(currentDateTime));
-      console.log('==========================================');
-      
-      // Limpiar datos del cliente para evitar campos undefined
-      const cleanCustomer = {
-        id: customer.id || null,
-        name: customer.name || 'Cliente General',
-        phone: customer.phone || null,
-        email: customer.email || null,
-        address: customer.address || null,
-        dni: customer.dni || null,
-        taxId: customer.taxId || null,
-        customerType: customer.customerType || 'individual',
-        creditLimit: customer.creditLimit || 0,
-        clientCode: customer.clientCode || null,
-        points: customer.points || 0,
-        totalPurchases: customer.totalPurchases || 0
-      };
-
-      // Limpiar detalles de pago
-      const cleanPaymentDetails: any = {
-        method: paymentMethod,
-        currency: 'ARS',
-        processedAt: currentDateTime.toISOString()
-      };
-
-      if (paymentMethod === 'cash') {
-        cleanPaymentDetails.receivedAmount = receivedAmount || 0;
-        cleanPaymentDetails.change = totals.change || 0;
-        cleanPaymentDetails.cashAmount = totals.total;
-      } else if (paymentMethod === 'mixed') {
-        cleanPaymentDetails.cash = receivedAmount || 0;
-        cleanPaymentDetails.card = cardAmount || 0;
-        cleanPaymentDetails.transfer = transferAmount || 0;
-        cleanPaymentDetails.totalPaid = (receivedAmount || 0) + (cardAmount || 0) + (transferAmount || 0);
-      } else if (paymentMethod === 'credit') {
-        cleanPaymentDetails.dueDate = creditDueDate || null;
-        cleanPaymentDetails.creditNotes = creditNotes || '';
-        cleanPaymentDetails.approvedBy = user?.email || 'Sistema POS';
-        cleanPaymentDetails.creditAmount = totals.total;
-        cleanPaymentDetails.creditStatus = 'pending';
-      } else if (paymentMethod === 'card') {
-        cleanPaymentDetails.cardAmount = totals.total;
-        cleanPaymentDetails.cardType = 'unknown'; // Se puede mejorar con más datos
-      } else if (paymentMethod === 'transfer') {
-        cleanPaymentDetails.transferAmount = totals.total;
-        cleanPaymentDetails.transferReference = `${invoiceNumber}-TRANSFER`;
-      }
-
-      // Crear estructura de venta mejorada
+      // Preparar estructura de venta para BD interna
       const saleData = {
-        // Identificación
-        numeroVenta: invoiceNumber,
-        saleNumber: invoiceNumber, // Mantener compatibilidad
-        id: `sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        
-        // Información temporal
-        fecha: currentDateTime,
-        timestamp: currentDateTime, // Mantener para compatibilidad
-        fechaVenta: getLocalDateString(currentDateTime), // 🔧 CORREGIDO: usar fecha local
-        horaVenta: currentDateTime.toTimeString().split(' ')[0], // HH:MM:SS
-        diaSemanaN: currentDateTime.getDay(), // 0-6
-        diaSemana: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][currentDateTime.getDay()],
-        mes: currentDateTime.getMonth() + 1,
-        año: currentDateTime.getFullYear(),
+        // Identificación básica
+        saleNumber: invoiceNumber,
+        numeroVenta: invoiceNumber, // Compatibilidad
         
         // Cliente
-        cliente: cleanCustomer,
-        
-        // Productos vendidos
-        productos: cart.map((item, index) => ({
-          id: item.product.id,
-          nombre: item.product.name,
-          categoria: getCategoryName(item.product.category),
-          categoriaId: item.product.category,
-          precio: item.product.price || 0,
-          cantidad: item.quantity,
-          descuento: item.discount || 0,
-          tipoDescuento: item.discountType || 'percentage',
-          subtotal: item.subtotal || 0,
-          notas: item.notes || '',
-          // Datos adicionales del producto
-          marca: item.product.brand || '',
-          proveedor: item.product.supplier || '',
-          codigoBarras: item.product.barcode || '',
-          descripcion: item.product.description || '',
-          precioCosto: item.product.costPrice || 0,
-          margen: item.product.margin || 0,
-          puntosRecompensa: item.product.puntosRecompensa || 0,
-          tipoRecompensa: item.product.tipoRecompensa || 'fijo',
-          orden: index + 1
-        })),
-        
-        // Resumen financiero
-        resumen: {
-          subtotal: totals.subtotal || 0,
-          descuentoGlobal: totals.globalDiscountAmount || 0,
-          tipoDescuentoGlobal: globalDiscountType,
-          valorDescuentoGlobal: globalDiscount,
-          baseImponible: totals.afterGlobalDiscount || 0,
-          impuestos: totals.tax || 0,
-          tasaImpuesto: taxRate,
-          total: totals.total || 0,
-          totalProductos: cart.length,
-          totalUnidades: cart.reduce((sum, item) => sum + item.quantity, 0)
+        customer: {
+          id: customer.id || null,
+          name: customer.name || 'Cliente',
+          phone: customer.phone || '',
+          email: customer.email || '',
+          address: customer.address || '',
+          dni: customer.dni || '',
+          clientCode: customer.clientCode || ''
         },
         
-        // Información de pago
-        pago: cleanPaymentDetails,
+        // Productos
+        items: cart.map((item, index) => ({
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            price: item.product.price || 0,
+            category: getCategoryName(item.product.category),
+            barcode: item.product.barcode || '',
+            brand: item.product.brand || '',
+            supplier: item.product.supplier || ''
+          },
+          quantity: item.quantity,
+          discount: item.discount || 0,
+          discountType: item.discountType || 'percentage',
+          subtotal: item.subtotal || 0,
+          notes: item.notes || ''
+        })),
         
-        // Estado y control
-        estado: 'completada',
-        status: 'completed', // Mantener compatibilidad
-        modo: mode || 'advanced',
+        // Totales
+        subtotal: totals.subtotal || 0,
+        discounts: totals.globalDiscountAmount || 0,
+        tax: totals.tax || 0,
+        total: totals.total || 0,
         
-        // Campo para consultas de Firestore (duplicado para compatibilidad)
+        // Pago
+        paymentMethod: paymentMethod,
+        paymentDetails: {
+          method: paymentMethod,
+          ...(paymentMethod === 'cash' && {
+            receivedAmount: receivedAmount || 0,
+            change: totals.change || 0
+          }),
+          ...(paymentMethod === 'mixed' && {
+            cash: receivedAmount || 0,
+            card: cardAmount || 0,
+            transfer: transferAmount || 0
+          }),
+          ...(paymentMethod === 'credit' && {
+            dueDate: creditDueDate,
+            notes: creditNotes || ''
+          })
+        },
+        
+        // Estado y metadata
+        status: 'completed',
+        mode: mode || 'advanced',
         reportId: cashRegisterStatus.reportId,
         cashier: user?.email || 'admin@pos.local',
+        notes: `Venta POS - ${cart.length} productos`,
         
-        // Información del turno y caja
-        turno: {
-          reporteId: cashRegisterStatus.reportId,
-          fechaApertura: cashRegisterStatus.openedAt,
-          balanceInicialTurno: cashRegisterStatus.openingBalance
-        },
-        
-        // Información del sistema
-        sistema: {
-          version: '2.0',
-          pos: true,
-          dispositivo: 'web',
-          navegador: navigator.userAgent,
-          ip: 'local', // Se puede mejorar obteniendo IP real
-          ubicacion: 'Argentina' // Se puede mejorar con geolocalización
-        },
-        
-        // Operador
-        operador: {
-          email: user?.email || 'admin@pos.local',
-          nombre: user?.email?.split('@')[0] || 'Operador POS',
-          rol: 'cajero',
-          turno: 'diurno' // Se puede calcular basado en la hora
-        },
-        
-        // Notas y observaciones
-        notas: `Venta procesada desde POS ${mode === 'advanced' ? 'avanzado' : 'básico'}. Cliente: ${customer.name}${customer.clientCode ? ` (Código: ${customer.clientCode})` : ''}. ${cart.length} productos, ${cart.reduce((sum, item) => sum + item.quantity, 0)} unidades totales.`,
-        
-        // Auditoría
-        auditoria: {
-          creadoPor: user?.email || 'sistema',
-          fechaCreacion: currentDateTime,
-          modificadoPor: null,
-          fechaModificacion: null,
-          version: 1
-        }
+        // Timestamps
+        createdAt: currentDateTime.toISOString(),
+        timestamp: currentDateTime // Compatibilidad
       };
 
-      // Preparar la venta para la interfaz (conversión de estructura para compatibilidad)
-      const saleForInterface = {
-        ...saleData,
-        // Convertir a la estructura que espera la interfaz
-        customer: saleData.cliente,
-        items: saleData.productos.map(producto => ({
-          product: {
-            id: producto.id,
-            name: producto.nombre,
-            price: producto.precio,
-            stock: 0, // No disponible en la nueva estructura
-            category: producto.categoria,
-            image: '',
-            barcode: producto.codigoBarras,
-            description: producto.descripcion,
-            brand: producto.marca,
-            supplier: producto.proveedor,
-            costPrice: producto.precioCosto,
-            margin: producto.margen,
-            puntosRecompensa: producto.puntosRecompensa,
-            tipoRecompensa: producto.tipoRecompensa
-          },
-          quantity: producto.cantidad,
-          discount: producto.descuento,
-          discountType: producto.tipoDescuento,
-          subtotal: producto.subtotal,
-          notes: producto.notas
-        })),
-        subtotal: saleData.resumen.subtotal,
-        discounts: saleData.resumen.descuentoGlobal,
-        tax: saleData.resumen.impuestos,
-        total: saleData.resumen.total,
-        paymentMethod: saleData.pago.method,
-        paymentDetails: saleData.pago,
-        status: saleData.estado === 'completada' ? 'completed' : saleData.estado,
-        timestamp: saleData.fecha,
-        cashier: saleData.operador.email,
-        mode: saleData.modo,
-        reportId: saleData.turno.reporteId,
-        notes: saleData.notas
-      } as Sale;
+      console.log('💾 Guardando venta en BD interna:', saleData);
 
-      // Intentar guardar en Firebase si hay conexión, sino guardar offline
-      const storage = OfflineStorage.getInstance();
-      
-      if (connectionStatus.isOnline) {
+      try {
+        // 🎯 PRIORIDAD 1: Guardar en BD interna (CONFIABLE)
+        const savedSale = await internalDB.createSale(saleData);
+        console.log('✅ Venta guardada en BD interna:', savedSale);
+
+        // 🔥 NUEVO: También crear la venta en el backend para descuento de stock
         try {
-          // Crear una copia para Firebase con Timestamps convertidos
-          const firebaseSaleData = {
-            ...saleData,
-            fecha: Timestamp.fromDate(currentDateTime),
-            timestamp: Timestamp.fromDate(currentDateTime),
-            'turno.fechaApertura': cashRegisterStatus.openedAt ? Timestamp.fromDate(cashRegisterStatus.openedAt) : null,
-            'auditoria.fechaCreacion': Timestamp.fromDate(currentDateTime)
-          };
-          
-          console.log('💾 Guardando venta en colección "ventas" con estructura mejorada:', {
-            numero: invoiceNumber,
-            fecha: currentDateTime.toISOString(),
-            cliente: cleanCustomer.name,
-            total: totals.total,
-            productos: cart.length,
-            turno: cashRegisterStatus.reportId
-          });
-          
-          // Guardar en la colección "ventas"
-          const docRef = await addDoc(collection(db, 'ventas'), firebaseSaleData);
-          console.log('✅ Venta guardada en colección "ventas" con ID:', docRef.id);
-          
-          // Actualizar el ID de la venta con el ID de Firebase
-          saleData.id = docRef.id;
-          
-          // Actualizar el corte de caja después de guardar la venta exitosamente
-          await updateCashRegisterAfterSale(saleForInterface);
-          
-        } catch (error) {
-          console.error('❌ Error guardando en Firebase, guardando offline:', error);
-          
-          // Si falla Firebase, guardar en cola offline con estructura mejorada
-          storage.addPendingOperation({
-            type: 'sale',
-            operation: 'create',
-            data: {
-              ...saleData,
-              syncStatus: 'pending',
-              offlineId: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              errorInfo: {
-                lastError: error.message,
-                attempts: 1,
-                createdOffline: true
-              }
+          console.log('📦 Enviando venta al backend para descuento de stock...');
+          const backendResponse = await fetch('http://localhost:3001/api/sales', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            timestamp: Date.now()
+            body: JSON.stringify({
+              items: saleData.items,
+              customer: saleData.customer,
+              subtotal: saleData.subtotal,
+              discounts: saleData.discounts,
+              tax: saleData.tax,
+              total: saleData.total,
+              payment_method: saleData.paymentMethod, // Cambiado a snake_case
+              payment_details: saleData.paymentDetails, // Cambiado a snake_case  
+              cashier: saleData.cashier,
+              notes: saleData.notes,
+              mode: saleData.mode,
+              cash_report_id: saleData.reportId // Cambiado a snake_case
+            })
           });
-          
-          updatePendingOperationsCount();
-          
-          toast({
-            title: "⚠️ Guardado offline",
-            description: "La venta se guardó localmente y se sincronizará cuando vuelva la conexión",
-            variant: "destructive"
-          });
-        }
-      } else {
-        // Modo offline: guardar en cola de sincronización
-        console.log('📴 Sin conexión - Guardando venta offline');
-        
-        const offlineId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const offlineSaleData = {
-          ...saleData,
-          id: offlineId,
-          syncStatus: 'pending',
-          offlineId: offlineId,
-          errorInfo: {
-            createdOffline: true,
-            attempts: 0
+
+          if (backendResponse.ok) {
+            const backendResult = await backendResponse.json();
+            console.log('✅ Venta procesada en backend - Stock descontado:', backendResult);
+          } else {
+            console.warn('⚠️ Error en backend, pero venta guardada localmente:', await backendResponse.text());
           }
-        };
-        
-        storage.addPendingOperation({
-          type: 'sale',
-          operation: 'create',
-          data: offlineSaleData,
-          timestamp: Date.now()
-        });
-        
-        // También actualizar el corte de caja localmente aunque esté offline
-        try {
-          await updateCashRegisterAfterSale(saleForInterface);
-        } catch (error) {
-          console.log('⚠️ No se pudo actualizar corte de caja offline:', error);
+        } catch (backendError) {
+          console.warn('⚠️ Backend no disponible, pero venta guardada localmente:', backendError);
         }
-        
-        updatePendingOperationsCount();
-        
+
+        // 🔥 NUEVO: También descontar stock directamente en Firebase
+        try {
+          console.log('📦 Descontando stock en Firebase...');
+          for (const item of saleData.items) {
+            const productRef = doc(db, 'products', item.product.id);
+            const productSnap = await getDoc(productRef);
+            
+            if (productSnap.exists()) {
+              const currentStock = productSnap.data().stock || 0;
+              const newStock = Math.max(0, currentStock - item.quantity);
+              
+              await updateDoc(productRef, {
+                stock: newStock,
+                updated_at: new Date()
+              });
+              
+              console.log(`📦 Stock actualizado en Firebase - Producto ${item.product.name}: ${currentStock} → ${newStock}`);
+              
+              // 🔥 ACTUALIZAR CACHE LOCAL INMEDIATAMENTE
+              const storage = OfflineStorage.getInstance();
+              const cachedProducts = storage.getItem<Product[]>('pos_products_cache', []);
+              const updatedProducts = cachedProducts.map(product => {
+                if (product.id === item.product.id) {
+                  return { ...product, stock: newStock };
+                }
+                return product;
+              });
+              storage.setItem('pos_products_cache', updatedProducts);
+              
+              // Actualizar estado local de productos
+              setProducts(updatedProducts);
+              console.log(`💾 Cache local actualizado - Producto ${item.product.name}: stock → ${newStock}`);
+              
+            } else {
+              console.warn(`⚠️ Producto ${item.product.id} no encontrado en Firebase`);
+            }
+          }
+          console.log('✅ Stock descontado exitosamente en Firebase');
+        } catch (firebaseError) {
+          console.error('❌ Error descontando stock en Firebase:', firebaseError);
+        }
+
+        // Mostrar éxito inmediatamente
         toast({
-          title: "📴 Venta guardada offline",
-          description: "La venta se sincronizará automáticamente cuando se restaure la conexión",
+          title: "✅ Venta procesada",
+          description: `Venta #${invoiceNumber} guardada exitosamente`,
           variant: "default"
         });
-      }
 
-      // Guardar venta en cache local independientemente del estado de conexión
-      const localSales = storage.getItem<any[]>('pos_sales_cache', []);
-      const saleForCache = {
-        ...saleData,
-        id: saleData.id || `local_${Date.now()}`,
-        syncStatus: connectionStatus.isOnline ? 'synced' : 'pending'
-      };
-      
-      localSales.unshift(saleForCache);
-      
-      // Mantener solo las últimas 500 ventas en cache
-      if (localSales.length > 500) {
-        localSales.splice(500);
-      }
-      
-      storage.setItem('pos_sales_cache', localSales);
+        // Actualizar el estado local inmediatamente
+        const saleForInterface = {
+          ...savedSale,
+          id: savedSale.id,
+          customer: savedSale.customer,
+          items: savedSale.items,
+          subtotal: savedSale.subtotal,
+          discounts: savedSale.discounts,
+          tax: savedSale.tax,
+          total: savedSale.total,
+          paymentMethod: savedSale.paymentMethod,
+          paymentDetails: savedSale.paymentDetails,
+          status: savedSale.status,
+          timestamp: new Date(savedSale.createdAt),
+          cashier: savedSale.cashier,
+          mode: savedSale.mode,
+          reportId: savedSale.reportId,
+          notes: savedSale.notes
+        } as Sale;
 
-      // Actualizar el estado local inmediatamente para mostrar en la interfaz
+        setAllSalesHistory(prev => [saleForInterface, ...prev]);
+        setRecentSales(prev => [saleForInterface, ...prev.slice(0, 49)]);
 
-      setAllSalesHistory(prev => [saleForInterface, ...prev]);
-      setRecentSales(prev => [saleForInterface, ...prev.slice(0, 49)]);
-
-      // Calcular y actualizar puntos del cliente si aplica
-      let totalPointsEarned = 0;
-      
-      // Calcular puntos por cada producto en el carrito
-      cart.forEach(item => {
-        const product = item.product;
-        if (product.puntosRecompensa && product.puntosRecompensa > 0) {
-          const productPrice = product.price || 0;
-          const quantity = item.quantity;
-          let pointsPerProduct = 0;
-          
-          if (product.tipoRecompensa === 'porcentaje') {
-            // Puntos por porcentaje del precio
-            pointsPerProduct = Math.floor((productPrice * product.puntosRecompensa) / 100);
-          } else {
-            // Puntos fijos por producto
-            pointsPerProduct = product.puntosRecompensa;
-          }
-          
-          // Multiplicar por la cantidad
-          totalPointsEarned += pointsPerProduct * quantity;
-        }
-      });
-
-      // Actualizar puntos del cliente si tiene código de cliente
-      if (customer.clientCode && totalPointsEarned > 0) {
+        // 🔥 SEGUNDO PLANO: Intentar guardar en Firebase (NO BLOQUEA)
         try {
-          const customerRef = customer.id ? doc(db, 'pos_clientes', customer.id) : null;
-          
-          if (customerRef && connectionStatus.isOnline) {
-            // Actualizar en Firebase si hay conexión
-            await updateDoc(customerRef, {
-              puntos: (customer.points || 0) + totalPointsEarned,
-              totalCompras: (customer.totalPurchases || 0) + totals.total,
-              ultimaCompra: new Date()
-            });
+          if (connectionStatus.isOnline) {
+            console.log('🌐 Intentando sincronizar con Firebase en segundo plano...');
             
-            console.log(`✅ Puntos actualizados en Firebase: +${totalPointsEarned} puntos`);
-          } else if (!connectionStatus.isOnline) {
-            // Guardar operación offline para sincronización posterior
-            storage.addPendingOperation({
-              type: 'customer',
-              operation: 'update',
-              data: {
-                id: customer.id,
-                puntos: (customer.points || 0) + totalPointsEarned,
-                totalCompras: (customer.totalPurchases || 0) + totals.total,
-                ultimaCompra: new Date()
+            // Preparar datos para Firebase
+            const firebaseSaleData = {
+              numeroVenta: invoiceNumber,
+              cliente: saleData.customer,
+              productos: saleData.items.map(item => ({
+                id: item.product.id,
+                nombre: item.product.name,
+                precio: item.product.price,
+                cantidad: item.quantity,
+                subtotal: item.subtotal
+              })),
+              resumen: {
+                subtotal: saleData.subtotal,
+                descuentoGlobal: saleData.discounts,
+                impuestos: saleData.tax,
+                total: saleData.total
               },
-              timestamp: Date.now()
-            });
+              pago: saleData.paymentDetails,
+              estado: 'completed',
+              timestamp: Timestamp.fromDate(currentDateTime),
+              reportId: saleData.reportId,
+              cashier: saleData.cashier,
+              modo: saleData.mode,
+              notas: saleData.notes
+            };
+
+            // Guardar en Firebase sin bloquear
+            const docRef = await addDoc(collection(db, 'ventas'), firebaseSaleData);
+            console.log('✅ Venta sincronizada con Firebase:', docRef.id);
             
-            console.log(`📴 Actualización de puntos guardada offline: +${totalPointsEarned} puntos`);
+            // Actualizar el ID de Firebase en la BD interna
+            await internalDB.updateSale(savedSale.id, { firebaseId: docRef.id });
+            
+          } else {
+            console.log('� Sin conexión - Firebase sync se realizará cuando se restaure la conexión');
           }
-          
-          // Actualizar cliente local
-          const updatedCustomer = {
-            ...customer,
-            points: (customer.points || 0) + totalPointsEarned,
-            totalPurchases: (customer.totalPurchases || 0) + totals.total
-          };
-          
-          setCustomer(updatedCustomer);
-          
-          // Actualizar en la lista de clientes guardados
-          setSavedCustomers(prev => prev.map(c => 
-            c.id === customer.id ? updatedCustomer : c
-          ));
-          
-          // Mostrar mensaje de puntos ganados
-          if (totalPointsEarned > 0) {
-            toast({
-              title: "🌟 ¡Puntos ganados!",
-              description: `${customer.name} ha ganado ${totalPointsEarned} puntos con esta compra. Total acumulado: ${(customer.points || 0) + totalPointsEarned} puntos`,
-            });
-          }
-          
-        } catch (error) {
-          console.error('Error updating customer points:', error);
-          toast({
-            title: "Error actualizando puntos",
-            description: "No se pudieron actualizar los puntos del cliente",
-            variant: "destructive"
-          });
+        } catch (firebaseError) {
+          console.warn('⚠️ Error sincronizando con Firebase (no crítico):', firebaseError);
+          // No hacer nada - la venta ya está guardada en BD interna
         }
-      } else if (totalPointsEarned > 0 && !customer.clientCode) {
-        // Mostrar mensaje informativo si no es cliente registrado
+
+        // 🔥 También guardar en localStorage como respaldo adicional
+        const localSalesKey = `pos_sales_${cashRegisterStatus.reportId}`;
+        const currentLocalSales = localStorage.getItem(localSalesKey);
+        let localSalesArray = [];
+        
+        if (currentLocalSales) {
+          try {
+            localSalesArray = JSON.parse(currentLocalSales);
+          } catch (error) {
+            console.warn('⚠️ Error parseando ventas locales:', error);
+            localSalesArray = [];
+          }
+        }
+        
+        localSalesArray.unshift(saleForInterface);
+        
+        // Mantener máximo 1000 ventas en localStorage
+        if (localSalesArray.length > 1000) {
+          localSalesArray = localSalesArray.slice(0, 1000);
+        }
+        
+        localStorage.setItem(localSalesKey, JSON.stringify(localSalesArray));
+        console.log(`💾 Respaldo en localStorage: ${localSalesArray.length} ventas`);
+
+        // Actualizar corte de caja
+        try {
+          await updateCashRegisterAfterSale(saleForInterface);
+          console.log('✅ Corte de caja actualizado');
+        } catch (error) {
+          console.warn('⚠️ Error actualizando corte de caja:', error);
+        }
+
+      } catch (internalDbError) {
+        console.error('❌ ERROR CRÍTICO: Fallo en BD interna:', internalDbError);
+        
+        // 🚨 FALLBACK CRÍTICO: Si falla BD interna, usar localStorage
+        const fallbackSale = {
+          ...saleData,
+          id: `fallback_${Date.now()}`,
+          fallbackMode: true,
+          error: internalDbError.message
+        };
+        
+        const fallbackKey = `fallback_sales_${cashRegisterStatus.reportId}`;
+        const fallbackSales = JSON.parse(localStorage.getItem(fallbackKey) || '[]');
+        fallbackSales.unshift(fallbackSale);
+        localStorage.setItem(fallbackKey, JSON.stringify(fallbackSales));
+        
         toast({
-          title: "ℹ️ Puntos disponibles",
-          description: `Esta compra habría generado ${totalPointsEarned} puntos. Registre al cliente para que los acumule.`,
+          title: "⚠️ Venta guardada en modo emergencia",
+          description: "La venta se guardó localmente. Contacte soporte técnico.",
+          variant: "destructive"
         });
+        
+        throw internalDbError;
       }
 
-      toast({
-        title: "🎉 ¡Venta Completada Exitosamente!",
-        description: `Factura ${invoiceNumber} registrada. Total: $${totals.total.toLocaleString('es-ES', {minimumFractionDigits: 2})}`,
-      });
+      // Limpiar carrito y resetear estado
+      setCart([]);
+      setCustomer({ name: '', phone: '', email: '', address: '', dni: '', id: '', taxId: '', customerType: 'individual', creditLimit: 0, clientCode: '', points: 0, totalPurchases: 0 });
+      setReceivedAmount(0);
+      setCardAmount(0);
+      setTransferAmount(0);
+      setCreditDueDate('');
+      setCreditNotes('');
+      setPaymentMethod('cash');
+      setGlobalDiscount(0);
+      setGlobalDiscountType('percentage');
+      setShowCustomerDialog(false);
 
-      // Mostrar modal de confirmación para imprimir factura
-      setShowPrintConfirmation(true);
-      setLastSaleData(saleForInterface);
-
-      // Refresh both recent sales and complete history
-      await Promise.all([
-        fetchRecentSales(),
-        fetchAllSalesHistory()
-      ]);
-      
-      clearSale();
+      console.log('✅ Venta procesada completamente');
 
     } catch (error) {
-      console.error('Error processing sale:', error);
+      console.error('❌ Error crítico procesando venta:', error);
+      
       toast({
-        title: "❌ Error al procesar la venta",
-        description: "Ocurrió un error al registrar la venta. Intenta nuevamente.",
+        title: "❌ Error procesando venta",
+        description: `Error: ${error.message}. Intente nuevamente.`,
         variant: "destructive"
       });
+    } finally {
+      setProcessing(false);
     }
-
-    setProcessing(false);
   };
 
   const clearSale = () => {
@@ -4306,24 +4765,26 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             }
           }}
         >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <Coffee className="h-5 w-5 text-white" />
-              </div>
-              Iniciar Turno
-            </DialogTitle>
-            <DialogDescription>
-              No hay un corte de caja activo para hoy. Para comenzar a realizar ventas, necesitas iniciar tu turno ingresando el valor inicial que tienes en caja.
-            </DialogDescription>
-          </DialogHeader>
+        <div className="fixed top-0 left-0 right-0 bottom-0 z-[99999]" style={{ position: 'fixed', zIndex: 99999 }}>
+          <div className="flex items-start justify-center pt-8 px-6 h-full overflow-y-auto">
+            <DialogContent className="max-w-xl w-full bg-white rounded-2xl shadow-2xl border-0 relative max-h-[85vh] overflow-y-auto" style={{ marginTop: '2rem' }}>
+              <DialogHeader className="text-center pb-8">
+                <DialogTitle className="flex items-center justify-center gap-4 text-2xl font-bold">
+                  <div className="p-4 bg-blue-500 rounded-2xl">
+                    <Coffee className="h-8 w-8 text-white" />
+                  </div>
+                  Iniciar Turno
+                </DialogTitle>
+                <DialogDescription className="text-lg mt-6 text-gray-600 leading-relaxed px-4">
+                  No hay un corte de caja activo para hoy. Para comenzar a realizar ventas, necesitas iniciar tu turno ingresando el valor inicial que tienes en caja.
+                </DialogDescription>
+              </DialogHeader>
           
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="opening-balance">Valor inicial de caja</Label>
+          <div className="space-y-8 px-6 pb-4">
+            <div className="space-y-4">
+              <Label htmlFor="opening-balance" className="text-lg font-semibold text-gray-800">Valor inicial de caja</Label>
               <div className="relative">
-                <DollarSign className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <DollarSign className="h-6 w-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
                   id="opening-balance"
                   type="number"
@@ -4335,39 +4796,41 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       createCashRegister();
                     }
                   }}
-                  className="pl-10"
+                  className="pl-14 h-14 text-xl border-2 border-gray-300 focus:border-blue-500 rounded-xl"
                   min="0"
                   step="0.01"
                   autoFocus
                 />
               </div>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-base text-gray-500 mt-3 leading-relaxed">
                 Ingresa el dinero en efectivo disponible al iniciar el turno
               </p>
             </div>
             
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                <div className="text-sm text-blue-800">
-                  <p className="font-medium">¿Por qué es necesario?</p>
-                  <p>El corte de caja registra todas las ventas y movimientos de dinero durante el turno.</p>
+            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+              <div className="flex items-start gap-4">
+                <AlertCircle className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
+                <div className="text-base text-blue-800">
+                  <p className="font-bold mb-2">¿Por qué es necesario?</p>
+                  <p className="leading-relaxed">El corte de caja registra todas las ventas y movimientos de dinero durante el turno.</p>
                 </div>
               </div>
             </div>
             
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-4 pt-6">
               <Button
                 onClick={createCashRegister}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 h-14 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
                 disabled={!openingBalance || parseFloat(openingBalance) < 0}
               >
-                <Rocket className="h-4 w-4 mr-2" />
+                <Rocket className="h-6 w-6 mr-3" />
                 Iniciar Turno
               </Button>
             </div>
           </div>
         </DialogContent>
+          </div>
+        </div>
       </Dialog>
       )}
 
@@ -4398,6 +4861,37 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                       <span className="text-xs text-green-700 font-medium">
                         Turno Activo
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Indicador de auto-cierre */}
+                  {cashRegisterStatus.isOpen && autoCloseStatus.timeRemaining && (
+                    <div className={`flex items-center space-x-1.5 px-2 py-0.5 rounded-md ${
+                      autoCloseStatus.shouldAutoClose 
+                        ? 'bg-red-50' 
+                        : autoCloseStatus.timeRemaining.includes('minutos') && !autoCloseStatus.timeRemaining.includes('h')
+                          ? 'bg-yellow-50'
+                          : 'bg-blue-50'
+                    }`}>
+                      <div className={`w-1.5 h-1.5 rounded-full ${
+                        autoCloseStatus.shouldAutoClose 
+                          ? 'bg-red-500 animate-pulse' 
+                          : autoCloseStatus.timeRemaining.includes('minutos') && !autoCloseStatus.timeRemaining.includes('h')
+                            ? 'bg-yellow-500 animate-pulse'
+                            : 'bg-blue-500'
+                      }`}></div>
+                      <span className={`text-xs font-medium ${
+                        autoCloseStatus.shouldAutoClose 
+                          ? 'text-red-700' 
+                          : autoCloseStatus.timeRemaining.includes('minutos') && !autoCloseStatus.timeRemaining.includes('h')
+                            ? 'text-yellow-700'
+                            : 'text-blue-700'
+                      }`}>
+                        {autoCloseStatus.shouldAutoClose 
+                          ? 'Auto-cierre pendiente' 
+                          : `Cierre en ${autoCloseStatus.timeRemaining}`
+                        }
                       </span>
                     </div>
                   )}
@@ -4531,37 +5025,16 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                 
               </Button>
 
-              {/* Botón de emergencia para cerrar modal */}
-              {showCashRegisterModal && (
-                <Button
-                  onClick={() => {
-                    console.log('🚨 EMERGENCIA - Cerrando modal forzadamente');
-                    setShowCashRegisterModal(false);
-                    setCashRegisterStatus(prev => ({
-                      ...prev,
-                      isOpen: true,
-                      reportId: 'emergency-override'
-                    }));
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="border-red-200 hover:bg-red-50 text-red-700"
-                >
-                  <X className="h-4 w-4" />
-                  Cerrar Modal
-                </Button>
-              )}
-
               {/* Botón para cerrar turno */}
               {cashRegisterStatus.isOpen && (
                 <Button
                   onClick={openCloseShiftModal}
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="border-red-200 hover:bg-red-50 text-red-700"
+                  className="h-8 px-3 text-xs border border-red-200 hover:bg-red-50 text-red-600 hover:text-red-700 transition-all duration-200"
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Cerrar Turno
+                  <LogOut className="h-3 w-3 mr-1" />
+                  Cerrar
                 </Button>
               )}
 
@@ -4597,6 +5070,21 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       await checkCashRegisterStatus();
                     }}>
                       ⚠️ Sin turno - Clic para verificar
+                    </p>
+                  )}
+                  {/* Auto-close information */}
+                  {cashRegisterStatus.isOpen && autoCloseStatus.timeRemaining && (
+                    <p className={`text-xs ${
+                      autoCloseStatus.shouldAutoClose 
+                        ? 'text-red-600 font-semibold animate-pulse' 
+                        : autoCloseStatus.timeRemaining.includes('minutos') && !autoCloseStatus.timeRemaining.includes('h')
+                          ? 'text-yellow-600 font-medium'
+                          : 'text-gray-500'
+                    }`}>
+                      {autoCloseStatus.shouldAutoClose 
+                        ? '🔴 Auto-cierre pendiente' 
+                        : `⏱️ Auto-cierre en ${autoCloseStatus.timeRemaining}`
+                      }
                     </p>
                   )}
                 </div>
@@ -5253,28 +5741,6 @@ ${totalPointsEarned > 0 && customer.clientCode ?
               ) : (
                 <div className="space-y-1">
                   {cart.map((item, index) => (
-<<<<<<< HEAD
-                    <div key={item.product.id} className="bg-white border border-gray-200 rounded p-1.5 flex items-center gap-2">
-                      <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded font-medium">#{index + 1}</span>
-                      {item.product.image && (
-                        <img src={item.product.image} alt={item.product.name} className="w-6 h-6 object-cover rounded" />
-                      )}
-                      <h4 className="font-medium text-gray-800 truncate text-xs flex-1">{item.product.name}</h4>
-                      <div className="flex items-center gap-1">
-                        <Button variant="outline" size="sm" onClick={() => updateQuantity(item.product.id, item.quantity - (item.product.tipoVenta === 'kilos' ? 0.1 : 1))} className="h-5 w-5 p-0" disabled={item.quantity <= (item.product.tipoVenta === 'kilos' ? 0.1 : 1)}>
-                          <Minus className="h-2 w-2" />
-                        </Button>
-                        <Input type="number" value={item.quantity} onChange={(e) => { const newQty = item.product.tipoVenta === 'kilos' ? parseFloat(e.target.value) || 0 : parseInt(e.target.value) || 1; if (newQty > 0 && newQty <= (item.product.stock || 0)) { updateQuantity(item.product.id, newQty); } }} className="w-10 h-5 text-center text-xs" min={item.product.tipoVenta === 'kilos' ? "0.01" : "1"} max={item.product.stock || 999} step={item.product.tipoVenta === 'kilos' ? "0.01" : "1"} />
-                        <Button variant="outline" size="sm" onClick={() => updateQuantity(item.product.id, item.quantity + (item.product.tipoVenta === 'kilos' ? 0.1 : 1))} className="h-5 w-5 p-0" disabled={item.quantity >= (item.product.stock || 0)}>
-                          <Plus className="h-2 w-2" />
-                        </Button>
-                      </div>
-                      <span className="text-xs text-gray-500">${(item.product.price || 0).toLocaleString('es-ES')}</span>
-                      <span className="font-bold text-green-600 text-xs">${(item.subtotal || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}</span>
-                      <Button variant="ghost" size="sm" onClick={() => removeFromCart(item.product.id)} className="text-red-500 hover:text-red-700 h-5 w-5 p-0">
-                        <Trash2 className="h-2.5 w-2.5" />
-                      </Button>
-=======
                     <div key={item.product.id} className="bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2 flex-1">
@@ -5396,7 +5862,6 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                           </div>
                         </div>
                       )}
->>>>>>> f30eb15 (Remove telegram-bot-server.cjs temporarily to fix security issues)
                     </div>
                   ))}
                   
@@ -6152,517 +6617,236 @@ ${totalPointsEarned > 0 && customer.clientCode ?
 
       {/* Modal de Historial Completo de Ventas */}
       <Dialog open={showSalesHistory} onOpenChange={setShowSalesHistory}>
-        <DialogContent className="sm:max-w-6xl max-h-[80vh] overflow-y-auto z-[10010]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-purple-600" />
+        <DialogContent className="w-[95vw] max-w-7xl h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col !top-[5vh] !translate-y-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <History className="h-6 w-6 text-purple-600" />
               Historial de Ventas - Turno Actual
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base">
               Gestiona y filtra las ventas realizadas durante el turno actual
             </DialogDescription>
           </DialogHeader>
           
-          {/* Filtros */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filtros de Búsqueda
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                <div>
-                  <Label htmlFor="dateFrom">Fecha Desde</Label>
-                  <Input
-                    id="dateFrom"
-                    type="date"
-                    value={salesHistoryFilter.dateFrom}
-                    onChange={(e) => setSalesHistoryFilter(prev => ({...prev, dateFrom: e.target.value}))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="dateTo">Fecha Hasta</Label>
-                  <Input
-                    id="dateTo"
-                    type="date"
-                    value={salesHistoryFilter.dateTo}
-                    onChange={(e) => setSalesHistoryFilter(prev => ({...prev, dateTo: e.target.value}))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="customer">Cliente</Label>
-                  <Input
-                    id="customer"
-                    placeholder="Nombre o código..."
-                    value={salesHistoryFilter.customer}
-                    onChange={(e) => setSalesHistoryFilter(prev => ({...prev, customer: e.target.value}))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cashier">Cajero/Vendedor</Label>
-                  <Input
-                    id="cashier"
-                    placeholder="Buscar por cajero..."
-                    value={salesHistoryFilter.cashier}
-                    onChange={(e) => setSalesHistoryFilter(prev => ({...prev, cashier: e.target.value}))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="minAmount">Monto Mínimo</Label>
-                  <Input
-                    id="minAmount"
-                    type="number"
-                    placeholder="0.00"
-                    value={salesHistoryFilter.minAmount}
-                    onChange={(e) => setSalesHistoryFilter(prev => ({...prev, minAmount: e.target.value}))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="maxAmount">Monto Máximo</Label>
-                  <Input
-                    id="maxAmount"
-                    type="number"
-                    placeholder="999999.00"
-                    value={salesHistoryFilter.maxAmount}
-                    onChange={(e) => setSalesHistoryFilter(prev => ({...prev, maxAmount: e.target.value}))}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <Button
-                  onClick={() => {
-                    console.log('🔄 Forzando recarga del historial...');
-                    fetchAllSalesHistory();
-                    toast({
-                      title: "Historial actualizado",
-                      description: "Se ha recargado el historial de ventas del turno actual"
-                    });
-                  }}
-                  variant="outline"
-                  disabled={loadingSalesHistory}
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  {loadingSalesHistory ? 'Cargando...' : 'Actualizar Ventas del Turno'}
-                </Button>
-                <Button
-                  onClick={async () => {
-                    try {
-                      console.log('🔄 Forzando sincronización completa...');
-                      
-                      // Limpiar cache local
-                      const storage = OfflineStorage.getInstance();
-                      storage.removeItem('sales_history_cache');
-                      
-                      // Recargar desde servidor
-                      setAllSalesHistory([]);
-                      await fetchAllSalesHistory();
-                      
-                      toast({
-                        title: "🔄 Sincronización forzada",
-                        description: "Se ha recargado todo el historial desde el servidor",
-                      });
-                    } catch (error) {
-                      console.error('❌ Error en sincronización forzada:', error);
-                      toast({
-                        title: "❌ Error de sincronización",
-                        description: "No se pudo sincronizar con el servidor",
-                        variant: "destructive"
-                      });
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
-                >
-                  🔄 Forzar Sincronización
-                </Button>
-                <Button
-                  onClick={async () => {
-                    try {
-                      const testQuery = query(collection(db, 'ventas'), limit(1));
-                      const testSnapshot = await getDocs(testQuery);
-                      toast({
-                        title: "Conexión exitosa",
-                        description: `Conectado a Firebase. Documentos: ${testSnapshot.docs.length}`,
-                      });
-                    } catch (error) {
-                      toast({
-                        title: "Error de conexión",
-                        description: `Error: ${error}`,
-                        variant: "destructive"
-                      });
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  🔗 Probar Conexión
-                </Button>
-                <Button
-                  onClick={async () => {
-                    try {
-                      console.log('🔍 ESTADO COMPLETO DEL TURNO:');
-                      console.log('- Turno abierto:', cashRegisterStatus.isOpen);
-                      console.log('- Report ID:', cashRegisterStatus.reportId);
-                      console.log('- Fecha apertura:', cashRegisterStatus.openedAt);
-                      console.log('- Balance inicial:', cashRegisterStatus.openingBalance);
-                      console.log('- Estado completo:', cashRegisterStatus);
-                      
-                      // Test 1: Verificar ventas por reportId
-                      if (cashRegisterStatus.reportId) {
-                        console.log('\n📋 TEST 1: Ventas por reportId');
-                        const reportQuery = query(
-                          collection(db, 'ventas'),
-                          where('reportId', '==', cashRegisterStatus.reportId)
-                        );
-                        const reportSnapshot = await getDocs(reportQuery);
-                        console.log(`Ventas encontradas con reportId ${cashRegisterStatus.reportId}:`, reportSnapshot.docs.length);
-                        reportSnapshot.docs.forEach((doc, index) => {
-                          const data = doc.data();
-                          console.log(`Venta ${index + 1}:`, {
-                            id: doc.id,
-                            reportId: data.reportId,
-                            timestamp: data.timestamp?.toDate?.() || data.timestamp,
-                            total: data.total,
-                            customer: data.customer?.name || 'Sin nombre'
-                          });
-                        });
-                      } else {
-                        console.log('❌ No hay reportId en el turno actual');
-                      }
-                      
-                      // Test 2: Verificar ventas por fecha
-                      if (cashRegisterStatus.openedAt) {
-                        console.log('\n📅 TEST 2: Ventas por fecha de apertura');
-                        const dateQuery = query(
-                          collection(db, 'ventas'),
-                          where('timestamp', '>=', cashRegisterStatus.openedAt)
-                        );
-                        const dateSnapshot = await getDocs(dateQuery);
-                        console.log(`Ventas desde ${cashRegisterStatus.openedAt}:`, dateSnapshot.docs.length);
-                        dateSnapshot.docs.forEach((doc, index) => {
-                          const data = doc.data();
-                          console.log(`Venta ${index + 1}:`, {
-                            id: doc.id,
-                            reportId: data.reportId,
-                            timestamp: data.timestamp?.toDate?.() || data.timestamp,
-                            total: data.total
-                          });
-                        });
-                      } else {
-                        console.log('❌ No hay fecha de apertura en el turno actual');
-                      }
-                      
-                      // Test 3: Verificar todas las ventas recientes
-                      console.log('\n🗂️ TEST 3: Últimas 20 ventas en total');
-                      const allQuery = query(
-                        collection(db, 'ventas'),
-                        orderBy('timestamp', 'desc'),
-                        limit(20)
-                      );
-                      const allSnapshot = await getDocs(allQuery);
-                      console.log('Últimas 20 ventas:', allSnapshot.docs.length);
-                      allSnapshot.docs.forEach((doc, index) => {
-                        const data = doc.data();
-                        console.log(`Venta ${index + 1}:`, {
-                          id: doc.id,
-                          reportId: data.reportId || 'SIN REPORTID',
-                          timestamp: data.timestamp?.toDate?.() || data.timestamp,
-                          total: data.total,
-                          customer: data.customer?.name || 'Sin nombre'
-                        });
-                      });
-
-                      // Test 4: Estado del historial local
-                      console.log('\n📦 TEST 4: Estado del historial local');
-                      console.log('allSalesHistory.length:', allSalesHistory.length);
-                      console.log('Datos locales:', allSalesHistory);
-                      
-                      toast({
-                        title: "Debug completo ejecutado",
-                        description: `Revisa la consola. Turno: ${cashRegisterStatus.isOpen ? 'ABIERTO' : 'CERRADO'}, ReportId: ${cashRegisterStatus.reportId || 'NINGUNO'}`,
-                      });
-                    } catch (error) {
-                      console.error('❌ Error en debug:', error);
-                      toast({
-                        title: "Error de debug",
-                        description: `Error: ${error}`,
-                        variant: "destructive"
-                      });
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  🔍 Debug Completo
-                </Button>
-                <Button
-                  onClick={async () => {
-                    try {
-                      console.log('🧪 SIMULANDO VENTA DE PRUEBA...');
-                      
-                      // Crear una venta de prueba simple
-                      const testSale = {
-                        saleNumber: `TEST-${Date.now()}`,
-                        customer: {
-                          name: 'Cliente de Prueba',
-                          phone: '',
-                          email: '',
-                          address: '',
-                          clientCode: ''
-                        },
-                        items: [{
-                          product: {
-                            id: 'test-product',
-                            name: 'Producto de Prueba',
-                            price: 100,
-                            stock: 10,
-                            category: 'Prueba',
-                            image: '',
-                            barcode: '',
-                            description: '',
-                            brand: '',
-                            supplier: '',
-                            costPrice: 50,
-                            margin: 50,
-                            puntosRecompensa: 0,
-                            tipoRecompensa: 'fijo'
-                          },
-                          quantity: 1,
-                          discount: 0,
-                          discountType: 'percentage',
-                          subtotal: 100,
-                          notes: ''
-                        }],
-                        subtotal: 100,
-                        discounts: 0,
-                        tax: 0,
-                        total: 100,
-                        paymentMethod: 'cash',
-                        paymentDetails: { receivedAmount: 100, change: 0 },
-                        status: 'completed',
-                        timestamp: new Date(), // Mantener Date para la interfaz
-                        cashier: 'Admin POS - Prueba',
-                        mode: 'simple',
-                        reportId: cashRegisterStatus.reportId, // Usar el reportId actual
-                        notes: 'Venta de prueba para verificar historial'
-                      };
-
-                      console.log('📄 Datos de la venta de prueba:', testSale);
-                      
-                      if (cashRegisterStatus.isOpen && cashRegisterStatus.reportId) {
-                        // Convertir timestamp a Timestamp de Firebase
-                        const firebaseTestSale = {
-                          ...testSale,
-                          timestamp: Timestamp.fromDate(testSale.timestamp)
-                        };
-                        
-                        await addDoc(collection(db, 'ventas'), firebaseTestSale);
-                        console.log('✅ Venta de prueba guardada exitosamente');
-                        
-                        // Recargar el historial después de crear la venta
-                        setTimeout(() => {
-                          fetchAllSalesHistory();
-                        }, 1000);
-                        
-                        toast({
-                          title: "Venta de prueba creada",
-                          description: `Venta guardada con reportId: ${cashRegisterStatus.reportId}`,
-                        });
-                      } else {
-                        toast({
-                          title: "Error",
-                          description: "No hay turno abierto o falta reportId",
-                          variant: "destructive"
-                        });
-                      }
-                    } catch (error) {
-                      console.error('❌ Error creando venta de prueba:', error);
-                      toast({
-                        title: "Error creando venta de prueba",
-                        description: `Error: ${error}`,
-                        variant: "destructive"
-                      });
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                >
-                  🧪 Crear Venta de Prueba
-                </Button>
-                <Button
-                  onClick={() => {
-                    setSalesHistoryFilter({
-                      dateFrom: '',
-                      dateTo: '',
-                      customer: '',
-                      cashier: '',
-                      minAmount: '',
-                      maxAmount: ''
-                    });
-                  }}
-                  variant="outline"
-                >
-                  Limpiar Filtros
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Lista de Ventas */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">
-                Ventas Encontradas: {getFilteredSalesHistory().length}
-              </h3>
-              <Badge variant="secondary" className="text-sm">
-                Total: ${getFilteredSalesHistory().reduce((sum, sale) => sum + ((sale as any).total || (sale as any).resumen?.total || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
-              </Badge>
-            </div>
-            
-            {loadingSalesHistory ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-                <p className="text-lg text-gray-600">Cargando historial de ventas...</p>
-                <p className="text-sm text-gray-500">Esto puede tardar unos segundos</p>
-              </div>
-            ) : (
-              <div className="max-h-96 overflow-y-auto space-y-2">
-                {getFilteredSalesHistory().map((sale) => (
-                <Card key={sale.id} className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <User className="h-4 w-4 text-blue-600" />
-                        <span className="font-semibold">{(sale as any).customer?.name || (sale as any).cliente?.name || 'Cliente General'}</span>
-                      </div>
-                      {((sale as any).customer?.clientCode || (sale as any).cliente?.clientCode) && (
-                        <p className="text-sm text-gray-600">Código: {(sale as any).customer?.clientCode || (sale as any).cliente?.clientCode}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Clock className="h-4 w-4 text-green-600" />
-                        <span className="text-sm">
-                          {((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt) 
-                            ? (
-                              ((sale as any).timestamp instanceof Date 
-                                ? (sale as any).timestamp.toLocaleDateString('es-ES')
-                                : new Date((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt).toLocaleDateString('es-ES')
-                              )
-                            ) : 'Fecha N/A'
-                          }
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600">
-                        {((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt)
-                          ? (
-                            ((sale as any).timestamp instanceof Date 
-                              ? (sale as any).timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-                              : new Date((sale as any).timestamp || (sale as any).fecha || (sale as any).createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-                            )
-                          ) : 'Hora N/A'
-                        }
-                      </p>
-                      {/* Información del cajero/vendedor */}
-                      <div className="flex items-center gap-1 mt-2 p-1 bg-orange-50 rounded-md border border-orange-200">
-                        <Users className="h-3 w-3 text-orange-600" />
-                        <span className="text-xs text-orange-800 font-semibold">
-                          {sale.cashier || 'Sin información'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <DollarSign className="h-4 w-4 text-purple-600" />
-                        <span className="font-bold text-lg text-green-600">
-                          ${((sale as any).total || (sale as any).resumen?.total || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={
-                          (sale as any).paymentMethod === 'cash' || (sale as any).pago?.method === 'cash' ? 'default' : 
-                          (sale as any).paymentMethod === 'card' || (sale as any).pago?.method === 'credit_card' || (sale as any).pago?.method === 'card' ? 'secondary' : 
-                          (sale as any).paymentMethod === 'transfer' || (sale as any).pago?.method === 'transfer' || (sale as any).pago?.method === 'digital' ? 'outline' : 
-                          (sale as any).paymentMethod === 'credit' || (sale as any).pago?.method === 'credit' ? 'destructive' : 'destructive'
-                        }>
-                          {((sale as any).paymentMethod === 'cash' || (sale as any).pago?.method === 'cash') ? '💵 Efectivo' : 
-                           ((sale as any).paymentMethod === 'card' || (sale as any).pago?.method === 'credit_card' || (sale as any).pago?.method === 'card') ? '💳 Tarjeta' : 
-                           ((sale as any).paymentMethod === 'transfer' || (sale as any).pago?.method === 'transfer' || (sale as any).pago?.method === 'digital') ? '🏦 Transfer.' : 
-                           ((sale as any).paymentMethod === 'credit' || (sale as any).pago?.method === 'credit') ? '⏰ Crédito' : 
-                           '🔄 Mixto'}
-                        </Badge>
-                        
-                        {/* Información adicional para créditos */}
-                        {((sale as any).paymentMethod === 'credit' || (sale as any).pago?.method === 'credit') && (sale as any).paymentDetails?.dueDate && (
-                          <Badge variant="outline" className="text-xs ml-1">
-                            Vence: {new Date((sale as any).paymentDetails.dueDate).toLocaleDateString('es-ES')}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm font-medium mb-1">
-                        📦 {((sale as any).items || (sale as any).productos || []).length} producto{((sale as any).items || (sale as any).productos || []).length !== 1 ? 's' : ''}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        🧾 {(sale as any).saleNumber || (sale as any).numero || 'N/A'}
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => printReceipt(sale)}
-                        className="mt-2 text-xs"
-                      >
-                        <Printer className="h-3 w-3 mr-1" />
-                        Reimprimir
-                      </Button>
-                    </div>
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            {/* Filtros */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filtros de Búsqueda
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+                  <div>
+                    <Label htmlFor="dateFrom" className="text-sm font-medium">Fecha Desde</Label>
+                    <Input
+                      id="dateFrom"
+                      type="date"
+                      className="mt-1"
+                      value={salesHistoryFilter.dateFrom}
+                      onChange={(e) => setSalesHistoryFilter(prev => ({...prev, dateFrom: e.target.value}))}
+                    />
                   </div>
-                  
-                  {/* Detalles expandibles */}
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <details className="text-sm">
-                      <summary className="cursor-pointer font-medium text-blue-600 hover:text-blue-800">
-                        Ver detalles de productos
-                      </summary>
-                      <div className="mt-2 space-y-1">
-                        {((sale as any).items || (sale as any).productos || []).map((item: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center py-1 px-2 bg-gray-50 rounded">
-                            <div>
-                              <span className="font-medium">{item.product?.name || item.nombre || 'Producto'}</span>
-                              <span className="text-gray-600 ml-2">× {item.quantity || item.cantidad || 1}</span>
-                            </div>
-                            <span className="font-medium">
-                              ${(item.subtotal || item.precio || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
+                  <div>
+                    <Label htmlFor="dateTo" className="text-sm font-medium">Fecha Hasta</Label>
+                    <Input
+                      id="dateTo"
+                      type="date"
+                      className="mt-1"
+                      value={salesHistoryFilter.dateTo}
+                      onChange={(e) => setSalesHistoryFilter(prev => ({...prev, dateTo: e.target.value}))}
+                    />
                   </div>
-                </Card>
-              ))}
+                  <div>
+                    <Label htmlFor="customer" className="text-sm font-medium">Cliente</Label>
+                    <Input
+                      id="customer"
+                      placeholder="Nombre o código..."
+                      className="mt-1"
+                      value={salesHistoryFilter.customer}
+                      onChange={(e) => setSalesHistoryFilter(prev => ({...prev, customer: e.target.value}))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cashier" className="text-sm font-medium">Cajero/Vendedor</Label>
+                    <Input
+                      id="cashier"
+                      placeholder="Buscar por cajero..."
+                      className="mt-1"
+                      value={salesHistoryFilter.cashier}
+                      onChange={(e) => setSalesHistoryFilter(prev => ({...prev, cashier: e.target.value}))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="minAmount" className="text-sm font-medium">Monto Mínimo</Label>
+                    <Input
+                      id="minAmount"
+                      type="number"
+                      placeholder="0.00"
+                      className="mt-1"
+                      value={salesHistoryFilter.minAmount}
+                      onChange={(e) => setSalesHistoryFilter(prev => ({...prev, minAmount: e.target.value}))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="maxAmount" className="text-sm font-medium">Monto Máximo</Label>
+                    <Input
+                      id="maxAmount"
+                      type="number"
+                      placeholder="999999.00"
+                      className="mt-1"
+                      value={salesHistoryFilter.maxAmount}
+                      onChange={(e) => setSalesHistoryFilter(prev => ({...prev, maxAmount: e.target.value}))}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-4">
+                  <Button
+                    onClick={() => {
+                      console.log('🔄 Forzando recarga del historial...');
+                      fetchAllSalesHistory();
+                      toast({
+                        title: "Historial actualizado",
+                        description: "Se ha recargado el historial de ventas del turno actual"
+                      });
+                    }}
+                    variant="outline"
+                    disabled={loadingSalesHistory}
+                    size="sm"
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    {loadingSalesHistory ? 'Cargando...' : 'Actualizar Ventas'}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setSalesHistoryFilter({
+                        dateFrom: '',
+                        dateTo: '',
+                        customer: '',
+                        cashier: '',
+                        minAmount: '',
+                        maxAmount: ''
+                      });
+                      
+                      toast({
+                        title: "🧹 Filtros Limpiados",
+                        description: "Todos los filtros han sido restablecidos",
+                      });
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                  >
+                    Limpiar Filtros
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Lista de Ventas */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h3 className="text-lg font-semibold">
+                  Ventas Encontradas: {getFilteredSalesHistory().length}
+                </h3>
+                <Badge variant="secondary" className="text-sm w-fit">
+                  Total: ${getFilteredSalesHistory().reduce((sum, sale) => sum + ((sale as any).total || (sale as any).resumen?.total || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                </Badge>
+              </div>
               
-              {getFilteredSalesHistory().length === 0 && !loadingSalesHistory && (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No se encontraron ventas en el turno actual con los filtros aplicados</p>
-                  {!cashRegisterStatus.isOpen && (
-                    <p className="text-sm mt-2 text-orange-600">
-                      ⚠️ No hay un turno abierto actualmente
-                    </p>
+              {loadingSalesHistory ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                  <p className="text-lg text-gray-600">Cargando historial de ventas...</p>
+                  <p className="text-sm text-gray-500">Esto puede tardar unos segundos</p>
+                </div>
+              ) : (
+                <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-2">
+                  {getFilteredSalesHistory().map((sale) => (
+                    <Card key={sale.id} className="p-4 hover:shadow-md transition-shadow">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Receipt className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-sm">#{(sale as any).saleNumber || (sale as any).numeroVenta || sale.id}</span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            {((sale as any).timestamp?.toDate?.() || new Date((sale as any).timestamp || sale.timestamp)).toLocaleString('es-ES', {
+                              day: '2-digit',
+                              month: '2-digit', 
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-blue-600" />
+                            <span className="font-medium text-sm">Cliente</span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            {(sale as any).customer?.name || (sale as any).cliente?.name || 'Cliente General'}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-sm">Total</span>
+                          </div>
+                          <p className="text-lg font-bold text-green-600">
+                            ${((sale as any).total || (sale as any).resumen?.total || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={(sale as any).status === 'completed' || (sale as any).estado === 'completada' ? 'default' : 'secondary'} className="text-xs">
+                              {(sale as any).status === 'completed' || (sale as any).estado === 'completada' ? 'Completada' : 'Pendiente'}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {(sale as any).paymentMethod || (sale as any).pago?.method || 'N/A'}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => printReceipt(sale)}
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 text-xs"
+                            >
+                              <Printer className="h-3 w-3 mr-1" />
+                              Imprimir
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Información adicional en móvil */}
+                      <div className="mt-3 pt-3 border-t sm:hidden">
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>Productos: {(sale as any).items?.length || (sale as any).productos?.length || 0}</span>
+                          <span>Método: {(sale as any).paymentMethod || (sale as any).pago?.method || 'N/A'}</span>
+                          <span>Cajero: {(sale as any).cashier || (sale as any).operador?.email || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                  
+                  {getFilteredSalesHistory().length === 0 && !loadingSalesHistory && (
+                    <div className="text-center py-12">
+                      <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 text-lg">No se encontraron ventas</p>
+                      <p className="text-gray-400 text-sm">Intenta ajustar los filtros o verifica que hay ventas en el turno actual</p>
+                    </div>
                   )}
                 </div>
               )}
-              </div>
-            )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

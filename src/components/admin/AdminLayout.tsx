@@ -12,6 +12,7 @@ import {
 import Sidebar from './Sidebar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import StockNotificationCenter from '@/components/notifications/StockNotificationCenter';
 import './admin-layout.css';
 
 interface AdminLayoutProps {
@@ -114,15 +115,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
           {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>
         
-        {/* Notifications */}
-        <button className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors relative">
-          <Bell className="h-5 w-5" />
-          {notificationsCount > 0 && (
-            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-              {notificationsCount}
-            </div>
-          )}
-        </button>
+        {/* Notifications de Stock */}
+        <StockNotificationCenter />
         
         {/* User Profile */}
         <div className="relative" id="user-menu-container">
