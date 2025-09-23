@@ -1,0 +1,33 @@
+directories:
+  output: dist-electron
+  buildResources: build
+appId: com.conectinggroup.pos
+productName: Conecting Group - Sistema de Gestión
+files:
+  - filter:
+      - src/**/*
+      - data/**/*
+      - uploads/**/*
+      - package.json
+      - '!node_modules/@firebase/**/*'
+      - '!node_modules/@whiskeysockets/**/*'
+      - '!node_modules/firebase/**/*'
+extraResources:
+  - from: ../dist
+    to: frontend
+    filter:
+      - '**/*'
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Conecting Group
+win:
+  target: portable
+mac:
+  target: dmg
+linux:
+  target: AppImage
+forceCodeSigning: false
+electronVersion: 25.9.8
