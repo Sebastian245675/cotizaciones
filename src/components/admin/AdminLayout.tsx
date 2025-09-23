@@ -12,6 +12,8 @@ import {
 import Sidebar from './Sidebar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import StockNotificationCenter from '@/components/notifications/StockNotificationCenter';
+import './admin-layout.css';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -113,15 +115,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
           {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>
         
-        {/* Notifications */}
-        <button className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors relative">
-          <Bell className="h-5 w-5" />
-          {notificationsCount > 0 && (
-            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-              {notificationsCount}
-            </div>
-          )}
-        </button>
+        {/* Notifications de Stock */}
+        <StockNotificationCenter />
         
         {/* User Profile */}
         <div className="relative" id="user-menu-container">
@@ -177,21 +172,22 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
     </header>
   );
 
+  // Debug para verificar el estado
+  console.log('AdminLayout - isMobile:', isMobile);
+
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="bg-slate-50 min-h-screen">
       {/* Sidebar */}
-      <div className={cn("flex-shrink-0", isMobile ? "hidden" : "block")}>
-        <Sidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          isAdmin={isAdmin}
-          isSubAdmin={isSubAdmin}
-          navigateToHome={navigateToHome}
-        />
-      </div>
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isAdmin={isAdmin}
+        isSubAdmin={isSubAdmin}
+        navigateToHome={navigateToHome}
+      />
       
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      {/* Contenido principal - SIEMPRE con margen izquierdo */}
+      <div className="admin-main-content min-h-screen">
         <Header />
         
         {/* Tab Title and Breadcrumb */}
@@ -207,7 +203,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
         </div>
         
         {/* Content Container with Scroll */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="p-6">
           <div className="max-w-full mx-auto">
             {children}
           </div>

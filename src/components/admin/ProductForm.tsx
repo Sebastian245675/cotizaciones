@@ -21,7 +21,7 @@ import {
   ShieldCheck, Award, Wand2, ChevronDown, Calendar, Clock, Filter, RefreshCw, Tags, History, 
   SlidersHorizontal, Loader2, Eye, TrendingUp, CheckCircle, Upload, WifiOff, AlertCircle,
   Settings, FileText, Palette, Star, Shield, Tag, DollarSign, Calculator, ShoppingCart,
-  ChevronUp
+  ChevronUp, Hash, BarChart3
 } from 'lucide-react';
 import { sampleProducts } from '@/data/products';
 import {
@@ -52,11 +52,15 @@ export const ProductForm: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    claveNumerica: '', // Nuevo: Clave numérica del producto
+    codigoBarras: '', // Nuevo: Código de barras del producto
     precioVenta: '', // Precio de venta (antes era price)
     precioCosto: '', // Nuevo: Precio de costo
     precioMayoreo: '', // Nuevo: Precio de mayoreo
     ganancia: 0, // Calculado automáticamente
     porcentajeGanancia: 0, // Calculado automáticamente
+    ivaAplicable: true, // Nuevo: Si aplica IVA al producto
+    tasaIva: 21, // Nuevo: Tasa de IVA específica del producto (21% por defecto)
     category: '',
     subcategory: '',  // Será "none" en la UI, pero guardamos como "" cuando no hay subcategoría
     terceraCategoria: '', // Será "none" en la UI, pero guardamos como "" cuando no hay tercera categoría
@@ -206,6 +210,37 @@ export const ProductForm: React.FC = () => {
         description: "Por favor completa los campos obligatorios: nombre, precio de venta, stock y categoría."
       });
       return;
+    }
+
+    // Validar códigos únicos
+    if (formData.claveNumerica) {
+      const duplicateClaveProduct = products.find(p => 
+        p.claveNumerica === formData.claveNumerica && 
+        (!isEditing || p.id !== editingId)
+      );
+      if (duplicateClaveProduct) {
+        toast({
+          variant: "destructive",
+          title: "Clave numérica duplicada",
+          description: `La clave numérica "${formData.claveNumerica}" ya está siendo usada por el producto "${duplicateClaveProduct.name}".`
+        });
+        return;
+      }
+    }
+
+    if (formData.codigoBarras) {
+      const duplicateCodigoProduct = products.find(p => 
+        p.codigoBarras === formData.codigoBarras && 
+        (!isEditing || p.id !== editingId)
+      );
+      if (duplicateCodigoProduct) {
+        toast({
+          variant: "destructive",
+          title: "Código de barras duplicado",
+          description: `El código de barras "${formData.codigoBarras}" ya está siendo usada por el producto "${duplicateCodigoProduct.name}".`
+        });
+        return;
+      }
     }
     
     // Verificar si se está editando un producto sin imagen
@@ -513,11 +548,15 @@ export const ProductForm: React.FC = () => {
     setFormData({
       name: product.name || '',
       description: product.description || '',
+      claveNumerica: String(product.claveNumerica || ''),
+      codigoBarras: String(product.codigoBarras || ''),
       precioVenta: String(product.precioVenta || product.price || ''), // Compatibilidad con productos antiguos
       precioCosto: String(product.precioCosto || ''),
       precioMayoreo: String(product.precioMayoreo || ''),
       ganancia: product.ganancia || 0,
       porcentajeGanancia: product.porcentajeGanancia || 0,
+      ivaAplicable: product.ivaAplicable !== undefined ? product.ivaAplicable : true,
+      tasaIva: product.tasaIva || 21,
       category: product.category || '',
       subcategory: product.subcategory || '',
       terceraCategoria: product.terceraCategoria || '',
@@ -660,11 +699,15 @@ export const ProductForm: React.FC = () => {
     setFormData({
       name: '',
       description: '',
+      claveNumerica: '',
+      codigoBarras: '',
       precioVenta: '',
       precioCosto: '',
       precioMayoreo: '',
       ganancia: 0,
       porcentajeGanancia: 0,
+      ivaAplicable: true,
+      tasaIva: 21,
       category: '',
       subcategory: '',
       terceraCategoria: '',
@@ -774,6 +817,8 @@ export const ProductForm: React.FC = () => {
         (product.name && product.name.toLowerCase().includes(lowercasedTerm)) || 
         (product.description && product.description.toLowerCase().includes(lowercasedTerm)) ||
         (product.category && product.category.toLowerCase().includes(lowercasedTerm)) ||
+        (product.claveNumerica && product.claveNumerica.toLowerCase().includes(lowercasedTerm)) ||
+        (product.codigoBarras && product.codigoBarras.toLowerCase().includes(lowercasedTerm)) ||
         (product.precioVenta && String(product.precioVenta).includes(lowercasedTerm)) ||
         (product.price && String(product.price).includes(lowercasedTerm)) // Compatibilidad con productos antiguos
       );
@@ -1268,9 +1313,9 @@ export const ProductForm: React.FC = () => {
 
     // Campos a comparar
     const fieldsToCompare = [
-      'name', 'description', 'precioVenta', 'precioCosto', 'precioMayoreo', 
+      'name', 'description', 'claveNumerica', 'codigoBarras', 'precioVenta', 'precioCosto', 'precioMayoreo', 
       'stock', 'category', 'subcategory', 'terceraCategoria', 'isOffer', 
-      'discount', 'originalPrice', 'habilitarEcommerce', 'tipoVenta'
+      'discount', 'originalPrice', 'habilitarEcommerce', 'tipoVenta', 'ivaAplicable', 'tasaIva'
     ];
 
     fieldsToCompare.forEach(field => {
@@ -1309,6 +1354,8 @@ export const ProductForm: React.FC = () => {
     const fieldNames: {[key: string]: string} = {
       name: 'Nombre',
       description: 'Descripción',
+      claveNumerica: 'Clave Numérica',
+      codigoBarras: 'Código de Barras',
       precioVenta: 'Precio de Venta',
       precioCosto: 'Precio de Costo',
       precioMayoreo: 'Precio de Mayoreo',
@@ -1321,6 +1368,8 @@ export const ProductForm: React.FC = () => {
       originalPrice: 'Precio Original',
       habilitarEcommerce: 'Habilitado para Ecommerce',
       tipoVenta: 'Tipo de Venta',
+      ivaAplicable: 'IVA Aplicable',
+      tasaIva: 'Tasa de IVA',
       benefits: 'Beneficios',
       warranties: 'Garantías',
       paymentMethods: 'Métodos de Pago'
@@ -1336,7 +1385,7 @@ export const ProductForm: React.FC = () => {
       return typeof value === 'number' ? `$${value.toLocaleString()}` : `$${value}`;
     }
     
-    if (field === 'isOffer') {
+    if (field === 'isOffer' || field === 'ivaAplicable') {
       return value ? 'Sí' : 'No';
     }
     
@@ -1347,6 +1396,11 @@ export const ProductForm: React.FC = () => {
     if (field === 'tipoVenta') {
       const types = { unidad: 'Por Unidad', granel: 'A Granel', paquete: 'Por Paquete', kilos: 'Por Kilos' };
       return types[value as keyof typeof types] || value;
+    }
+
+    if (field === 'tasaIva') {
+      const numValue = parseFloat(value);
+      return `${numValue.toFixed(1)}%`;
     }
     
     return String(value);
@@ -1458,11 +1512,15 @@ export const ProductForm: React.FC = () => {
               setFormData({
                 name: '',
                 description: '',
+                claveNumerica: '',
+                codigoBarras: '',
                 precioVenta: '',
                 precioCosto: '',
                 precioMayoreo: '',
                 ganancia: 0,
                 porcentajeGanancia: 0,
+                ivaAplicable: true,
+                tasaIva: 21,
                 category: '',
                 subcategory: '',
                 terceraCategoria: '',
@@ -1553,11 +1611,15 @@ export const ProductForm: React.FC = () => {
                     setFormData({
                       name: '',
                       description: '',
+                      claveNumerica: '',
+                      codigoBarras: '',
                       precioVenta: '',
                       precioCosto: '',
                       precioMayoreo: '',
                       ganancia: 0,
                       porcentajeGanancia: 0,
+                      ivaAplicable: true,
+                      tasaIva: 21,
                       category: '',
                       subcategory: '',
                       terceraCategoria: '',
@@ -1827,6 +1889,43 @@ export const ProductForm: React.FC = () => {
                       required
                       className="h-12 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
+                  </div>
+
+                  {/* Clave numérica y código de barras */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Clave numérica */}
+                    <div className="space-y-3">
+                      <Label htmlFor="claveNumerica" className="text-base font-semibold text-gray-700 flex items-center gap-2">
+                        <Hash className="h-4 w-4 text-purple-600" />
+                        Clave Numérica
+                      </Label>
+                      <Input
+                        id="claveNumerica"
+                        type="text"
+                        value={formData.claveNumerica}
+                        onChange={(e) => setFormData({...formData, claveNumerica: e.target.value})}
+                        placeholder="Ej: 001234"
+                        className="h-12 text-base border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                      />
+                      <p className="text-xs text-gray-500">Código numérico único para identificar el producto</p>
+                    </div>
+
+                    {/* Código de barras */}
+                    <div className="space-y-3">
+                      <Label htmlFor="codigoBarras" className="text-base font-semibold text-gray-700 flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-indigo-600" />
+                        Código de Barras
+                      </Label>
+                      <Input
+                        id="codigoBarras"
+                        type="text"
+                        value={formData.codigoBarras}
+                        onChange={(e) => setFormData({...formData, codigoBarras: e.target.value})}
+                        placeholder="Ej: 7891234567890"
+                        className="h-12 text-base border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                      <p className="text-xs text-gray-500">Código de barras del producto (EAN-13, UPC, etc.)</p>
+                    </div>
                   </div>
 
                   {/* Precio de venta */}
@@ -2148,6 +2247,95 @@ export const ProductForm: React.FC = () => {
                         />
                       </div>
                     </div>
+                  </div>
+                </details>
+
+                {/* Configuración de IVA */}
+                <details className="group border border-gray-300 rounded-xl shadow-sm">
+                  <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <Calculator className="h-5 w-5 text-red-600" />
+                      <span className="text-base font-semibold text-gray-800">Configuración de IVA</span>
+                    </div>
+                    <ChevronDown className="h-5 w-5 text-gray-400 group-open:rotate-180 transition-transform" />
+                  </summary>
+                  <div className="p-4 pt-0 space-y-6">
+                    {/* Switch para aplicar IVA */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-gray-800">¿Este producto tiene IVA?</Label>
+                        <p className="text-xs text-gray-600">Activa esta opción si el producto debe incluir IVA en su precio</p>
+                      </div>
+                      <Switch
+                        checked={formData.ivaAplicable}
+                        onCheckedChange={(checked) => setFormData({...formData, ivaAplicable: checked})}
+                        className="data-[state=checked]:bg-red-600"
+                      />
+                    </div>
+                    
+                    {/* Tasa de IVA - Solo visible si IVA está activado */}
+                    {formData.ivaAplicable && (
+                      <div className="space-y-3">
+                        <Label htmlFor="tasaIva" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <span className="text-red-600">%</span>
+                          Tasa de IVA
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="tasaIva"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={formData.tasaIva}
+                            onChange={(e) => setFormData({...formData, tasaIva: parseFloat(e.target.value) || 0})}
+                            placeholder="Ej: 21"
+                            className="h-11 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                          />
+                          <div className="flex gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFormData({...formData, tasaIva: 0})}
+                              className="h-11 px-3 text-xs border-gray-300 hover:bg-gray-50"
+                            >
+                              0%
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFormData({...formData, tasaIva: 10.5})}
+                              className="h-11 px-3 text-xs border-gray-300 hover:bg-gray-50"
+                            >
+                              10.5%
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFormData({...formData, tasaIva: 21})}
+                              className="h-11 px-3 text-xs border-gray-300 hover:bg-gray-50"
+                            >
+                              21%
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFormData({...formData, tasaIva: 27})}
+                              className="h-11 px-3 text-xs border-gray-300 hover:bg-gray-50"
+                            >
+                              27%
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Ingresa cualquier porcentaje de IVA personalizado o usa los botones para tasas comunes
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </details>
 
@@ -2713,7 +2901,7 @@ export const ProductForm: React.FC = () => {
                 <Search className="h-4 w-4 text-gray-400" />
               </div>
               <Input 
-                placeholder="Buscar productos disponibles en ecommerce..." 
+                placeholder="Buscar por nombre, descripción, categoría, clave numérica o código de barras..." 
                 className="pl-10 pr-10 h-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -2920,6 +3108,44 @@ export const ProductForm: React.FC = () => {
                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
                             <span className="text-xs opacity-60 mr-1">→</span>
                             {product.subcategoryName}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Códigos de identificación */}
+                      {(product.claveNumerica || product.codigoBarras) && (
+                        <div className="flex flex-wrap gap-2">
+                          {product.claveNumerica && (
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 font-medium text-xs">
+                              <Hash className="h-3 w-3 mr-1" />
+                              Clave: {product.claveNumerica}
+                            </Badge>
+                          )}
+                          {product.codigoBarras && (
+                            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 font-medium text-xs">
+                              <BarChart3 className="h-3 w-3 mr-1" />
+                              Código: {product.codigoBarras}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Configuración de IVA */}
+                      <div className="flex flex-wrap gap-2">
+                        {product.ivaAplicable !== undefined && (
+                          <Badge 
+                            variant="outline" 
+                            className={`font-medium text-xs ${
+                              product.ivaAplicable 
+                                ? 'bg-red-50 text-red-700 border-red-200' 
+                                : 'bg-gray-50 text-gray-700 border-gray-200'
+                            }`}
+                          >
+                            <Calculator className="h-3 w-3 mr-1" />
+                            {product.ivaAplicable 
+                              ? `IVA ${(product.tasaIva || 21).toFixed(1)}%` 
+                              : 'Sin IVA'
+                            }
                           </Badge>
                         )}
                       </div>

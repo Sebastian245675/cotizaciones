@@ -304,17 +304,17 @@ export const useQuoteExport = () => {
       // Nota: jsPDF soporta fuentes limitadas, pero podemos usar diferentes estilos y tamaños creativamente
 
       // === HEADER CORPORATIVO ULTRA PROFESIONAL ===
-      // Gradiente de fondo superior
-      doc.setFillColor(15, 23, 42); // Azul muy oscuro
+      // Gradiente de fondo superior en grises
+      doc.setFillColor(70, 70, 70); // Gris muy oscuro
       doc.rect(0, 0, pageWidth, 8, 'F');
       
-      doc.setFillColor(30, 58, 138); // Azul oscuro
+      doc.setFillColor(120, 120, 120); // Gris oscuro
       doc.rect(0, 8, pageWidth, 6, 'F');
       
-      doc.setFillColor(59, 130, 246); // Azul vibrante
+      doc.setFillColor(180, 180, 180); // Gris medio
       doc.rect(0, 14, pageWidth, 4, 'F');
       
-      doc.setFillColor(147, 197, 253); // Azul claro
+      doc.setFillColor(220, 220, 220); // Gris claro
       doc.rect(0, 18, pageWidth, 2, 'F');
 
       // Header principal con degradado visual
@@ -380,7 +380,7 @@ export const useQuoteExport = () => {
       const contactX = pageWidth - margin - 50; // Posición del contacto
       
       // Fondo para info de contacto
-      doc.setFillColor(30, 58, 138);
+      doc.setFillColor(120, 120, 120); // Gris oscuro
       doc.rect(contactX - 2, 26, 52, 22, 'F');
       
       doc.setTextColor(255, 255, 255);
@@ -407,10 +407,10 @@ export const useQuoteExport = () => {
 
       // === TÍTULO PRINCIPAL ESPECTACULAR ===
       // Fondo degradado para el título
-      doc.setFillColor(15, 23, 42);
+      doc.setFillColor(60, 60, 60); // Gris muy oscuro
       doc.rect(margin - 5, yPosition - 5, pageWidth - (margin * 2) + 10, 25, 'F');
       
-      doc.setFillColor(30, 58, 138);
+      doc.setFillColor(120, 120, 120); // Gris oscuro
       doc.rect(margin - 3, yPosition - 3, pageWidth - (margin * 2) + 6, 21, 'F');
       
       doc.setTextColor(255, 255, 255);
@@ -449,10 +449,10 @@ export const useQuoteExport = () => {
 
       // Sección izquierda - Info de cotización
       // === SECCIÓN IZQUIERDA - INFORMACIÓN DE COTIZACIÓN ===
-      doc.setFillColor(30, 58, 138);
+      doc.setFillColor(220, 220, 220); // Gris claro
       doc.rect(margin, yPosition, (pageWidth - (margin * 2)) / 2, 40, 'F');
       
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(60, 60, 60); // Texto gris oscuro
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('DATOS DE COTIZACIÓN', margin + 8, yPosition + 10);
@@ -538,15 +538,15 @@ export const useQuoteExport = () => {
 
       // Línea divisoria vertical estilizada
       const centerX = pageWidth / 2;
-      doc.setDrawColor(59, 130, 246);
+      doc.setDrawColor(180, 180, 180); // Línea gris
       doc.setLineWidth(1);
       doc.line(centerX, yPosition, centerX, yPosition + 65);
 
       // === COLUMNA IZQUIERDA - DATOS PRINCIPALES ===
-      doc.setFillColor(30, 58, 138);
+      doc.setFillColor(250, 250, 250); // Gris muy claro
       doc.rect(margin, yPosition, centerX - margin, 25, 'F');
       
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(60, 60, 60); // Texto gris oscuro
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('INFORMACION CORPORATIVA', margin + 10, yPosition + 12);
@@ -633,16 +633,16 @@ export const useQuoteExport = () => {
       yPosition = 20;
 
       // Header estilizado para segunda página
-      doc.setFillColor(15, 23, 42);
+      doc.setFillColor(70, 70, 70); // Gris muy oscuro
       doc.rect(0, 0, pageWidth, 8, 'F');
       
-      doc.setFillColor(30, 58, 138);
+      doc.setFillColor(120, 120, 120); // Gris oscuro
       doc.rect(0, 8, pageWidth, 6, 'F');
       
-      doc.setFillColor(59, 130, 246);
+      doc.setFillColor(180, 180, 180); // Gris medio
       doc.rect(0, 14, pageWidth, 4, 'F');
       
-      doc.setFillColor(147, 197, 253);
+      doc.setFillColor(220, 220, 220); // Gris claro
       doc.rect(0, 18, pageWidth, 2, 'F');
       
       doc.setFillColor(248, 250, 252);
@@ -684,7 +684,7 @@ export const useQuoteExport = () => {
       doc.setFillColor(15, 23, 42);
       doc.rect(margin - 5, yPosition - 5, pageWidth - (margin * 2) + 10, 22, 'F');
       
-      doc.setFillColor(30, 58, 138);
+      doc.setFillColor(120, 120, 120); // Gris oscuro
       doc.rect(margin - 3, yPosition - 3, pageWidth - (margin * 2) + 6, 18, 'F');
       
       doc.setTextColor(255, 255, 255);

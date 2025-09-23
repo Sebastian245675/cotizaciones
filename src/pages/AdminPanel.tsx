@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import '@/components/admin/admin-layout.css'; // Importar CSS para admin-main-content
 import { 
   Users, 
   Package, 
@@ -96,7 +97,7 @@ import { CashRegisterSystem } from '@/components/admin/AdvancedCashSystem';
 import { POSSubAccountsManager } from '@/components/admin/POSSubAccountsManager';
 import POSSalesSystem from '@/components/admin/POSSalesSystem';
 import POSInventoryManager from '@/components/admin/POSInventoryManager';
-import WhatsAppIntegration from '@/components/WhatsAppSimple';
+import WhatsAppIntegration from '@/components/WhatsAppIA';
 import QuotesManager from '@/components/admin/QuotesManager';
 import QuotesDashboard from '@/components/admin/QuotesDashboard';
 import POSReports from '@/components/admin/POSReports';
@@ -136,6 +137,9 @@ export const AdminPanel: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showFullScreenSettings, setShowFullScreenSettings] = useState(false);
+  // Admin presence/status (activo, inactivo, ocupado)
+  const [adminStatus, setAdminStatus] = useState<'activo' | 'inactivo' | 'ocupado'>('activo');
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
 
   console.log('AdminPanel rendered, user:', user);
 
@@ -190,24 +194,24 @@ export const AdminPanel: React.FC = () => {
   
   // Efecto para controlar el tiempo de sesión
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      const now = new Date();
-      const diff = now.getTime() - sessionStart.getTime();
-      
-      // Calcular horas, minutos y segundos
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      
-      // Formatear el tiempo en formato HH:MM:SS
-      const formattedHours = hours.toString().padStart(2, '0');
-      const formattedMinutes = minutes.toString().padStart(2, '0');
-      const formattedSeconds = seconds.toString().padStart(2, '0');
-      
-      setSessionTime(`${formattedHours}:${formattedMinutes}:${formattedSeconds}`);
-    }, 1000);
+    // const intervalId = setInterval(() => {
+    //   const now = new Date();
+    //   const diff = now.getTime() - sessionStart.getTime();
+    //   
+    //   // Calcular horas, minutos y segundos
+    //   const hours = Math.floor(diff / (1000 * 60 * 60));
+    //   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    //   const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    //   
+    //   // Formatear el tiempo en formato HH:MM:SS
+    //   const formattedHours = hours.toString().padStart(2, '0');
+    //   const formattedMinutes = minutes.toString().padStart(2, '0');
+    //   const formattedSeconds = seconds.toString().padStart(2, '0');
+    //   
+    //   setSessionTime(`${formattedHours}:${formattedMinutes}:${formattedSeconds}`);
+    // }, 1000);
     
-    return () => clearInterval(intervalId);
+    return () => {}; // clearInterval(intervalId);
   }, [sessionStart]);
 
   useEffect(() => {
@@ -774,13 +778,92 @@ export const AdminPanel: React.FC = () => {
                 <Settings className="h-4 w-4 text-slate-600" />
               </button>
 
-              {/* User Badge - Third (sin fondo gradient) */}
-              <div className="flex items-center space-x-2 text-slate-700">
-                <span className="text-lg">{isAdmin ? "👑" : "🔑"}</span>
+              {/* User Badge - Third (sin fondo gradient) with status menu */}
+              <div className="flex items-center space-x-3 text-slate-700 relative">
+                <button
+                  className="flex items-center space-x-2 p-1 rounded hover:bg-slate-100 transition"
+                  onClick={() => setShowStatusMenu(prev => !prev)}
+                  title={isAdmin ? 'Administrador' : 'Sub-admin'}
+                >
+                  {/* Admin icon instead of crown */}
+                  <Shield className="h-5 w-5 text-slate-700" />
+                  {/* Status dot */}
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full border ${adminStatus === 'activo' ? 'bg-green-500 border-white' : adminStatus === 'ocupado' ? 'bg-yellow-500 border-white' : 'bg-gray-400 border-white'}`}
+                    aria-hidden
+                  />
+                </button>
+
                 <div className="text-right">
-                  <p className="text-xs font-medium text-slate-600">{isAdmin ? "Administrador" : "Sub-admin"}</p>
+                  <p className="text-xs font-medium text-slate-600">{isAdmin ? 'Administrador' : 'Sub-admin'}</p>
                   <p className="text-sm font-bold text-slate-900">{user?.name}</p>
                 </div>
+
+                {/* Status menu */}
+                {showStatusMenu && (
+                  <div className="absolute right-0 top-10 w-44 bg-white rounded-lg shadow-lg z-50 border border-slate-200 overflow-hidden">
+                    <div className="p-2">
+                      <p className="text-xs text-slate-500 mb-1">Estado</p>
+                      <button
+                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-50 flex items-center space-x-2"
+                        onClick={async () => {
+                          setAdminStatus('activo');
+                          setShowStatusMenu(false);
+                          try {
+                            if (user?.uid) {
+                              await setDoc(doc(db, 'users', user.uid), { adminStatus: 'activo' }, { merge: true });
+                              toast({ title: 'Estado actualizado', description: 'Ahora estás ACTIVO' });
+                            }
+                          } catch (e) {
+                            console.error('Error actualizando estado:', e);
+                            toast({ title: 'Error', description: 'No se pudo actualizar el estado' });
+                          }
+                        }}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block mr-2" />
+                        <span>Activo</span>
+                      </button>
+                      <button
+                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-50 flex items-center space-x-2"
+                        onClick={async () => {
+                          setAdminStatus('ocupado');
+                          setShowStatusMenu(false);
+                          try {
+                            if (user?.uid) {
+                              await setDoc(doc(db, 'users', user.uid), { adminStatus: 'ocupado' }, { merge: true });
+                              toast({ title: 'Estado actualizado', description: 'Ahora estás OCUPADO' });
+                            }
+                          } catch (e) {
+                            console.error('Error actualizando estado:', e);
+                            toast({ title: 'Error', description: 'No se pudo actualizar el estado' });
+                          }
+                        }}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block mr-2" />
+                        <span>Ocupado</span>
+                      </button>
+                      <button
+                        className="w-full text-left px-2 py-1 rounded hover:bg-slate-50 flex items-center space-x-2"
+                        onClick={async () => {
+                          setAdminStatus('inactivo');
+                          setShowStatusMenu(false);
+                          try {
+                            if (user?.uid) {
+                              await setDoc(doc(db, 'users', user.uid), { adminStatus: 'inactivo' }, { merge: true });
+                              toast({ title: 'Estado actualizado', description: 'Ahora estás INACTIVO' });
+                            }
+                          } catch (e) {
+                            console.error('Error actualizando estado:', e);
+                            toast({ title: 'Error', description: 'No se pudo actualizar el estado' });
+                          }
+                        }}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block mr-2" />
+                        <span>Inactivo</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -800,7 +883,7 @@ export const AdminPanel: React.FC = () => {
         />
         
         {/* Main content area */}
-        <div className="flex-1 p-4 md:p-6 overflow-auto">
+        <div className="admin-main-content flex-1 p-4 md:p-6 overflow-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
             {/* Hidden tabs list for state management - visual only */}
             <TabsList className="hidden">
@@ -3050,320 +3133,269 @@ export const AdminPanel: React.FC = () => {
 
       {/* Full Screen Settings */}
       {showFullScreenSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center">
-                  <Settings className="h-7 w-7 mr-3" />
-                  Configuraciones del Sistema
-                </h2>
-                <p className="text-slate-300 mt-1">Administra todas las opciones y configuraciones del sistema</p>
+        <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col">
+          {/* Professional Header Bar */}
+          <div className="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-lg">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-slate-700 rounded-lg">
+                  <Settings className="h-6 w-6 text-slate-200" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-white">Configuraciones del Sistema</h1>
+                  <p className="text-sm text-slate-400">Panel de administración y configuración avanzada</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="text-right">
+                <p className="text-sm text-slate-300">Administrador</p>
+                <p className="text-xs text-slate-400">{user?.email}</p>
               </div>
               <button
                 onClick={closeFullScreenSettings}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-300 hover:text-white"
+                title="Cerrar configuraciones"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               </button>
             </div>
+          </div>
 
-            {/* Content */}
-            <div className="flex h-full">
-              {/* Sidebar Navigation */}
-              <div className="w-80 bg-slate-50 border-r border-slate-200 overflow-y-auto">
-                <div className="p-6">
-                  {/* Mode Selection - Highlighted */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
-                      <Crown className="h-5 w-5 mr-2 text-amber-500" />
-                      Selección de Modo
-                    </h3>
-                    <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-4 text-white shadow-lg">
-                      <h4 className="font-semibold mb-2">Modo Actual: {saasConfig?.businessType || 'No configurado'}</h4>
-                      <p className="text-sm text-blue-100 mb-3">Cambia el modo de operación del sistema</p>
-                      <button
-                        onClick={() => {
-                          closeFullScreenSettings();
-                          openModeSelection();
-                        }}
-                        className="w-full bg-white text-blue-600 py-2 px-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-                      >
-                        Cambiar Modo
-                      </button>
+          {/* Main Content Area */}
+          <div className="flex flex-1 bg-slate-50 overflow-hidden">
+            {/* Professional Sidebar */}
+            <div className="w-80 bg-white border-r border-slate-200 shadow-sm">
+              <div className="p-6 border-b border-slate-100">
+                <h2 className="text-lg font-semibold text-slate-800">Categorías</h2>
+                <p className="text-sm text-slate-500 mt-1">Selecciona una categoría para configurar</p>
+              </div>
+              
+              <div className="p-4 space-y-3 overflow-y-auto h-full">
+                {/* Mode Selection - Priority */}
+                <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-slate-800 mb-3 flex items-center">
+                    <Shield className="h-5 w-5 mr-2 text-blue-600" />
+                    Modo de Operación
+                  </h3>
+                  <div className="bg-white border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm font-medium text-slate-700">Actual: {saasConfig?.businessType || 'No configurado'}</p>
+                    <p className="text-xs text-slate-500 mt-1">Sistema de comercio configurado</p>
+                    <button
+                      onClick={() => {
+                        closeFullScreenSettings();
+                        openModeSelection();
+                      }}
+                      className="mt-3 w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      Cambiar Configuración
+                    </button>
+                  </div>
+                </div>
+
+                {/* System Categories */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                    <div className="flex items-center">
+                      <Smartphone className="h-5 w-5 mr-3 text-slate-600" />
+                      <div>
+                        <p className="font-medium text-slate-800">Dispositivos</p>
+                        <p className="text-xs text-slate-500">Pantallas, impresoras, hardware</p>
+                      </div>
                     </div>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   </div>
 
-                  {/* Other Categories */}
-                  <div className="space-y-4">
-                    {/* Devices */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <Smartphone className="h-5 w-5 mr-2 text-blue-500" />
-                        Dispositivos
-                      </h4>
-                      <p className="text-sm text-slate-600">Gestión de pantallas, impresoras y periféricos</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Monitor className="h-4 w-4 mr-2" />
-                          Configurar pantallas
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Printer className="h-4 w-4 mr-2" />
-                          Gestionar impresoras
-                        </div>
+                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                    <div className="flex items-center">
+                      <Network className="h-5 w-5 mr-3 text-slate-600" />
+                      <div>
+                        <p className="font-medium text-slate-800">Conectividad</p>
+                        <p className="text-xs text-slate-500">Red, internet, comunicaciones</p>
                       </div>
                     </div>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  </div>
 
-                    {/* Connectivity */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <Wifi className="h-5 w-5 mr-2 text-purple-500" />
-                        Conectividad
-                      </h4>
-                      <p className="text-sm text-slate-600">Configuración de red e internet</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Network className="h-4 w-4 mr-2" />
-                          Red local
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Globe className="h-4 w-4 mr-2" />
-                          Conexión a internet
-                        </div>
+                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                    <div className="flex items-center">
+                      <Shield className="h-5 w-5 mr-3 text-slate-600" />
+                      <div>
+                        <p className="font-medium text-slate-800">Seguridad</p>
+                        <p className="text-xs text-slate-500">Usuarios, permisos, accesos</p>
                       </div>
                     </div>
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  </div>
 
-                    {/* Storage */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <HardDrive className="h-5 w-5 mr-2 text-orange-500" />
-                        Almacenamiento
-                      </h4>
-                      <p className="text-sm text-slate-600">Gestión de datos y backup</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <HardDrive className="h-4 w-4 mr-2" />
-                          Backup automático
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Archive className="h-4 w-4 mr-2" />
-                          Limpieza de datos
-                        </div>
+                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                    <div className="flex items-center">
+                      <HardDrive className="h-5 w-5 mr-3 text-slate-600" />
+                      <div>
+                        <p className="font-medium text-slate-800">Almacenamiento</p>
+                        <p className="text-xs text-slate-500">Datos, backups, archivos</p>
                       </div>
                     </div>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  </div>
 
-                    {/* Billing */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <Calculator className="h-5 w-5 mr-2 text-red-500" />
-                        Facturación
-                      </h4>
-                      <p className="text-sm text-slate-600">Configuración de documentos fiscales</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Formatos de factura
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Receipt className="h-4 w-4 mr-2" />
-                          Numeración fiscal
-                        </div>
+                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                    <div className="flex items-center">
+                      <BarChart3 className="h-5 w-5 mr-3 text-slate-600" />
+                      <div>
+                        <p className="font-medium text-slate-800">Reportes</p>
+                        <p className="text-xs text-slate-500">Analytics, estadísticas</p>
                       </div>
                     </div>
-
-                    {/* Modules */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <Package className="h-5 w-5 mr-2 text-indigo-500" />
-                        Módulos
-                      </h4>
-                      <p className="text-sm text-slate-600">Activar/desactivar funcionalidades</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Zap className="h-4 w-4 mr-2" />
-                          Módulos activos
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Package className="h-4 w-4 mr-2" />
-                          Extensiones disponibles
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Special Configurations */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <Wrench className="h-5 w-5 mr-2 text-teal-500" />
-                        Configuraciones Especiales
-                      </h4>
-                      <p className="text-sm text-slate-600">Opciones avanzadas del sistema</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Shield className="h-4 w-4 mr-2" />
-                          Seguridad avanzada
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Lock className="h-4 w-4 mr-2" />
-                          Permisos de usuario
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SEO */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <Target className="h-5 w-5 mr-2 text-pink-500" />
-                        SEO y Posicionamiento
-                      </h4>
-                      <p className="text-sm text-slate-600">Optimización para motores de búsqueda</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Globe className="h-4 w-4 mr-2" />
-                          Configuración SEO
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Target className="h-4 w-4 mr-2" />
-                          Analytics
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Support */}
-                    <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer">
-                      <h4 className="font-semibold text-slate-800 flex items-center mb-2">
-                        <Headphones className="h-5 w-5 mr-2 text-emerald-500" />
-                        Soporte
-                      </h4>
-                      <p className="text-sm text-slate-600">Ayuda y asistencia técnica</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center text-sm text-slate-500">
-                          <HelpCircle className="h-4 w-4 mr-2" />
-                          Centro de ayuda
-                        </div>
-                        <div className="flex items-center text-sm text-slate-500">
-                          <Mail className="h-4 w-4 mr-2" />
-                          Contactar soporte
-                        </div>
-                      </div>
-                    </div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Main Content Area */}
-              <div className="flex-1 p-8 overflow-y-auto">
+            {/* Main Content Panel */}
+            <div className="flex-1 bg-white">
+              <div className="p-8">
                 <div className="max-w-4xl">
-                  <h3 className="text-xl font-bold text-slate-900 mb-6">Panel de Configuración Principal</h3>
-                  
-                  {/* Quick Actions */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
-                      <div className="flex items-center mb-4">
-                        <div className="p-2 bg-blue-500 rounded-lg">
-                          <Store className="h-6 w-6 text-white" />
+                  <div className="border-b border-slate-200 pb-6 mb-8">
+                    <h2 className="text-2xl font-semibold text-slate-800 mb-2">Configuración del Sistema</h2>
+                    <p className="text-slate-600">Administra y configura todos los aspectos del sistema de gestión</p>
+                  </div>
+
+                  {/* Configuration Sections */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Business Mode */}
+                    <div className="border border-slate-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                        <Shield className="h-5 w-5 mr-2 text-blue-600" />
+                        Configuración de Negocio
+                      </h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Negocio</label>
+                          <div className="p-3 bg-slate-50 rounded-md border">
+                            <p className="font-medium text-slate-800">{saasConfig?.businessType || 'No configurado'}</p>
+                            <p className="text-sm text-slate-500 mt-1">Modo de operación actual del sistema</p>
+                          </div>
                         </div>
-                        <h4 className="text-lg font-semibold text-blue-900 ml-3">Cambiar Modo</h4>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del Negocio</label>
+                          <div className="p-3 bg-slate-50 rounded-md border">
+                            <p className="font-medium text-slate-800">{saasConfig?.businessName || 'No configurado'}</p>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-blue-700 mb-4">Configura el modo de operación: E-commerce, POS o Híbrido</p>
+                    </div>
+
+                    {/* System Status */}
+                    <div className="border border-slate-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                        <Monitor className="h-5 w-5 mr-2 text-green-600" />
+                        Estado del Sistema
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700">Base de Datos</span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></div>
+                            Conectada
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700">Autenticación</span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></div>
+                            Activa
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700">Almacenamiento</span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></div>
+                            85% Usado
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Security Settings */}
+                    <div className="border border-slate-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                        <Lock className="h-5 w-5 mr-2 text-red-600" />
+                        Configuración de Seguridad
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700">Autenticación de 2 Factores</span>
+                          <Switch />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700">Logs de Auditoría</span>
+                          <Switch defaultChecked />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700">Cifrado de Datos</span>
+                          <Switch defaultChecked />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Performance */}
+                    <div className="border border-slate-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                        <Zap className="h-5 w-5 mr-2 text-yellow-600" />
+                        Rendimiento
+                      </h3>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-slate-700">CPU</span>
+                            <span className="text-slate-500">24%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-2">
+                            <div className="bg-green-500 h-2 rounded-full" style={{width: '24%'}}></div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-slate-700">Memoria</span>
+                            <span className="text-slate-500">67%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-2">
+                            <div className="bg-yellow-500 h-2 rounded-full" style={{width: '67%'}}></div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-slate-700">Red</span>
+                            <span className="text-slate-500">12%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-2">
+                            <div className="bg-blue-500 h-2 rounded-full" style={{width: '12%'}}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="mt-8 pt-6 border-t border-slate-200">
+                    <div className="flex space-x-4">
                       <button
                         onClick={() => {
                           closeFullScreenSettings();
                           openModeSelection();
                         }}
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                        className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                       >
-                        Seleccionar Modo
+                        Cambiar Modo de Negocio
                       </button>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
-                      <div className="flex items-center mb-4">
-                        <div className="p-2 bg-green-500 rounded-lg">
-                          <Printer className="h-6 w-6 text-white" />
-                        </div>
-                        <h4 className="text-lg font-semibold text-green-900 ml-3">Configurar Impresión</h4>
-                      </div>
-                      <p className="text-green-700 mb-4">Configuración rápida de impresoras y formatos</p>
-                      <button className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                        Configurar Ahora
+                      <button className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors">
+                        Exportar Configuración
                       </button>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
-                      <div className="flex items-center mb-4">
-                        <div className="p-2 bg-purple-500 rounded-lg">
-                          <Wifi className="h-6 w-6 text-white" />
-                        </div>
-                        <h4 className="text-lg font-semibold text-purple-900 ml-3">Estado de Red</h4>
-                      </div>
-                      <p className="text-purple-700 mb-4">Verificar conectividad y configuración de red</p>
-                      <button className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
-                        Verificar Red
+                      <button className="px-6 py-2.5 border border-red-300 text-red-700 rounded-lg font-medium hover:bg-red-50 transition-colors">
+                        Restablecer Sistema
                       </button>
-                    </div>
-                  </div>
-
-                  {/* System Status */}
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-                    <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-                      <Monitor className="h-5 w-5 mr-2 text-slate-600" />
-                      Estado del Sistema
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
-                        <div>
-                          <p className="text-sm font-medium text-green-800">Base de Datos</p>
-                          <p className="text-xs text-green-600">Conectado</p>
-                        </div>
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      </div>
-                      <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
-                        <div>
-                          <p className="text-sm font-medium text-green-800">Internet</p>
-                          <p className="text-xs text-green-600">Estable</p>
-                        </div>
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      </div>
-                      <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <div>
-                          <p className="text-sm font-medium text-yellow-800">Backup</p>
-                          <p className="text-xs text-yellow-600">Pendiente</p>
-                        </div>
-                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recent Activity */}
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-                      <Clock className="h-5 w-5 mr-2 text-slate-600" />
-                      Actividad Reciente
-                    </h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center p-3 bg-slate-50 rounded-lg">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-700">Configuración de empresa actualizada</p>
-                          <p className="text-xs text-slate-500">Hace 5 minutos</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center p-3 bg-slate-50 rounded-lg">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-700">Backup automático completado</p>
-                          <p className="text-xs text-slate-500">Hace 2 horas</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center p-3 bg-slate-50 rounded-lg">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full mr-3"></div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-700">Nueva actualización disponible</p>
-                          <p className="text-xs text-slate-500">Hace 1 día</p>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -3372,6 +3404,7 @@ export const AdminPanel: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

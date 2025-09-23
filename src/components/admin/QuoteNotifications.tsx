@@ -38,9 +38,9 @@ const QuoteNotifications: React.FC<QuoteNotificationsProps> = ({ onQuoteClick })
     };
 
     // Verificar cada 30 segundos
-    const interval = setInterval(checkForNewQuotes, 30000);
+    // const interval = setInterval(checkForNewQuotes, 120000); // 2 minutos en lugar de 30 segundos
 
-    return () => clearInterval(interval);
+    return () => {}; // clearInterval(interval);
   }, [lastCheck, getRecentSubmissions]);
 
   const handleNotificationClick = () => {

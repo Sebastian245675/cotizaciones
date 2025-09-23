@@ -1,12 +1,16 @@
 import React from 'react';
 import { POSPermissions, POSSubAccount } from '@/components/admin/POSSubAccountsManager';
+import { useAuth } from "@/contexts/AuthContext";
 
 // Hook para gestionar permisos de sub-cuentas POS
 export const usePOSPermissions = () => {
-  // En una implementación real, esto vendría del contexto de autenticación
-  // Por ahora, asumimos que es el administrador principal
-  const isMainAdmin = true;
+  const { user } = useAuth();
+  
+  // Determinar si es admin principal basado en el email
+  const isMainAdmin = user?.email === 'admin@gmail.com' || user?.email === 'admin@tienda.com';
   const currentSubAccount = null; // Aquí iría la sub-cuenta actual si está logueada
+  
+  console.log('🔐 usePOSPermissions - Usuario:', user?.email, '- Es admin:', isMainAdmin);
   
   const hasPermission = (category: keyof POSPermissions, permission: string): boolean => {
     // Si es admin principal, siempre tiene todos los permisos

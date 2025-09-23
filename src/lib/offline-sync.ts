@@ -27,11 +27,11 @@ export class OfflineSyncService {
     this.setupConnectionListeners();
     
     // Intentar sincronizar cada 30 segundos si hay elementos en la cola
-    setInterval(() => {
-      if (this.isOnline && this.syncQueue.length > 0 && !this.isProcessingSync) {
-        this.processSyncQueue();
-      }
-    }, 30000);
+    // setInterval(() => {
+    //   if (this.isOnline && this.syncQueue.length > 0 && !this.isProcessingSync) {
+    //     this.processSyncQueue();
+    //   }
+    // }, 30000);
   }
 
   static getInstance(): OfflineSyncService {

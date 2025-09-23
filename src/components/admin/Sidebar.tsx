@@ -32,11 +32,31 @@ import {
   Target,
   BookOpen,
   Shield,
-  MessageCircle
+  MessageCircle,
+  Gift
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from '@/hooks/use-toast';
+import '../layout/scrollbar.css'; // Importar estilos de scrollbar
+
+// Agregar estilos directos para el scrollbar
+const sidebarScrollStyles = `
+  .sidebar-nav::-webkit-scrollbar {
+    width: 8px;
+  }
+  .sidebar-nav::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  .sidebar-nav::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 4px;
+  }
+  .sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+`;
 
 interface SidebarItem {
   id: string;
@@ -115,6 +135,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Admin items
       { id: 'subaccounts', icon: <Users className="h-5 w-5" />, label: 'Subcuentas', description: 'Gestión de accesos' },
       
+      // Recursos Humanos
+      { id: 'employees', icon: <Gift className="h-5 w-5" />, label: 'Recursos Humanos', description: 'Gestión de empleados y cumpleaños' },
+      
       // Common items
       { id: 'info', icon: <Settings className="h-5 w-5" />, label: 'Info Secciones', description: 'Configuración general' },
       { id: 'ai-assistant', icon: <BrainCog className="h-5 w-5" />, label: 'Asistente IA', description: 'Inteligencia artificial avanzada' },
@@ -150,7 +173,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const MobileToggleButton = () => (
     <button 
-      className="md:hidden fixed top-4 left-4 z-50 p-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+      className="md:hidden fixed top-20 left-4 z-50 p-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
       onClick={toggleSidebar}
       style={{ backdropFilter: 'blur(10px)' }}
       aria-label={isSidebarOpen ? "Cerrar menú" : "Abrir menú"}
@@ -166,6 +189,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
+      <style>{sidebarScrollStyles}</style>
       <MobileToggleButton />
       
       {/* Overlay para móvil */}
@@ -178,19 +202,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed left-0 top-0 h-full bg-white border-r border-gray-200 shadow-2xl z-40 transition-all duration-300 ease-in-out",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full",
-        "w-80 md:relative md:translate-x-0"
+        "fixed left-0 top-[68px] h-[calc(100vh-68px)] w-64 bg-white border-r border-gray-200 shadow-2xl z-50 transition-all duration-300 ease-in-out flex flex-col",
+        // En móvil: se desliza desde la izquierda
+        isMobile 
+          ? (isSidebarOpen ? "translate-x-0" : "-translate-x-full")
+          : "translate-x-0" // En desktop siempre visible
       )}>
-        {/* Header del sidebar */}
-        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+        {/* Header del sidebar - FIJO */}
+        <div className="flex-shrink-0 p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Home className="h-5 w-5 text-white" />
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Home className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h2 className="font-bold text-lg text-gray-800">Panel Admin</h2>
+                <h2 className="font-bold text-base text-gray-800">Panel Admin</h2>
                 <p className="text-xs text-gray-500">
                   {currentMode ? `Modo ${currentMode === 'ecommerce' ? 'E-commerce' : currentMode === 'pos' ? 'POS' : 'Híbrido'}` : 'Sin modo'}
                 </p>
@@ -199,9 +225,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 overflow-y-auto py-4">
-          <div className="px-4 space-y-2">
+        {/* Navigation Items - CON SCROLL INDEPENDIENTE */}
+        <nav 
+          className="sidebar-nav flex-1 py-3" 
+          style={{ 
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 160px)',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#94a3b8 #f1f5f9'
+          }}
+        >
+          <div className="px-3 space-y-1">
             {sidebarItems.map((item, index) => {
               const isActive = activeTab === item.id;
               const hasChildren = item.children && item.children.length > 0;
@@ -220,7 +254,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       }
                     }}
                     className={cn(
-                      "w-full text-left px-4 py-3 rounded-xl transition-all duration-200 group flex items-center space-x-3",
+                      "w-full text-left px-3 py-2.5 rounded-xl transition-all duration-200 group flex items-center space-x-2",
                       (isActive || hasActiveChild)
                         ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-[1.02]" 
                         : "hover:bg-gray-50 text-gray-700 hover:text-blue-600"
@@ -228,7 +262,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <div className={cn("flex items-center justify-center", iconAnimation(isActive || hasActiveChild))}>
                       <div className={cn(
-                        "p-2 rounded-lg transition-all duration-200",
+                        "p-1.5 rounded-lg transition-all duration-200",
                         (isActive || hasActiveChild)
                           ? "bg-white/20 text-white" 
                           : "group-hover:bg-blue-100 group-hover:text-blue-600"
@@ -322,11 +356,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </nav>
 
-        {/* Footer del sidebar */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50">
+        {/* Footer del sidebar - FIJO */}
+        <div className="flex-shrink-0 p-3 border-t border-gray-100 bg-gray-50">
           <button
             onClick={navigateToHome}
-            className="w-full px-4 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-white rounded-lg transition-all duration-200 flex items-center space-x-2"
+            className="w-full px-3 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-white rounded-lg transition-all duration-200 flex items-center space-x-2"
           >
             <Home className="h-4 w-4" />
             <span>Volver al sitio</span>
