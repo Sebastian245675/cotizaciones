@@ -533,8 +533,23 @@ export const CashRegisterSystem: React.FC = () => {
       sales.forEach(sale => {
         const total = sale.displayTotal || sale.resumen?.total || 0;
         const paymentMethod = sale.pago?.method || 'cash';
-        const cost = sale.productos?.reduce((sum: number, p: any) => sum + (p.precioCosto || 0) * (p.cantidad || 1), 0) || 0;
-        const profit = total - cost;
+        
+        // Calcular ganancia según estructura disponible
+        let profit = 0;
+        
+        // 1. Usar nueva estructura si está disponible
+        if (sale.ganancias?.totalGanancia) {
+          profit = Number(sale.ganancias.totalGanancia);
+        }
+        // 2. Calcular desde productos individuales con ganancia
+        else if (sale.productos && sale.productos.some((p: any) => p.ganancia !== undefined)) {
+          profit = sale.productos.reduce((sum: number, p: any) => sum + (Number(p.ganancia) || 0), 0);
+        }
+        // 3. Calcular usando precio de costo (método anterior)
+        else if (sale.productos) {
+          const cost = sale.productos.reduce((sum: number, p: any) => sum + (p.precioCosto || 0) * (p.cantidad || 1), 0);
+          profit = total - cost;
+        }
 
         totalSales += total;
         totalProfit += profit;
@@ -940,10 +955,21 @@ export const CashRegisterSystem: React.FC = () => {
       let totalProfit = 0;
       
       todaySales.forEach(sale => {
-        if (sale.totalProfit) {
+        // 1. Usar nueva estructura si está disponible
+        if (sale.ganancias?.totalGanancia) {
+          totalProfit += Number(sale.ganancias.totalGanancia);
+        }
+        // 2. Calcular desde productos individuales con ganancia
+        else if (sale.productos && sale.productos.some((p: any) => p.ganancia !== undefined)) {
+          sale.productos.forEach((producto: any) => {
+            totalProfit += Number(producto.ganancia || 0);
+          });
+        }
+        // 3. Formatos anteriores (compatibilidad)
+        else if (sale.totalProfit) {
           totalProfit += sale.totalProfit;
         } else if (sale.items) {
-          // Calcular ganancia si no está en la venta
+          // Calcular ganancia desde items si no está en la venta
           sale.items.forEach(item => {
             const costPrice = item.product?.costPrice || item.costPrice || 0;
             const salePrice = item.salePrice || item.price || 0;
@@ -2011,22 +2037,37 @@ export const CashRegisterSystem: React.FC = () => {
                       // Buscar ganancia en múltiples campos
                       let profit = 0;
                       
-                      if (sale.totalProfit) {
+                      // 1. Nuevo formato: sale.ganancias.totalGanancia
+                      if (sale.ganancias?.totalGanancia) {
+                        profit = Number(sale.ganancias.totalGanancia);
+                        console.log(`🎯 Ganancia desde ganancias.totalGanancia: ${profit}`);
+                      }
+                      // 2. Calcular desde productos individuales
+                      else if (sale.productos && sale.productos.length > 0) {
+                        profit = sale.productos.reduce((sum: number, producto: any) => {
+                          const gananciaProducto = Number(producto.ganancia || 0);
+                          return sum + gananciaProducto;
+                        }, 0);
+                        console.log(`🎯 Ganancia calculada desde productos: ${profit}`);
+                      }
+                      // 3. Formatos anteriores (compatibilidad)
+                      else if (sale.totalProfit) {
                         profit = Number(sale.totalProfit);
-
+                        console.log(`🎯 Ganancia desde totalProfit: ${profit}`);
                       } else if (sale.profit) {
                         profit = Number(sale.profit);
-
+                        console.log(`🎯 Ganancia desde profit: ${profit}`);
                       } else if (sale.ganancia) {
                         profit = Number(sale.ganancia);
-                        console.log(`� Encontrado ganancia: ${profit}`);
+                        console.log(`🎯 Ganancia desde ganancia: ${profit}`);
                       }
                       
                       totalProfit += profit;
-                      console.log(`� Ganancia venta: ${profit} - Total acumulado: ${totalProfit}`);
+                      console.log(`💰 Ganancia venta #${sale.numeroVenta}: ${profit} - Total acumulado: ${totalProfit}`);
                     }
                   });
                   
+                  console.log(`🎯 GANANCIA TOTAL DEL DÍA: $${totalProfit.toLocaleString()}`);
                   return totalProfit.toLocaleString();
                 })()}`}
                 change={15.2}
