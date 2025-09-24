@@ -96,7 +96,7 @@ export const DashboardStats: React.FC = () => {
     
     // Pedidos y ventas del mes - Aseguramos usar 'orders' como nombre de colección
     getDocs(collection(db, "orders")).then(async snapshot => {
-      console.log("Cargando órdenes: ", snapshot.size, " documentos encontrados");
+
       setOrderCount(snapshot.size);
 
       // Ventas del mes

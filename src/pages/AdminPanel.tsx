@@ -7,6 +7,10 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import '@/components/admin/admin-layout.css'; // Importar CSS para admin-main-content
+import { PluginProvider } from '@/plugins/core/PluginContext';
+import PluginStore from '@/plugins/store/PluginStore';
+import ActivePluginsView from '@/components/plugins/ActivePluginsView';
+import { BarConfigProvider, useBarConfig } from '@/contexts/BarConfigContext';
 import { 
   Users, 
   Package, 
@@ -68,7 +72,8 @@ import {
   Lock,
   Headphones,
   Crown,
-  X
+  X,
+  Layout
 } from 'lucide-react';
 import { ProductForm } from '@/components/admin/ProductForm';
 import { UsersList } from '@/components/admin/UsersList';
@@ -93,6 +98,7 @@ import ModeSelection from '@/components/admin/ModeSelection';
 import POSSystem from '@/components/admin/POSSystem';
 import { POSClientsManager } from '@/components/admin/POSClientsManager';
 import { InvoiceManager } from '@/components/admin/InvoiceManager';
+import ConfigurationModal from '@/components/admin/ConfigurationModal';
 import { CashRegisterSystem } from '@/components/admin/AdvancedCashSystem';
 import { POSSubAccountsManager } from '@/components/admin/POSSubAccountsManager';
 import POSSalesSystem from '@/components/admin/POSSalesSystem';
@@ -109,7 +115,11 @@ export const AdminPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { barFunctionsConfig } = useBarConfig();
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Debug logging
+
   const [orders, setOrders] = useState<any[]>([]);
   const [subName, setSubName] = useState('');
   const [subEmail, setSubEmail] = useState('');
@@ -140,22 +150,25 @@ export const AdminPanel: React.FC = () => {
   // Admin presence/status (activo, inactivo, ocupado)
   const [adminStatus, setAdminStatus] = useState<'activo' | 'inactivo' | 'ocupado'>('activo');
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  
+  // Estado para controlar expansión del sidebar
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
-  console.log('AdminPanel rendered, user:', user);
+
 
   useEffect(() => {
-    console.log('🚀 useEffect de AuthStateChanged iniciado');
+
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      console.log('🔍 AuthStateChanged - firebaseUser:', firebaseUser);
-      console.log('📧 Email del usuario:', firebaseUser?.email);
+
+
       if (firebaseUser) {
-        console.log('✅ Usuario logueado - Email:', firebaseUser.email);
+
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
         const userData = userDoc.data();
-        console.log('📋 UserData from Firestore:', userData);
+
         
         if (firebaseUser.email === "admin@gmail.com") {
-          console.log('👑 Detectado como ADMIN principal');
+
           setIsAdmin(true);
           setIsSubAdmin(false);
           
@@ -645,13 +658,7 @@ export const AdminPanel: React.FC = () => {
     return <SaasOnboarding onComplete={handleSaasConfigComplete} />;
   }
 
-  console.log('🔐 Verificación de acceso:');
-  console.log('   - isAdmin:', isAdmin);
-  console.log('   - isSubAdmin:', isSubAdmin);
-  console.log('   - currentMode:', currentMode);
-  console.log('   - Condición (!isAdmin && !isSubAdmin):', !isAdmin && !isSubAdmin);
-  console.log('   - Condición para mostrar pos-sales:', ((currentMode === 'pos' || currentMode === 'hybrid') || (isSubAdmin && !isAdmin)));
-  console.log('   - Es cajero (isSubAdmin && !isAdmin):', (isSubAdmin && !isAdmin));
+
 
   if (!isAdmin && !isSubAdmin) {
     return (
@@ -692,8 +699,41 @@ export const AdminPanel: React.FC = () => {
     return <POSSystem onBack={closePOSSystem} />;
   }
 
+  // APIs simuladas para el sistema de plugins
+  const posAPI = {
+    addProduct: async (product: any) => { console.log('Adding product:', product); },
+    updateInventory: async (itemId: string, quantity: number) => { console.log('Updating inventory:', itemId, quantity); },
+    getCurrentSale: () => { return null; },
+    addToCart: (item: any) => { console.log('Adding to cart:', item); },
+    processSale: async (saleData: any) => { console.log('Processing sale:', saleData); }
+  };
+
+  const dbAPI = {
+    query: async (sql: string, params?: any[]) => { console.log('DB Query:', sql, params); return []; },
+    insert: async (table: string, data: any) => { console.log('DB Insert:', table, data); return Date.now(); },
+    update: async (table: string, data: any, where: any) => { console.log('DB Update:', table, data, where); },
+    delete: async (table: string, where: any) => { console.log('DB Delete:', table, where); }
+  };
+
+  const uiAPI = {
+    showNotification: (message: string, type: 'success' | 'error' | 'info') => {
+      toast({ title: message, variant: type === 'error' ? 'destructive' : 'default' });
+    },
+    showModal: async (component: React.ComponentType, props?: any) => { 
+      console.log('Show modal:', component, props);
+      return null;
+    },
+    addMenuItem: (label: string, onClick: () => void, icon?: string) => {
+      console.log('Add menu item:', label, icon);
+    },
+    addDashboardWidget: (widget: React.ComponentType) => {
+      console.log('Add dashboard widget:', widget);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <PluginProvider posAPI={posAPI} dbAPI={dbAPI} uiAPI={uiAPI}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Professional Header */}
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3">
@@ -880,10 +920,11 @@ export const AdminPanel: React.FC = () => {
           isSubAdmin={isSubAdmin} 
           navigateToHome={() => navigate('/')}
           currentMode={currentMode}
+          onSidebarExpandChange={setIsSidebarExpanded}
         />
         
         {/* Main content area */}
-        <div className="admin-main-content flex-1 p-4 md:p-6 overflow-auto">
+        <div className={`admin-main-content flex-1 p-4 md:p-6 overflow-auto ${isSidebarExpanded ? 'sidebar-expanded' : ''}`}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
             {/* Hidden tabs list for state management - visual only */}
             <TabsList className="hidden">
@@ -902,6 +943,8 @@ export const AdminPanel: React.FC = () => {
               {/* Tabs comunes entre admin y subadmin */}
               <TabsTrigger value="info">Info</TabsTrigger>
               <TabsTrigger value="ai-assistant">AI Assistant</TabsTrigger>
+              <TabsTrigger value="plugin-store">Plugin Store</TabsTrigger>
+              <TabsTrigger value="active-plugins">Plugins Activos</TabsTrigger>
               <TabsTrigger value="inventario-pos">
                 <Package className="h-4 w-4 mr-2" />
                 Inventario POS
@@ -1664,6 +1707,14 @@ export const AdminPanel: React.FC = () => {
                     )}
                   </div>
                   {/* Revisiones ahora tienen su propia pestaña */}
+                </TabsContent>
+                
+                <TabsContent value="plugin-store" className="space-y-6">
+                  <PluginStore />
+                </TabsContent>
+                
+                <TabsContent value="active-plugins" className="space-y-6">
+                  <ActivePluginsView />
                 </TabsContent>
                 
                 <TabsContent value="analytics" className="space-y-6">
@@ -3131,280 +3182,32 @@ export const AdminPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Full Screen Settings */}
-      {showFullScreenSettings && (
-        <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col">
-          {/* Professional Header Bar */}
-          <div className="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-lg">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-slate-700 rounded-lg">
-                  <Settings className="h-6 w-6 text-slate-200" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-white">Configuraciones del Sistema</h1>
-                  <p className="text-sm text-slate-400">Panel de administración y configuración avanzada</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <div className="text-right">
-                <p className="text-sm text-slate-300">Administrador</p>
-                <p className="text-xs text-slate-400">{user?.email}</p>
-              </div>
-              <button
-                onClick={closeFullScreenSettings}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-300 hover:text-white"
-                title="Cerrar configuraciones"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
+      {/* Configuration Modal */}
+      <ConfigurationModal
+        isOpen={showFullScreenSettings}
+        onClose={closeFullScreenSettings}
+        user={user}
+        saasConfig={saasConfig}
+        onOpenModeSelection={() => {
+          closeFullScreenSettings();
+          openModeSelection();
+        }}
+      />
 
-          {/* Main Content Area */}
-          <div className="flex flex-1 bg-slate-50 overflow-hidden">
-            {/* Professional Sidebar */}
-            <div className="w-80 bg-white border-r border-slate-200 shadow-sm">
-              <div className="p-6 border-b border-slate-100">
-                <h2 className="text-lg font-semibold text-slate-800">Categorías</h2>
-                <p className="text-sm text-slate-500 mt-1">Selecciona una categoría para configurar</p>
-              </div>
-              
-              <div className="p-4 space-y-3 overflow-y-auto h-full">
-                {/* Mode Selection - Priority */}
-                <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-800 mb-3 flex items-center">
-                    <Shield className="h-5 w-5 mr-2 text-blue-600" />
-                    Modo de Operación
-                  </h3>
-                  <div className="bg-white border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm font-medium text-slate-700">Actual: {saasConfig?.businessType || 'No configurado'}</p>
-                    <p className="text-xs text-slate-500 mt-1">Sistema de comercio configurado</p>
-                    <button
-                      onClick={() => {
-                        closeFullScreenSettings();
-                        openModeSelection();
-                      }}
-                      className="mt-3 w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      Cambiar Configuración
-                    </button>
-                  </div>
-                </div>
 
-                {/* System Categories */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className="flex items-center">
-                      <Smartphone className="h-5 w-5 mr-3 text-slate-600" />
-                      <div>
-                        <p className="font-medium text-slate-800">Dispositivos</p>
-                        <p className="text-xs text-slate-500">Pantallas, impresoras, hardware</p>
-                      </div>
-                    </div>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  </div>
 
-                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className="flex items-center">
-                      <Network className="h-5 w-5 mr-3 text-slate-600" />
-                      <div>
-                        <p className="font-medium text-slate-800">Conectividad</p>
-                        <p className="text-xs text-slate-500">Red, internet, comunicaciones</p>
-                      </div>
-                    </div>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className="flex items-center">
-                      <Shield className="h-5 w-5 mr-3 text-slate-600" />
-                      <div>
-                        <p className="font-medium text-slate-800">Seguridad</p>
-                        <p className="text-xs text-slate-500">Usuarios, permisos, accesos</p>
-                      </div>
-                    </div>
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className="flex items-center">
-                      <HardDrive className="h-5 w-5 mr-3 text-slate-600" />
-                      <div>
-                        <p className="font-medium text-slate-800">Almacenamiento</p>
-                        <p className="text-xs text-slate-500">Datos, backups, archivos</p>
-                      </div>
-                    </div>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className="flex items-center">
-                      <BarChart3 className="h-5 w-5 mr-3 text-slate-600" />
-                      <div>
-                        <p className="font-medium text-slate-800">Reportes</p>
-                        <p className="text-xs text-slate-500">Analytics, estadísticas</p>
-                      </div>
-                    </div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content Panel */}
-            <div className="flex-1 bg-white">
-              <div className="p-8">
-                <div className="max-w-4xl">
-                  <div className="border-b border-slate-200 pb-6 mb-8">
-                    <h2 className="text-2xl font-semibold text-slate-800 mb-2">Configuración del Sistema</h2>
-                    <p className="text-slate-600">Administra y configura todos los aspectos del sistema de gestión</p>
-                  </div>
-
-                  {/* Configuration Sections */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Business Mode */}
-                    <div className="border border-slate-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                        <Shield className="h-5 w-5 mr-2 text-blue-600" />
-                        Configuración de Negocio
-                      </h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Negocio</label>
-                          <div className="p-3 bg-slate-50 rounded-md border">
-                            <p className="font-medium text-slate-800">{saasConfig?.businessType || 'No configurado'}</p>
-                            <p className="text-sm text-slate-500 mt-1">Modo de operación actual del sistema</p>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del Negocio</label>
-                          <div className="p-3 bg-slate-50 rounded-md border">
-                            <p className="font-medium text-slate-800">{saasConfig?.businessName || 'No configurado'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* System Status */}
-                    <div className="border border-slate-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                        <Monitor className="h-5 w-5 mr-2 text-green-600" />
-                        Estado del Sistema
-                      </h3>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-700">Base de Datos</span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></div>
-                            Conectada
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-700">Autenticación</span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></div>
-                            Activa
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-700">Almacenamiento</span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1"></div>
-                            85% Usado
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Security Settings */}
-                    <div className="border border-slate-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                        <Lock className="h-5 w-5 mr-2 text-red-600" />
-                        Configuración de Seguridad
-                      </h3>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-700">Autenticación de 2 Factores</span>
-                          <Switch />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-700">Logs de Auditoría</span>
-                          <Switch defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-700">Cifrado de Datos</span>
-                          <Switch defaultChecked />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Performance */}
-                    <div className="border border-slate-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                        <Zap className="h-5 w-5 mr-2 text-yellow-600" />
-                        Rendimiento
-                      </h3>
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-slate-700">CPU</span>
-                            <span className="text-slate-500">24%</span>
-                          </div>
-                          <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div className="bg-green-500 h-2 rounded-full" style={{width: '24%'}}></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-slate-700">Memoria</span>
-                            <span className="text-slate-500">67%</span>
-                          </div>
-                          <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div className="bg-yellow-500 h-2 rounded-full" style={{width: '67%'}}></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-slate-700">Red</span>
-                            <span className="text-slate-500">12%</span>
-                          </div>
-                          <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div className="bg-blue-500 h-2 rounded-full" style={{width: '12%'}}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="mt-8 pt-6 border-t border-slate-200">
-                    <div className="flex space-x-4">
-                      <button
-                        onClick={() => {
-                          closeFullScreenSettings();
-                          openModeSelection();
-                        }}
-                        className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        Cambiar Modo de Negocio
-                      </button>
-                      <button className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors">
-                        Exportar Configuración
-                      </button>
-                      <button className="px-6 py-2.5 border border-red-300 text-red-700 rounded-lg font-medium hover:bg-red-50 transition-colors">
-                        Restablecer Sistema
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
+      </div>
+    </PluginProvider>
   );
 };
+
+// Componente envuelto con BarConfigProvider
+const AdminPanelWithBarConfig = () => {
+  return (
+    <BarConfigProvider>
+      <AdminPanel />
+    </BarConfigProvider>
+  );
+};
+
+export default AdminPanelWithBarConfig;

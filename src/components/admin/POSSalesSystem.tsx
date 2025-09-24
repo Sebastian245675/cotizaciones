@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useBarConfig } from '@/contexts/BarConfigContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -198,6 +199,8 @@ interface CartItem {
   discount: number;
   discountType: 'percentage' | 'amount';
   subtotal: number;
+  profit?: number; // Ganancia del item
+  profitMargin?: number; // Margen de ganancia porcentual del item
   notes?: string;
 }
 
@@ -225,6 +228,8 @@ interface Sale {
   discounts: number;
   tax: number;
   total: number;
+  totalProfit?: number; // Ganancia total de la venta
+  totalProfitMargin?: number; // Margen de ganancia porcentual
   paymentMethod: 'cash' | 'card' | 'transfer' | 'mixed' | 'credit';
   paymentDetails?: any;
   status: 'pending' | 'completed' | 'cancelled' | 'refunded';
@@ -350,6 +355,9 @@ const POSSalesSystem: React.FC = () => {
   const [selectedProductForWeight, setSelectedProductForWeight] = useState<Product | null>(null);
   const [weightInput, setWeightInput] = useState('');
 
+  // Configuración de funciones de la barra
+  const { barFunctionsConfig } = useBarConfig();
+
   // Estados para verificación de corte de caja
   const [cashRegisterStatus, setCashRegisterStatus] = useState<{
     isOpen: boolean;
@@ -359,6 +367,7 @@ const POSSalesSystem: React.FC = () => {
     openedAt?: Date | null;
     justClosed?: boolean;
     totalSales?: number;
+    totalProfit?: number;
     cashInBox?: number;
     closingBalance?: number;
   }>({
@@ -369,6 +378,7 @@ const POSSalesSystem: React.FC = () => {
     openedAt: null,
     justClosed: false,
     totalSales: 0,
+    totalProfit: 0,
     cashInBox: 0,
     closingBalance: 0
   });
@@ -2473,6 +2483,32 @@ const POSSalesSystem: React.FC = () => {
       return;
     }
 
+    // ✅ VALIDAR SI EL TURNO ACTUAL ES VÁLIDO ANTES DE CARGAR VENTAS
+    console.log('🔍 Validando turno antes de configurar listener de ventas...');
+    console.log('🏪 CashRegisterStatus completo:', cashRegisterStatus);
+    
+    const autoCloseConditions = checkAutoCloseConditions();
+    console.log('🔍 Resultado de checkAutoCloseConditions:', autoCloseConditions);
+    
+    if (autoCloseConditions.shouldAutoClose) {
+      console.log('⚠️ TURNO INVÁLIDO - No se cargarán ventas:', autoCloseConditions.reason);
+      
+      // Limpiar historial de ventas para evitar mostrar ventas del turno anterior
+      setAllSalesHistory([]);
+      
+      // Mostrar advertencia
+      toast({
+        title: "⚠️ Turno Expirado",
+        description: `${autoCloseConditions.reason}. Las ventas no se mostrarán hasta que cierres el turno.`,
+        className: "border-red-200 bg-red-50",
+        duration: 10000
+      });
+      
+      return; // ✅ NO CONFIGURAR LISTENER SI EL TURNO ES INVÁLIDO
+    }
+    
+    console.log('✅ Turno válido, configurando listener de ventas...');
+
     console.log('🔄 Configurando listener en tiempo real para ventas del turno...');
     
     const setupSalesListener = () => {
@@ -2578,7 +2614,7 @@ const POSSalesSystem: React.FC = () => {
         unsubscribe();
       }
     };
-  }, [connectionStatus.isOnline, cashRegisterStatus.isOpen, cashRegisterStatus.reportId, cashRegisterStatus.openedAt]);
+  }, [connectionStatus.isOnline, cashRegisterStatus.isOpen, cashRegisterStatus.reportId, cashRegisterStatus.openedAt, cashRegisterStatus]);
 
   // Auto-cargar ventas cuando se abre el modal de historial
   useEffect(() => {
@@ -3397,7 +3433,47 @@ const POSSalesSystem: React.FC = () => {
     console.log('🔍 Filtrando historial de ventas. Total disponible:', allSalesHistory.length);
     console.log('📋 Filtros aplicados:', salesHistoryFilter);
     
+    // ✅ DEBUG: Mostrar información del turno actual
+    console.log('🏪 Estado del turno actual:', {
+      isOpen: cashRegisterStatus.isOpen,
+      openedAt: cashRegisterStatus.openedAt,
+      reportId: cashRegisterStatus.reportId,
+      openedAtFormatted: cashRegisterStatus.openedAt ? new Date(cashRegisterStatus.openedAt).toLocaleString('es-ES') : null
+    });
+    
+    // ✅ VALIDAR SI EL TURNO ACTUAL ES VÁLIDO ANTES DE MOSTRAR VENTAS
+    if (cashRegisterStatus.isOpen) {
+      const autoCloseConditions = checkAutoCloseConditions();
+      console.log('🔍 Condiciones de auto-cierre:', autoCloseConditions);
+      
+      if (autoCloseConditions.shouldAutoClose) {
+        console.log('⚠️ TURNO INVÁLIDO - No se mostrarán ventas:', autoCloseConditions.reason);
+        return []; // ✅ RETORNAR ARRAY VACÍO SI EL TURNO ES INVÁLIDO
+      }
+    }
+    
     let filtered = [...allSalesHistory];
+    
+    // ✅ FILTRO ADICIONAL: Excluir ventas de más de 12 horas independientemente del turno
+    const now = new Date();
+    const twelveHoursAgo = new Date(now.getTime() - (12 * 60 * 60 * 1000));
+    
+    // Filtrar ventas que no sean del día de hoy o que tengan más de 12 horas
+    filtered = filtered.filter(sale => {
+      const saleDate = new Date(sale.timestamp);
+      const isFromToday = saleDate.toDateString() === now.toDateString();
+      const isWithin12Hours = saleDate >= twelveHoursAgo;
+      
+      const isValid = isFromToday && isWithin12Hours;
+      
+      if (!isValid) {
+        console.log(`🚫 Excluida venta antigua: ${sale.id} - Fecha: ${saleDate.toLocaleString('es-ES')}`);
+      }
+      
+      return isValid;
+    });
+    
+    console.log(`✅ Después de filtro de 12 horas: ${filtered.length} ventas (de ${allSalesHistory.length} originales)`);
 
     // Filtrar por fecha
     if (salesHistoryFilter.dateFrom) {
@@ -3829,12 +3905,7 @@ const POSSalesSystem: React.FC = () => {
 
   // Función para actualizar el corte de caja después de una venta
   const updateCashRegisterAfterSale = async (saleData: Sale) => {
-    console.log('🔥 INICIANDO updateCashRegisterAfterSale con BD interna');
-    console.log('📊 cashRegisterStatus:', cashRegisterStatus);
-    console.log('💰 saleData:', saleData);
-    
     if (!cashRegisterStatus.reportId || !cashRegisterStatus.isOpen) {
-      console.log('⚠️ No hay corte de caja activo para actualizar');
       toast({
         title: "⚠️ Sin corte de caja",
         description: "No hay un turno activo para actualizar. Inicia un turno primero.",
@@ -3844,18 +3915,11 @@ const POSSalesSystem: React.FC = () => {
     }
 
     try {
-      console.log('🔄 Actualizando corte de caja en BD interna después de venta...', {
-        reportId: cashRegisterStatus.reportId,
-        saleTotal: saleData.total,
-        paymentMethod: saleData.paymentMethod
-      });
 
       // 🎯 USAR BD INTERNA en lugar de Firebase
-      const cashRegisters = await internalDB.getCashRegisters({ id: cashRegisterStatus.reportId });
-      const currentCashRegister = cashRegisters.find(cr => cr.id === cashRegisterStatus.reportId);
+      const currentCashRegister = await internalDB.getCashRegisterById(cashRegisterStatus.reportId);
       
       if (!currentCashRegister) {
-        console.error('❌ No se encontró el corte de caja con ID:', cashRegisterStatus.reportId);
         toast({
           title: "❌ Error",
           description: `No se encontró el corte de caja activo: ${cashRegisterStatus.reportId}`,
@@ -3863,23 +3927,20 @@ const POSSalesSystem: React.FC = () => {
         });
         return;
       }
-
-      console.log('📋 Corte de caja actual:', currentCashRegister);
       
       const saleTotal = saleData.total || 0;
-      console.log('💵 Total de la venta:', saleTotal);
+      const saleProfit = saleData.totalProfit || 0;
 
       // Calcular los nuevos totales
       const newTotalSales = (currentCashRegister.totalSales || 0) + saleTotal;
-      console.log('📈 Nuevo totalSales:', newTotalSales);
+      const newTotalProfit = (currentCashRegister.totalProfit || 0) + saleProfit;
       
       // Preparar datos de actualización
       let updateData: any = {
         totalSales: newTotalSales,
+        totalProfit: newTotalProfit,
         lastUpdated: new Date().toISOString()
       };
-
-      console.log('💳 Método de pago:', saleData.paymentMethod);
 
       // Calcular efectivo según método de pago
       let cashAmount = 0;
@@ -3890,26 +3951,18 @@ const POSSalesSystem: React.FC = () => {
           updateData.cashSales = (currentCashRegister.cashSales || 0) + saleTotal;
           updateData.cashInBox = (currentCashRegister.cashInBox || currentCashRegister.openingBalance || 0) + saleTotal;
           updateData.closingBalance = updateData.cashInBox;
-          console.log('💰 Actualización efectivo:', { 
-            cashSales: updateData.cashSales, 
-            cashInBox: updateData.cashInBox,
-            closingBalance: updateData.closingBalance 
-          });
           break;
           
         case 'card':
           updateData.creditCardSales = (currentCashRegister.creditCardSales || 0) + saleTotal;
-          console.log('💳 Actualización tarjeta:', { creditCardSales: updateData.creditCardSales });
           break;
           
         case 'transfer':
           updateData.digitalPayments = (currentCashRegister.digitalPayments || 0) + saleTotal;
-          console.log('📱 Actualización transferencia:', { digitalPayments: updateData.digitalPayments });
           break;
           
         case 'credit':
           updateData.creditSales = (currentCashRegister.creditSales || 0) + saleTotal;
-          console.log('⏰ Actualización crédito:', { creditSales: updateData.creditSales });
           break;
           
         case 'mixed':
@@ -3932,20 +3985,14 @@ const POSSalesSystem: React.FC = () => {
           }
           
           updateData.closingBalance = updateData.cashInBox || currentCashRegister.cashInBox || currentCashRegister.openingBalance || 0;
-          
-          console.log('🔄 Actualización pago mixto:', { 
-            cashPart, cardPart, transferPart,
-            cashSales: updateData.cashSales,
-            creditCardSales: updateData.creditCardSales,
-            digitalPayments: updateData.digitalPayments,
-            closingBalance: updateData.closingBalance
-          });
           break;
           
         default:
-          console.warn('⚠️ Método de pago no reconocido:', saleData.paymentMethod);
           break;
       }
+
+      // Actualizar ganancia total
+      updateData.totalProfit = (currentCashRegister.totalProfit || 0) + saleData.totalProfit;
 
       // Agregar información de la venta
       const saleRecord = {
@@ -3961,7 +4008,9 @@ const POSSalesSystem: React.FC = () => {
       salesHistory.push(saleRecord);
       updateData.salesHistory = salesHistory;
 
-      console.log('📝 Datos finales de actualización:', updateData);
+      console.log('� Ganancia de esta venta:', saleData.totalProfit);
+      console.log('💰 Ganancia total acumulada:', updateData.totalProfit);
+      console.log('�📝 Datos finales de actualización:', updateData);
 
       // 💾 ACTUALIZAR EN BD INTERNA
       const updatedCashRegister = await internalDB.updateCashRegister(cashRegisterStatus.reportId, updateData);
@@ -3971,6 +4020,7 @@ const POSSalesSystem: React.FC = () => {
       setCashRegisterStatus(prev => ({
         ...prev,
         totalSales: newTotalSales,
+        totalProfit: updateData.totalProfit || prev.totalProfit,
         cashInBox: updateData.cashInBox || prev.cashInBox,
         closingBalance: updateData.closingBalance || prev.closingBalance
       }));
@@ -4132,28 +4182,41 @@ const POSSalesSystem: React.FC = () => {
         },
         
         // Productos
-        items: cart.map((item, index) => ({
-          product: {
-            id: item.product.id,
-            name: item.product.name,
-            price: item.product.price || 0,
-            category: getCategoryName(item.product.category),
-            barcode: item.product.barcode || '',
-            brand: item.product.brand || '',
-            supplier: item.product.supplier || ''
-          },
-          quantity: item.quantity,
-          discount: item.discount || 0,
-          discountType: item.discountType || 'percentage',
-          subtotal: item.subtotal || 0,
-          notes: item.notes || ''
-        })),
+        items: cart.map((item, index) => {
+          const costPrice = item.product.costPrice || 0;
+          const salePrice = item.product.price || 0;
+          const quantity = item.quantity || 0;
+          const itemProfit = (salePrice - costPrice) * quantity;
+          const profitMargin = salePrice > 0 ? ((salePrice - costPrice) / salePrice * 100) : 0;
+          
+          return {
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              price: salePrice,
+              costPrice: costPrice,
+              category: getCategoryName(item.product.category),
+              barcode: item.product.barcode || '',
+              brand: item.product.brand || '',
+              supplier: item.product.supplier || ''
+            },
+            quantity: quantity,
+            discount: item.discount || 0,
+            discountType: item.discountType || 'percentage',
+            subtotal: item.subtotal || 0,
+            profit: itemProfit,
+            profitMargin: profitMargin,
+            notes: item.notes || ''
+          };
+        }),
         
         // Totales
         subtotal: totals.subtotal || 0,
         discounts: totals.globalDiscountAmount || 0,
         tax: totals.tax || 0,
         total: totals.total || 0,
+        
+
         
         // Pago
         paymentMethod: paymentMethod,
@@ -4181,17 +4244,31 @@ const POSSalesSystem: React.FC = () => {
         cashier: user?.email || 'admin@pos.local',
         notes: `Venta POS - ${cart.length} productos`,
         
+        // Ganancias calculadas
+        totalProfit: cart.reduce((sum, item) => {
+          const costPrice = item.product.costPrice || 0;
+          const salePrice = item.product.price || 0;
+          const quantity = item.quantity || 0;
+          return sum + ((salePrice - costPrice) * quantity);
+        }, 0),
+        totalProfitMargin: totals.total > 0 ? (cart.reduce((sum, item) => {
+          const costPrice = item.product.costPrice || 0;
+          const salePrice = item.product.price || 0;
+          const quantity = item.quantity || 0;
+          return sum + ((salePrice - costPrice) * quantity);
+        }, 0) / totals.total * 100) : 0,
+        
         // Timestamps
         createdAt: currentDateTime.toISOString(),
         timestamp: currentDateTime // Compatibilidad
       };
 
-      console.log('💾 Guardando venta en BD interna:', saleData);
+
 
       try {
         // 🎯 PRIORIDAD 1: Guardar en BD interna (CONFIABLE)
         const savedSale = await internalDB.createSale(saleData);
-        console.log('✅ Venta guardada en BD interna:', savedSale);
+
 
         // 🔥 NUEVO: También crear la venta en el backend para descuento de stock
         try {
@@ -4901,11 +4978,12 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             
             <div className="flex items-center space-x-3">
               {/* Estado de conexión */}
-              <button
-                onClick={() => setShowOfflineStatus(true)}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-50 border hover:bg-gray-100 transition-colors"
-                title="Ver estado de sincronización"
-              >
+              {barFunctionsConfig.showConnectionStatus && (
+                <button
+                  onClick={() => setShowOfflineStatus(true)}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-50 border hover:bg-gray-100 transition-colors"
+                  title="Ver estado de sincronización"
+                >
                 {/* Icono de conexión */}
                 <div className="flex items-center gap-1">
                   {connectionStatus.isOnline ? (
@@ -4960,26 +5038,11 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                   )}
                 </div>
               </button>
-
-              {/* Botón de sincronización manual */}
-              {connectionStatus.isOnline && connectionStatus.pendingOperations > 0 && (
-                <Button
-                  onClick={syncPendingOperations}
-                  disabled={connectionStatus.syncInProgress}
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-200 hover:bg-blue-50 text-blue-700"
-                >
-                  {connectionStatus.syncInProgress ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                </Button>
               )}
 
-
-              <Button
+              {/* Botón de Debug - Solo si está habilitado */}
+              {barFunctionsConfig.showDebugButton && (
+                <Button
                 onClick={async () => {
                   console.log('🔄 DEBUG - Estado actual del corte de caja:', cashRegisterStatus);
                   console.log('🔄 DEBUG - Modal visible:', showCashRegisterModal);
@@ -5022,19 +5085,18 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                 className="border-green-200 hover:bg-green-50 text-green-700"
               >
                 <RefreshCw className="h-4 w-4" />
-                
               </Button>
+              )}
 
               {/* Botón para cerrar turno */}
-              {cashRegisterStatus.isOpen && (
+              {cashRegisterStatus.isOpen && barFunctionsConfig.showCloseShiftButton && (
                 <Button
                   onClick={openCloseShiftModal}
                   variant="ghost"
                   size="sm"
-                  className="h-8 px-3 text-xs border border-red-200 hover:bg-red-50 text-red-600 hover:text-red-700 transition-all duration-200"
+                  className="h-7 px-2 text-xs border border-red-100 bg-red-50/30 hover:bg-red-50 text-red-500 hover:text-red-600 hover:border-red-200 transition-all duration-300 rounded-md shadow-sm"
                 >
-                  <LogOut className="h-3 w-3 mr-1" />
-                  Cerrar
+                  <LogOut className="h-3 w-3" />
                 </Button>
               )}
 
@@ -5697,9 +5759,9 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             </CardContent>
           </Card>
 
-          {/* Carrito de productos - Ultra compacto */}
-          <Card className="shadow-sm border-0 bg-white">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-orange-50 border-b border-gray-100 py-2">
+          {/* Carrito de productos - Con scroll interno */}
+          <Card className="shadow-sm border-0 bg-white flex-1 flex flex-col min-h-0">
+            <CardHeader className="bg-gradient-to-r from-slate-50 to-orange-50 border-b border-gray-100 py-2 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="p-1 bg-orange-600 rounded-md">
@@ -5727,7 +5789,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-3">
+            <CardContent className="p-3 flex-1 overflow-y-auto">
               {cart.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -5871,128 +5933,6 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       <span className="text-blue-700 font-medium">📊 {cart.reduce((sum, item) => sum + item.quantity, 0)} productos • {cart.length} líneas</span>
                     </div>
                   </div>
-
-                  {/* Resumen de totales en el carrito */}
-                  <div className="bg-gray-50 border border-gray-200 rounded p-2 mt-2">
-                    <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                      <Calculator className="h-3 w-3" />
-                      Resumen de Pago
-                    </h4>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span>Subtotal:</span>
-                        <span className="font-semibold">${totals.subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="border-t pt-1">
-                        <div className="flex justify-between text-sm font-bold text-green-600">
-                          <span>TOTAL:</span>
-                          <span>${totals.total.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Método de pago seleccionado */}
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CreditCard className="h-4 w-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">Método de Pago:</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {paymentMethod === 'cash' && <Banknote className="h-4 w-4 text-green-600" />}
-                        {paymentMethod === 'card' && <CreditCard className="h-4 w-4 text-blue-600" />}
-                        {paymentMethod === 'transfer' && <DollarSign className="h-4 w-4 text-purple-600" />}
-                        {paymentMethod === 'mixed' && <Calculator className="h-4 w-4 text-orange-600" />}
-                        {paymentMethod === 'credit' && <Clock className="h-4 w-4 text-red-600" />}
-                        <span className="text-sm capitalize font-medium">
-                          {paymentMethod === 'cash' ? 'Efectivo' : 
-                           paymentMethod === 'card' ? 'Tarjeta' :
-                           paymentMethod === 'transfer' ? 'Transferencia' :
-                           paymentMethod === 'mixed' ? 'Mixto' :
-                           paymentMethod === 'credit' ? 'Crédito' : paymentMethod}
-                        </span>
-                      </div>
-                      
-                      {/* Mostrar cambio si es efectivo */}
-                      {paymentMethod === 'cash' && receivedAmount > 0 && (
-                        <div className="mt-2 p-2 bg-yellow-50 rounded-md">
-                          <div className="flex justify-between text-sm">
-                            <span>Recibido:</span>
-                            <span className="font-semibold">${receivedAmount.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Cambio:</span>
-                            <span className={`font-semibold ${totals.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              ${Math.abs(totals.change).toFixed(2)}
-                              {totals.change < 0 && ' (Falta)'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Botón de Completar y Pagar */}
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <Button
-                        onClick={processSale}
-                        disabled={processing || cart.length === 0 || 
-                          (paymentMethod === 'cash' && receivedAmount < totals.total) ||
-                          (paymentMethod === 'credit' && !creditDueDate)}
-                        className="w-full h-16 text-lg font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {processing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                            Procesando Venta...
-                          </>
-                        ) : (
-                          <div className="w-full flex items-center justify-between">
-                            <div className="flex items-center">
-                              <CheckCircle className="h-5 w-5 mr-2" />
-                              💳 Completar y Cobrar
-                            </div>
-                            <div className="text-right">
-                              <div className="text-xl font-bold">
-                                ${totals.total.toLocaleString('es-ES', {minimumFractionDigits: 0})}
-                              </div>
-                              <div className="text-xs opacity-90">
-                                {cart.reduce((sum, item) => sum + item.quantity, 0)} productos
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </Button>
-
-                      {/* Botones adicionales */}
-                      <div className="grid grid-cols-2 gap-2 mt-3">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => printReceipt()} 
-                          className="h-10 border-blue-300 text-blue-700 hover:bg-blue-50"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Vista Previa
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            if (cart.length === 0) {
-                              toast({
-                                title: "Datos incompletos",
-                                description: "Asegúrate de tener productos antes de imprimir",
-                                variant: "destructive"
-                              });
-                              return;
-                            }
-                            printReceipt();
-                          }}
-                          className="h-10 border-purple-300 text-purple-700 hover:bg-purple-50"
-                        >
-                          <Printer className="h-4 w-4 mr-1" />
-                          Imprimir
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </CardContent>
@@ -6072,11 +6012,11 @@ ${totalPointsEarned > 0 && customer.clientCode ?
           </Card>
         </div>
 
-        {/* Panel lateral derecho - Ultra compacto */}
-        <div className="lg:col-span-2 space-y-1 overflow-y-auto">
+        {/* Panel lateral derecho - Ultra compacto con botón fijo */}
+        <div className="lg:col-span-2 flex flex-col h-full overflow-hidden">
           
           {/* Resumen de totales - Compacto */}
-          <Card className="shadow-sm">
+          <Card className="shadow-sm flex-shrink-0">
             <CardHeader className="py-1">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Calculator className="h-3 w-3 text-blue-600" />
@@ -6317,92 +6257,85 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             </Card>
           )}
 
-          {/* Botones de acción - Solo botón de guardar borrador */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-3">
-                {/* Estado de la venta */}
-                <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center">
-                      <span className={`inline-block w-2 h-2 rounded-full mr-2 ${cart.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                      <span className={cart.length > 0 ? 'text-green-700' : 'text-gray-500'}>
-                        {cart.length} productos
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <span className="inline-block w-2 h-2 rounded-full mr-2 bg-green-500"></span>
-                      <span className="text-green-700">
-                        Cliente OK
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                        paymentMethod === 'cash' ? (receivedAmount >= totals.total ? 'bg-green-500' : 'bg-yellow-500') : 
-                        paymentMethod === 'credit' ? (creditDueDate ? 'bg-green-500' : 'bg-yellow-500') :
-                        'bg-green-500'
-                      }`}></span>
-                      <span className={
-                        paymentMethod === 'cash' ? (receivedAmount >= totals.total ? 'text-green-700' : 'text-yellow-600') : 
-                        paymentMethod === 'credit' ? (creditDueDate ? 'text-green-700' : 'text-yellow-600') :
-                        'text-green-700'
-                      }>
-                        Pago {
-                          paymentMethod === 'cash' ? (receivedAmount >= totals.total ? 'OK' : 'Pendiente') : 
-                          paymentMethod === 'credit' ? (creditDueDate ? 'OK' : 'Pendiente') :
-                          'OK'
-                        }
-                      </span>
-                    </div>
+          {/* Botón de Completar y Pagar */}
+          <Card className="shadow-lg border-0 bg-white">
+            <CardContent className="p-3">
+              {/* Mostrar cambio si es efectivo */}
+              {paymentMethod === 'cash' && receivedAmount > 0 && (
+                <div className="mb-3 p-2 bg-yellow-50 rounded-md border border-yellow-200">
+                  <div className="flex justify-between text-sm">
+                    <span>Recibido:</span>
+                    <span className="font-semibold">${receivedAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Cambio:</span>
+                    <span className={`font-semibold ${totals.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ${Math.abs(totals.change).toFixed(2)}
+                      {totals.change < 0 && ' (Falta)'}
+                    </span>
                   </div>
                 </div>
+              )}
 
-                {cart.length > 0 && (
-                  <div className="grid grid-cols-1 gap-2 pt-2">
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        // Guardar venta como borrador (funcionalidad futura)
-                        toast({
-                          title: "Función próximamente",
-                          description: "La función de guardar borrador estará disponible pronto",
-                        });
-                      }}
-                      className="h-10 bg-gray-100 hover:bg-gray-200 text-gray-700"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      💾 Guardar Borrador
-                    </Button>
+              {/* Botón de Completar y Pagar */}
+              <Button
+                onClick={processSale}
+                disabled={processing || cart.length === 0 || 
+                  (paymentMethod === 'cash' && receivedAmount < totals.total) ||
+                  (paymentMethod === 'credit' && !creditDueDate)}
+                className="w-full h-16 text-lg font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+              >
+                {processing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                    Procesando Venta...
+                  </>
+                ) : (
+                  <div className="w-full flex items-center justify-between">
+                    <div className="flex items-center">
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      💳 Completar y Cobrar
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold">
+                        ${totals.total.toLocaleString('es-ES', {minimumFractionDigits: 0})}
+                      </div>
+                      <div className="text-xs opacity-90">
+                        {cart.reduce((sum, item) => sum + item.quantity, 0)} productos
+                      </div>
+                    </div>
                   </div>
                 )}
+              </Button>
 
-                {/* Información de validación */}
-                <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium text-gray-700">Estado de la Venta:</span>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    <div className={`flex items-center gap-2 ${cart.length > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                      {cart.length > 0 ? '✅' : '⭕'} Productos: {cart.length > 0 ? `${cart.length} líneas` : 'Sin productos'}
-                    </div>
-                    <div className="flex items-center gap-2 text-green-600">
-                      ✅ Cliente: Identificado
-                    </div>
-                    <div className={`flex items-center gap-2 ${paymentMethod ? 'text-green-600' : 'text-gray-400'}`}>
-                      {paymentMethod ? '✅' : '⭕'} Pago: {paymentMethod ? 
-                        (paymentMethod === 'cash' ? 'Efectivo' : 
-                         paymentMethod === 'card' ? 'Tarjeta' : 
-                         paymentMethod === 'transfer' ? 'Transferencia' : 'Mixto') 
-                        : 'Sin seleccionar'}
-                    </div>
-                  </div>
-                  {cart.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <div className="text-green-700 font-medium">🎉 ¡Listo para procesar!</div>
-                    </div>
-                  )}
-                </div>
+              {/* Botones adicionales */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => printReceipt()} 
+                  className="h-10 border-blue-300 text-blue-700 hover:bg-blue-50"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  Vista Previa
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (cart.length === 0) {
+                      toast({
+                        title: "Datos incompletos",
+                        description: "Asegúrate de tener productos antes de imprimir",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    printReceipt();
+                  }}
+                  className="h-10 border-purple-300 text-purple-700 hover:bg-purple-50"
+                >
+                  <Printer className="h-4 w-4 mr-1" />
+                  Imprimir
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -7199,11 +7132,11 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                 </Button>
                 <Button
                   onClick={closeCashRegister}
-                  className="flex-1 h-16 text-xl bg-red-600 hover:bg-red-700 text-white font-bold"
+                  className="flex-1 h-12 text-base bg-red-500 hover:bg-red-600 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200"
                   disabled={!actualCashCount || parseFloat(actualCashCount) < 0}
                 >
-                  <LogOut className="h-6 w-6 mr-3" />
-                  🏁 Cerrar Turno Definitivamente
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Cerrar Turno
                 </Button>
               </div>
             </div>

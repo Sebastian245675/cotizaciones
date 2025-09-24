@@ -15,7 +15,7 @@ export class OfflineSyncService {
       const isFirstTime = await this.isFirstTimeSetup();
       
       if (isFirstTime && navigator.onLine) {
-        console.log('🔄 Primera inicialización - Descargando datos de Firebase...');
+
         await this.performInitialSync();
       }
 
@@ -45,7 +45,7 @@ export class OfflineSyncService {
     this.isSyncing = true;
 
     try {
-      console.log('🔄 Iniciando sincronización inicial Firebase → SQLite...');
+
 
       // Sincronizar productos
       await this.syncCollectionToLocal('products', 'productos');
@@ -79,7 +79,7 @@ export class OfflineSyncService {
     options: { limit?: number } = {}
   ): Promise<void> {
     try {
-      console.log(`📥 Sincronizando ${firebaseCollection}...`);
+
 
       // Obtener datos de Firebase
       const collectionRef = collection(db, firebaseCollection);
@@ -93,7 +93,7 @@ export class OfflineSyncService {
         updated_at: doc.data().updated_at?.toDate?.()?.toISOString() || new Date().toISOString()
       }));
 
-      console.log(`📊 Encontrados ${items.length} elementos en ${firebaseCollection}`);
+
 
       // Enviar a backend local en lotes
       const batchSize = 50;
@@ -114,7 +114,7 @@ export class OfflineSyncService {
         }
       }
 
-      console.log(`✅ ${firebaseCollection} sincronizado exitosamente`);
+
 
     } catch (error) {
       console.error(`❌ Error sincronizando ${firebaseCollection}:`, error);

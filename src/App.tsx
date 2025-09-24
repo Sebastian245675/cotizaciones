@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import AdvancedIndex from "./pages/AdvancedIndex";
-import { AdminPanel } from "./pages/AdminPanel";
+import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import { UserProfile } from "@/components/user/UserProfile";
 import ProductDetailPage from "./pages/ProductDetail";
@@ -31,9 +31,9 @@ const App = () => {
   useEffect(() => {
     const initializeOfflineSystem = async () => {
       try {
-        console.log('🔄 Inicializando sistema offline...');
+
         await posAPI.initialize();
-        console.log('✅ Sistema offline inicializado');
+
       } catch (error) {
         console.error('❌ Error inicializando sistema offline:', error);
       }

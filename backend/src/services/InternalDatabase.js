@@ -234,6 +234,16 @@ class InternalDatabase {
     }
   }
 
+  async getCashRegisterById(id) {
+    try {
+      const cashRegisters = await this.readFile(this.cashRegistersFile) || [];
+      return cashRegisters.find(register => register.id === id);
+    } catch (error) {
+      console.error('❌ Error obteniendo corte de caja por ID:', error);
+      return null;
+    }
+  }
+
   async updateCashRegister(registerId, updateData) {
     try {
       const cashRegisters = await this.readFile(this.cashRegistersFile) || [];

@@ -34,9 +34,7 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Log para depuración
-console.log('🔥 Firebase initialized with project:', firebaseConfig.projectId);
-console.log('🔥 App name:', app.name);
-console.log('🔥 App options:', app.options);
+
 
 const analytics = getAnalytics(app);
 export const auth = getAuth(app);
@@ -44,8 +42,7 @@ export const functions = getFunctions(app, 'us-central1');
 export const storage = getStorage(app);
 
 // Log para verificar que las funciones usen el proyecto correcto
-console.log('🔧 Functions configured for project:', firebaseConfig.projectId);
-console.log('🔧 Functions app:', functions.app.name);
+
 
 // Conexión para la función de envío de correo
 export const sendWelcomeEmail = httpsCallable(functions, 'sendRegistrationEmail');
@@ -86,7 +83,7 @@ if (shouldUseEmulator) {
       try {
         await enableIndexedDbPersistence(db);
         persistenceEnabled = true;
-        console.log("%c✅ Persistencia Firestore habilitada", "color: green; font-weight: bold;");
+
       } catch (err: any) {
         if (err.code === 'failed-precondition') {
           console.warn("No se pudo habilitar la persistencia: múltiples pestañas abiertas");
@@ -100,7 +97,7 @@ if (shouldUseEmulator) {
     try {
       await getDocs(collection(db, "access_test"));
       simulatedDB.setSimulationMode(false);
-      console.log("%c✅ Firestore está accesible y configurado correctamente", "color: green; font-weight: bold;");
+
     } catch (accessError: any) {
       // Si el error es de permisos pero la conexión funciona, mostrar mensajes específicos
       if (accessError.code === 'permission-denied') {
@@ -167,5 +164,3 @@ export { FirebaseDebugger, diagnosticarFirebase } from './lib/firebase-debug';
 import './scripts/initializeFirestore';
 
 // Añadir diagnóstico a la ventana para acceso fácil desde la consola de desarrollador
-console.log("%c🔧 Tip de depuración: Usa diagnosticarFirebase() en la consola para diagnosticar problemas con Firebase", 
-  "background: #673AB7; color: white; padding: 4px; border-radius: 4px; font-weight: bold;");

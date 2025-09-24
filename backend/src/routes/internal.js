@@ -189,6 +189,33 @@ router.get('/cash-registers/active/:userId', async (req, res) => {
   }
 });
 
+// Obtener corte de caja específico por ID
+router.get('/cash-registers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cashRegister = await db.getCashRegisterById(id);
+    
+    if (!cashRegister) {
+      return res.status(404).json({
+        success: false,
+        error: 'Corte de caja no encontrado'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: cashRegister
+    });
+  } catch (error) {
+    console.error('Error obteniendo corte por ID:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo corte de caja',
+      details: error.message
+    });
+  }
+});
+
 // Crear nuevo corte de caja
 router.post('/cash-registers', async (req, res) => {
   try {

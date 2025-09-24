@@ -77,5 +77,3 @@ export const initializeFirestore = async () => {
 // Hacer la función disponible globalmente para uso en consola
 (window as any).initializeFirestore = initializeFirestore;
 
-console.log('📋 Función initializeFirestore disponible globalmente');
-console.log('💡 Usa initializeFirestore() en la consola para inicializar las colecciones');

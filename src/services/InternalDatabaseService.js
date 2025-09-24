@@ -192,6 +192,20 @@ class InternalDatabaseService {
     }
   }
 
+  async getCashRegisterById(id) {
+    try {
+      // Primero intentar obtener de la API
+      const response = await this.makeRequest(`/cash-registers/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error obteniendo corte de caja por ID:', error);
+      
+      // Buscar en localStorage como fallback
+      const localCashRegisters = this.getFromLocalStorage('cashRegisters') || [];
+      return localCashRegisters.find(cr => cr.id === id);
+    }
+  }
+
   async getActiveCashRegister(userId) {
     try {
       const response = await this.makeRequest(`/cash-registers/active/${userId}`);

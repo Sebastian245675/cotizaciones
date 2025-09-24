@@ -1,12 +1,24 @@
-/* SOLUCION DEFINITIVA - CSS SIMPLE Y DIRECTO */
+/* SOLUCION DEFINITIVA - CSS SIMPLE Y DIRECTO CON SIDEBAR RESPONSIVO */
 
-/* Contenido principal SIEMPRE con margen de 256px y padding-top para el header */
+/* Contenido principal con margen dinámico para sidebar colapsado/expandido */
 .admin-main-content {
-  margin-left: 256px !important;
-  width: calc(100vw - 256px) !important;
+  transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out !important;
   background: #f8fafc;
   padding-top: 4rem !important; /* Espacio para el header (64px) */
   min-height: calc(100vh - 4rem) !important; /* Altura mínima considerando el header */
+}
+
+/* Estado por defecto - sidebar colapsado (solo iconos) */
+.admin-main-content {
+  margin-left: 64px !important; /* 4rem = 64px para sidebar colapsado */
+  width: calc(100vw - 64px) !important;
+}
+
+/* Cuando el sidebar está expandido (con hover) */
+.sidebar-expanded ~ * .admin-main-content,
+.admin-main-content.sidebar-expanded {
+  margin-left: 256px !important; /* 16rem = 256px para sidebar expandido */
+  width: calc(100vw - 256px) !important;
 }
 
 /* En pantallas pequeñas, sin margen pero manteniendo el padding-top */
@@ -15,5 +27,12 @@
     margin-left: 0 !important;
     width: 100vw !important;
     padding-top: 4rem !important; /* Mantener espacio para el header en móvil */
+    transition: none !important; /* Deshabilitar transiciones en móvil */
+  }
+  
+  .sidebar-expanded ~ * .admin-main-content,
+  .admin-main-content.sidebar-expanded {
+    margin-left: 0 !important;
+    width: 100vw !important;
   }
 }

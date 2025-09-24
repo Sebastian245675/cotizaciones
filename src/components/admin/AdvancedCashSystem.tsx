@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import './modal-override.css';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,13 +12,13 @@ import { cn } from "@/lib/utils";
 import { 
   Calculator, DollarSign, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
   CreditCard, Banknote, Receipt, FileText, Calendar, Clock, PieChart, BarChart3,
-  Target, AlertCircle, CheckCircle, RefreshCw, Download, PrinterIcon, Eye,
+  Target, AlertCircle, CheckCircle, RefreshCw, Download, Eye,
   Building, ShoppingCart, ShoppingBag, Package, Users, Percent, Hash, Archive, Plus, Minus,
   ChevronRight, ChevronDown, Filter, Search, SlidersHorizontal, Loader2,
   Zap, Star, Award, Crown, Diamond, Sparkles, Flame, Activity, Radio,
   Timer, Gauge, MapPin, Smartphone, Wifi, Battery, Signal, Mic2,
   Rocket, Globe, Infinity, Layers, Maximize2, MousePointer, Move3D,
-  Volume2, VolumeX, Settings, Bell, BellRing, ChevronUp, PlayCircle,
+  Settings, Bell, BellRing, ChevronUp, PlayCircle,
   StopCircle, PauseCircle, RotateCcw, Share2, Link2, Camera, Video,
   Headphones, Coffee, Zap as Lightning, Sun, Moon, Cloud, Umbrella, Wind, History,
   BarChart
@@ -45,6 +46,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { collection, addDoc, getDocs, updateDoc, doc, getDoc, query, orderBy, where, Timestamp, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import internalDB from '@/services/InternalDatabaseService';
 
 // Interfaces exportables
 export interface CashMovement {
@@ -367,7 +369,6 @@ export const CashRegisterSystem: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString()); // 🔧 CORREGIDO: usar fecha local
   const [activeTab, setActiveTab] = useState('dashboard');
   const [liveMode, setLiveMode] = useState(true); // Activado por defecto para actualización en tiempo real
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Estados para modales
@@ -469,6 +470,7 @@ export const CashRegisterSystem: React.FC = () => {
       console.log('💳 Reporte actual - Card Sales:', currentReport?.creditCardSales || 0);
       console.log('📱 Reporte actual - Digital:', currentReport?.digitalPayments || 0);
       console.log('💰 Balance en caja:', currentReport?.cashInBox || 0);
+      console.log('🎯 Ganancia total:', currentReport?.totalProfit || 0);
     };
     
     return () => {
@@ -686,10 +688,7 @@ export const CashRegisterSystem: React.FC = () => {
               }
             }
             
-            // Efectos de sonido y visuales para movimientos nuevos
-            if (soundEnabled && todayReport.movements.length > (currentReport?.movements.length || 0)) {
-              playNotificationSound();
-            }
+
           }
         }
       );
@@ -738,7 +737,7 @@ export const CashRegisterSystem: React.FC = () => {
         unsubscribeVentas();
       };
     }
-  }, [selectedDate, liveMode, soundEnabled, currentReport?.movements.length]);
+  }, [selectedDate, liveMode, currentReport?.movements.length]);
 
   // Efecto para sincronizar ventas cuando cambia el reporte actual
   useEffect(() => {
@@ -821,6 +820,9 @@ export const CashRegisterSystem: React.FC = () => {
         
         setCurrentReport(report);
         
+        // Sincronizar con BD interna
+        await syncWithInternalDB(report.id);
+        
         toast({
           title: "✅ Turno Activo Detectado",
           description: `Turno con $${report.openingBalance?.toLocaleString()} en progreso`,
@@ -867,12 +869,103 @@ export const CashRegisterSystem: React.FC = () => {
         
         console.log('📊 Reporte cargado:', report.status, '- Balance:', report.openingBalance);
         setCurrentReport(report);
+        
+        // Sincronizar con BD interna
+        await syncWithInternalDB(report.id);
       } else {
-        console.log('❌ No se encontró reporte para hoy');
+        console.log('❌ No se encontrado reporte para hoy');
         setCurrentReport(null);
       }
     } catch (error) {
       console.error("❌ Error loading today's report:", error);
+    }
+  };
+
+  // Función para sincronizar datos de BD interna con el reporte actual
+  const syncWithInternalDB = async (reportId: string) => {
+    try {
+      console.log('🔄 Sincronizando con BD interna para reportId:', reportId);
+      const internalReport = await internalDB.getCashRegister(reportId);
+      
+      console.log('📋 Resultado de BD interna:', internalReport);
+      console.log('📋 Current report existe:', !!currentReport);
+      
+      if (internalReport && currentReport) {
+        console.log('💰 Datos de BD interna:', {
+          totalSales: internalReport.totalSales,
+          totalProfit: internalReport.totalProfit,
+          cashSales: internalReport.cashSales,
+          creditCardSales: internalReport.creditCardSales
+        });
+
+        // Actualizar el reporte actual con los datos de la BD interna
+        const updatedReport = {
+          ...currentReport,
+          totalSales: internalReport.totalSales || currentReport.totalSales,
+          totalProfit: internalReport.totalProfit || currentReport.totalProfit || 0,
+          cashSales: internalReport.cashSales || currentReport.cashSales,
+          creditCardSales: internalReport.creditCardSales || currentReport.creditCardSales,
+          digitalPayments: internalReport.digitalPayments || currentReport.digitalPayments
+        };
+
+        setCurrentReport(updatedReport);
+        console.log('✅ Reporte sincronizado con BD interna');
+      } else {
+        // Si no hay datos en BD interna, calcular ganancias desde las ventas del día
+        console.log('⚠️ No hay datos en BD interna, calculando ganancias desde ventas...');
+        await calculateProfitFromSales(reportId);
+      }
+    } catch (error) {
+      console.log('⚠️ No se pudo sincronizar con BD interna:', error);
+      // Como fallback, intentar calcular desde las ventas
+      await calculateProfitFromSales(reportId);
+    }
+  };
+
+  // Función para calcular ganancias desde las ventas del día
+  const calculateProfitFromSales = async (reportId: string) => {
+    try {
+      console.log('🧮 Calculando ganancias desde ventas del día...');
+      
+      // Obtener ventas del día actual
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+      
+      const todaySales = daySales.filter(sale => {
+        const saleDate = new Date(sale.fechaVenta || sale.fecha || sale.timestamp);
+        return saleDate >= startOfToday && saleDate < endOfToday;
+      });
+      
+      let totalProfit = 0;
+      
+      todaySales.forEach(sale => {
+        if (sale.totalProfit) {
+          totalProfit += sale.totalProfit;
+        } else if (sale.items) {
+          // Calcular ganancia si no está en la venta
+          sale.items.forEach(item => {
+            const costPrice = item.product?.costPrice || item.costPrice || 0;
+            const salePrice = item.salePrice || item.price || 0;
+            const quantity = item.quantity || 1;
+            const itemProfit = (salePrice - costPrice) * quantity;
+            totalProfit += itemProfit;
+          });
+        }
+      });
+      
+      console.log('💰 Ganancia calculada desde ventas:', totalProfit);
+      
+      if (currentReport && totalProfit > 0) {
+        const updatedReport = {
+          ...currentReport,
+          totalProfit: totalProfit
+        };
+        setCurrentReport(updatedReport);
+        console.log('✅ Ganancia actualizada desde cálculo de ventas');
+      }
+    } catch (error) {
+      console.log('⚠️ Error calculando ganancias desde ventas:', error);
     }
   };
 
@@ -1068,13 +1161,6 @@ export const CashRegisterSystem: React.FC = () => {
     }
 
     fetchDaySales(startDate, endDate);
-  };
-
-  // Funciones de sonido y efectos
-  const playNotificationSound = () => {
-    const audio = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmQdBDWBzvLZiTYIG2q+7eGVTwwOUarm8LpnGwU9k9n0yHUqBSl+zPLaizsIGGq+7uOWTgwOUarm8LpoGgU+lNr0yHgpBSl+zPLajDkIF2m+7uOWTwsOUqvm8LxmGgY9lNr0yHkpBSuBzvLZijYHGmu/7+OWTg0NVKHN8cF6JQQugs/z2Is4CBxuweGdcVkJDlOm5O+yiWwGSJ5Fp7J4zKMcxHYW4x4XRd3jrDmBr0CJNy1JI7C9jHKKj9YYtLLKf7HJf99kx+nZUJfNP5Q3kNnEkxXcR8xFm4R3yfYTLlLz+HM0CqO/jWKLrq5xL9Ny2KZNzcFLrJ+1/M8tRhNkCdkOmEh7+HjFCqLCjaB1jL13jkEG4s1YKA4vwM5X3FPhHWK0w5H4fYkq0KjH3D0lAkSP8+bJ3T/pBzjH7fD7Ow95U/6XyoTO4VhHFT/F4RL6vNaKfcv9CxiB5fjF5pSLO7v7KJpM1/LlDOoLH4A1XJnTZuYOYAK7xJx6k6HfAXYJ2BKh4DWz8jSQP4BNcjOJ+N+LdgFm2jDnLRk6QLbMN4nPM2z8h6FWUx8t5xXDR8z3F6OwOwzRJNP0VWVnUPGVzE7yqGklf6DgdgK/+3k/Jy3Z6JbvwBQrRqg5RjTLhOEAOvGMrPHt5a/UyiZmv3cFCHDW4V5IYV5DUNHt6Wx9/QqnLtDQjjEzgSDCF3HdY8pLV+NWlpIf2qJJaJJNTQi8Uh4e8U7SJo2ioZMWDgNUfbCNVRAKz/7AePf9fhUBj2hzx9+KVRYzB8+uxbEWgNKZ1RIBqF+7LRFKF4V1CgGzZTfF6x7R4PpInOFBrLxzgVqOCDJNJY4Gm6dSMO9bI7b4nL3P1/3O9TRPSEFzGYV4D+kCJuGYTBYJi9OUFG+3hFaYXXyOhTL6pUy9z6k2t8HUQCHx3hJ1zp6BKhDDZOGbU5W9x+b2x1kkJGKqh2RB/yQQ5ZAfQrTOCKUh5U0cYuQAE7QFJeHbzRfUoYkJNOWfUTkkOdNXTKr0QU+4HfxOfDUDCXgJhQgGxc3j6hCa1BKnGzZ3xv4kVUdHBbVUcOh7H3lE3DBRXqO8y0K+J5Qz/JhVJTd6DFb7wLj5W1g3LTXu8xLm");
-    audio.volume = 0.3;
-    audio.play().catch(() => {});
   };
 
   // === FUNCIONES DE ANÁLISIS AVANZADO ===
@@ -1857,15 +1943,6 @@ export const CashRegisterSystem: React.FC = () => {
               Actualizar
             </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="bg-white/80 backdrop-blur-sm border-white/50 hover:bg-white"
-            >
-              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            </Button>
-
             {!currentReport ? (
               <Button
                 onClick={() => setIsCreatingReport(true)}
@@ -1876,10 +1953,6 @@ export const CashRegisterSystem: React.FC = () => {
               </Button>
             ) : (
               <div className="flex gap-2">
-                <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
-                  <PrinterIcon className="h-4 w-4 mr-2" />
-                  Imprimir
-                </Button>
                 <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
                   <Share2 className="h-4 w-4 mr-2" />
                   Exportar
@@ -1921,7 +1994,41 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<TrendingUp />}
                 label="Ganancias"
-                value={`$${(currentReport.totalProfit || 0).toLocaleString()}`}
+                value={`$${(() => {
+                  let totalProfit = 0;
+                  const today = new Date().toISOString().split('T')[0];
+                  
+                  daySales.forEach((sale, index) => {
+                    // Determinar fecha de venta
+                    let saleDate = today; // default hoy
+                    if (sale.fechaVenta) {
+                      saleDate = sale.fechaVenta;
+                    } else if (sale.fecha) {
+                      saleDate = typeof sale.fecha === 'string' ? sale.fecha.split('T')[0] : sale.fecha.toDate().toISOString().split('T')[0];
+                    }
+                    
+                    if (saleDate === today) {
+                      // Buscar ganancia en múltiples campos
+                      let profit = 0;
+                      
+                      if (sale.totalProfit) {
+                        profit = Number(sale.totalProfit);
+
+                      } else if (sale.profit) {
+                        profit = Number(sale.profit);
+
+                      } else if (sale.ganancia) {
+                        profit = Number(sale.ganancia);
+                        console.log(`� Encontrado ganancia: ${profit}`);
+                      }
+                      
+                      totalProfit += profit;
+                      console.log(`� Ganancia venta: ${profit} - Total acumulado: ${totalProfit}`);
+                    }
+                  });
+                  
+                  return totalProfit.toLocaleString();
+                })()}`}
                 change={15.2}
                 color="text-purple-600"
                 gradient="from-purple-500 to-violet-600"
@@ -3006,14 +3113,6 @@ export const CashRegisterSystem: React.FC = () => {
                                   <Eye className="h-4 w-4 mr-1" />
                                   Ver Detalles
                                 </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="hover:bg-green-50"
-                                >
-                                  <PrinterIcon className="h-4 w-4 mr-1" />
-                                  Imprimir
-                                </Button>
                               </div>
                             </div>
                           </CardContent>
@@ -3029,7 +3128,7 @@ export const CashRegisterSystem: React.FC = () => {
 
         {/* Modal para crear nuevo corte */}
         <AlertDialog open={isCreatingReport} onOpenChange={setIsCreatingReport}>
-          <AlertDialogContent className="bg-white/95 backdrop-blur-xl border border-white/50">
+          <AlertDialogContent className="bg-white/95 backdrop-blur-xl border border-white/50 modal-top-override">
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-3 text-2xl">
                 <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full">
@@ -3108,7 +3207,7 @@ export const CashRegisterSystem: React.FC = () => {
 
       {/* Modal para ver Ticket Completo */}
       <AlertDialog open={showTicketModal} onOpenChange={setShowTicketModal}>
-        <AlertDialogContent className="max-w-2xl">
+        <AlertDialogContent className="max-w-2xl modal-top-override">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center space-x-2">
               <Receipt className="h-5 w-5 text-blue-600" />
@@ -3225,27 +3324,13 @@ export const CashRegisterSystem: React.FC = () => {
 
           <AlertDialogFooter>
             <AlertDialogCancel>Cerrar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                // Función para imprimir o compartir ticket
-                if (selectedSale) {
-                  console.log('🖨️ Imprimiendo ticket:', selectedSale);
-                  // Aquí se podría implementar lógica de impresión
-                }
-                setShowTicketModal(false);
-              }}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <PrinterIcon className="h-4 w-4 mr-2" />
-              Imprimir
-            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Modal para Entrada de Efectivo */}
       <AlertDialog open={showEntryModal} onOpenChange={setShowEntryModal}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="max-w-md modal-top-override">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center space-x-2">
               <ArrowUpCircle className="h-5 w-5 text-green-600" />
@@ -3350,7 +3435,7 @@ export const CashRegisterSystem: React.FC = () => {
 
       {/* Modal para Salida de Efectivo */}
       <AlertDialog open={showExitModal} onOpenChange={setShowExitModal}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="max-w-md modal-top-override">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center space-x-2">
               <ArrowDownCircle className="h-5 w-5 text-red-600" />
@@ -3456,7 +3541,7 @@ export const CashRegisterSystem: React.FC = () => {
 
       {/* Modal para Ver Detalles del Reporte Cerrado */}
       <AlertDialog open={showClosedReportModal} onOpenChange={setShowClosedReportModal}>
-        <AlertDialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-white/50">
+        <AlertDialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-white/50 modal-top-override">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-3 text-2xl">
               <div className="p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded-full">
@@ -3679,19 +3764,6 @@ export const CashRegisterSystem: React.FC = () => {
 
           <AlertDialogFooter>
             <AlertDialogCancel>Cerrar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => {
-                // Aquí se podría implementar la función de imprimir reporte
-                toast({
-                  title: "🖨️ Función de Impresión",
-                  description: "La impresión de reportes cerrados estará disponible pronto",
-                });
-              }}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-            >
-              <PrinterIcon className="h-4 w-4 mr-2" />
-              Imprimir Reporte
-            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
