@@ -4389,14 +4389,22 @@ const POSSalesSystem: React.FC = () => {
                 id: item.product.id,
                 nombre: item.product.name,
                 precio: item.product.price,
+                precioCosto: item.product.costPrice || 0,
                 cantidad: item.quantity,
-                subtotal: item.subtotal
+                subtotal: item.subtotal,
+                ganancia: item.profit || 0,
+                porcentajeGanancia: item.profitMargin || 0
               })),
               resumen: {
                 subtotal: saleData.subtotal,
                 descuentoGlobal: saleData.discounts,
                 impuestos: saleData.tax,
                 total: saleData.total
+              },
+              // Agregar información de ganancia a nivel de venta
+              ganancias: {
+                totalGanancia: saleData.totalProfit || 0,
+                porcentajeGananciaTotal: saleData.totalProfitMargin || 0
               },
               pago: saleData.paymentDetails,
               estado: 'completed',
