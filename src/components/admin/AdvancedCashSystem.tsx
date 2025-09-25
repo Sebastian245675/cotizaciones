@@ -533,24 +533,11 @@ export const CashRegisterSystem: React.FC = () => {
       sales.forEach(sale => {
         const total = sale.displayTotal || sale.resumen?.total || 0;
         const paymentMethod = sale.pago?.method || 'cash';
-        
-        // Calcular ganancia según estructura disponible
-        let profit = 0;
-        
-        // 1. Usar nueva estructura si está disponible
-        if (sale.ganancias?.totalGanancia) {
-          profit = Number(sale.ganancias.totalGanancia);
-        }
-        // 2. Calcular desde productos individuales con ganancia
-        else if (sale.productos && sale.productos.some((p: any) => p.ganancia !== undefined)) {
-          profit = sale.productos.reduce((sum: number, p: any) => sum + (Number(p.ganancia) || 0), 0);
-        }
-        // 3. Calcular usando precio de costo (método anterior)
-        else if (sale.productos) {
-          const cost = sale.productos.reduce((sum: number, p: any) => sum + (p.precioCosto || 0) * (p.cantidad || 1), 0);
-          profit = total - cost;
-        }
+        // Usar la ganancia ya calculada en lugar de recalcular
+        const profit = sale.ganancias?.totalGanancia || 0;
 
+        console.log(`💰 Venta ${sale.numeroVenta}: Total=$${total}, Ganancia=$${profit}`);
+        
         totalSales += total;
         totalProfit += profit;
 
@@ -616,11 +603,13 @@ export const CashRegisterSystem: React.FC = () => {
 
         console.log('✅ Reporte sincronizado con ventas:', {
           totalSales,
+          totalProfit,
           cashSales,
           creditCardSales,
           creditSales,
           digitalPayments,
-          cashInBox: newCashInBox
+          cashInBox: newCashInBox,
+          ventasSincronizadas: sales.length
         });
 
         // Mostrar notificación de sincronización
@@ -720,13 +709,27 @@ export const CashRegisterSystem: React.FC = () => {
           const todaySales = ventasSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as any))
             .filter((sale: any) => {
-              const saleDate = sale.fechaVenta || sale.timestamp?.toDate?.()?.toISOString().split('T')[0] || sale.fecha?.split('T')[0];
+              // Mejorar extracción de fecha con múltiples formatos
+              let saleDate = null;
+              
+              if (sale.fechaVenta) {
+                saleDate = sale.fechaVenta;
+              } else if (sale.timestamp?.toDate) {
+                // Timestamp de Firestore
+                saleDate = sale.timestamp.toDate().toISOString().split('T')[0];
+              } else if (sale.fecha) {
+                if (typeof sale.fecha === 'string') {
+                  saleDate = sale.fecha.split('T')[0];
+                } else if (sale.fecha.toDate) {
+                  // Timestamp de Firestore en campo fecha
+                  saleDate = sale.fecha.toDate().toISOString().split('T')[0];
+                }
+              }
+              
               const matches = saleDate === selectedDate;
 
               // Debug: mostrar fechas para entender el filtrado
-              if (!matches && sale.numeroVenta) {
-                console.log(`❌ Venta ${sale.numeroVenta} excluida - Fecha venta: ${saleDate}, Fecha filtro: ${selectedDate}`);
-              }
+              console.log(`🔍 Venta ${sale.numeroVenta || sale.id}: Fecha=${saleDate}, Filtro=${selectedDate}, Match=${matches}`);
 
               return matches;
             })
@@ -955,27 +958,16 @@ export const CashRegisterSystem: React.FC = () => {
       let totalProfit = 0;
       
       todaySales.forEach(sale => {
-        // 1. Usar nueva estructura si está disponible
+        // Usar la ganancia ya calculada de la estructura ganancias
         if (sale.ganancias?.totalGanancia) {
-          totalProfit += Number(sale.ganancias.totalGanancia);
-        }
-        // 2. Calcular desde productos individuales con ganancia
-        else if (sale.productos && sale.productos.some((p: any) => p.ganancia !== undefined)) {
-          sale.productos.forEach((producto: any) => {
-            totalProfit += Number(producto.ganancia || 0);
-          });
-        }
-        // 3. Formatos anteriores (compatibilidad)
-        else if (sale.totalProfit) {
+          totalProfit += sale.ganancias.totalGanancia;
+        } else if (sale.totalProfit) {
           totalProfit += sale.totalProfit;
-        } else if (sale.items) {
-          // Calcular ganancia desde items si no está en la venta
-          sale.items.forEach(item => {
-            const costPrice = item.product?.costPrice || item.costPrice || 0;
-            const salePrice = item.salePrice || item.price || 0;
-            const quantity = item.quantity || 1;
-            const itemProfit = (salePrice - costPrice) * quantity;
-            totalProfit += itemProfit;
+        } else if (sale.productos) {
+          // Calcular ganancia desde productos si no está disponible
+          sale.productos.forEach(producto => {
+            const gananciaProducto = producto.ganancia || 0;
+            totalProfit += gananciaProducto;
           });
         }
       });
@@ -1058,22 +1050,33 @@ export const CashRegisterSystem: React.FC = () => {
       
       // Aplicar filtros de fecha según el tipo seleccionado
       if (filterDate || endDate) {
-        const startDate = filterDate || new Date();
+        // Crear fecha en timezone local usando los componentes de fecha
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        const startDate = filterDate || new Date(year, month - 1, day); // month is 0-indexed
         const finishDate = endDate || startDate;
         
-        // Convertir fechas a formato YYYY-MM-DD para comparación
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = finishDate.toISOString().split('T')[0];
+        // Convertir fechas a formato YYYY-MM-DD para comparación usando fecha local
+        const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+        const endDateStr = `${finishDate.getFullYear()}-${String(finishDate.getMonth() + 1).padStart(2, '0')}-${String(finishDate.getDate()).padStart(2, '0')}`;
         
-        console.log(`🎯 Filtrando desde ${startDateStr} hasta ${endDateStr}`);
+        console.log(`✅ FECHAS FINALMENTE CORREGIDAS - selectedDate:${selectedDate}, startDate:${startDate.toDateString()}, filtering:${startDateStr} to ${endDateStr}`);
         
         filteredSales = allSalesData.filter(sale => {
           let saleDateStr: string;
           
-          // Usar fechaVenta si existe, sino extraer de timestamp
+          // Prioridad: fechaVenta > fecha > timestamp
           if (sale.fechaVenta) {
             saleDateStr = sale.fechaVenta;
+          } else if (sale.fecha) {
+            if (typeof sale.fecha === 'string') {
+              saleDateStr = sale.fecha.split('T')[0];
+            } else if (sale.fecha.toDate) {
+              saleDateStr = sale.fecha.toDate().toISOString().split('T')[0];
+            } else {
+              saleDateStr = sale.fecha.toISOString().split('T')[0];
+            }
           } else {
+            // Fallback: usar timestamp
             saleDateStr = sale.timestamp.toISOString().split('T')[0];
           }
           
@@ -1133,7 +1136,10 @@ export const CashRegisterSystem: React.FC = () => {
       
       // Sincronizar con reporte de caja si hay ventas y un reporte activo
       if (currentReport && filteredSales.length > 0) {
+        console.log(`✅ SYNC: Sincronizando ${filteredSales.length} ventas con reporte ${currentReport.id}`);
         await syncSalesWithCashReport(filteredSales);
+      } else {
+        console.log(`⚠️ NO SYNC: currentReport=${!!currentReport}, filteredSales.length=${filteredSales.length}`);
       }
       
       return filteredSales;
@@ -2000,7 +2006,18 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<DollarSign />}
                 label="Ventas Totales"
-                value={`$${(currentReport.totalSales || 0).toLocaleString()}`}
+                value={`$${(() => {
+                  const totalSales = currentReport.totalSales || 0;
+                  console.log('🔍 DEBUG VENTAS TOTALES:', {
+                    'currentReport.id': currentReport?.id,
+                    'currentReport.totalSales': totalSales,
+                    'currentReport.status': currentReport?.status,
+                    'currentReport.date': currentReport?.date,
+                    'daySales.length': daySales?.length || 0,
+                    'tipo de totalSales': typeof totalSales
+                  });
+                  return totalSales.toLocaleString('es-AR');
+                })()}`}
                 change={12.5}
                 color="text-green-600"
                 gradient="from-green-500 to-emerald-600"
@@ -2010,7 +2027,7 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<Banknote />}
                 label="Dinero en Caja"
-                value={`$${(currentReport.cashInBox || 0).toLocaleString()}`}
+                value={`$${(currentReport.cashInBox || 0).toLocaleString('es-AR')}`}
                 change={8.3}
                 color="text-blue-600"
                 gradient="from-blue-500 to-cyan-600"
@@ -2020,56 +2037,7 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<TrendingUp />}
                 label="Ganancias"
-                value={`$${(() => {
-                  let totalProfit = 0;
-                  const today = new Date().toISOString().split('T')[0];
-                  
-                  daySales.forEach((sale, index) => {
-                    // Determinar fecha de venta
-                    let saleDate = today; // default hoy
-                    if (sale.fechaVenta) {
-                      saleDate = sale.fechaVenta;
-                    } else if (sale.fecha) {
-                      saleDate = typeof sale.fecha === 'string' ? sale.fecha.split('T')[0] : sale.fecha.toDate().toISOString().split('T')[0];
-                    }
-                    
-                    if (saleDate === today) {
-                      // Buscar ganancia en múltiples campos
-                      let profit = 0;
-                      
-                      // 1. Nuevo formato: sale.ganancias.totalGanancia
-                      if (sale.ganancias?.totalGanancia) {
-                        profit = Number(sale.ganancias.totalGanancia);
-                        console.log(`🎯 Ganancia desde ganancias.totalGanancia: ${profit}`);
-                      }
-                      // 2. Calcular desde productos individuales
-                      else if (sale.productos && sale.productos.length > 0) {
-                        profit = sale.productos.reduce((sum: number, producto: any) => {
-                          const gananciaProducto = Number(producto.ganancia || 0);
-                          return sum + gananciaProducto;
-                        }, 0);
-                        console.log(`🎯 Ganancia calculada desde productos: ${profit}`);
-                      }
-                      // 3. Formatos anteriores (compatibilidad)
-                      else if (sale.totalProfit) {
-                        profit = Number(sale.totalProfit);
-                        console.log(`🎯 Ganancia desde totalProfit: ${profit}`);
-                      } else if (sale.profit) {
-                        profit = Number(sale.profit);
-                        console.log(`🎯 Ganancia desde profit: ${profit}`);
-                      } else if (sale.ganancia) {
-                        profit = Number(sale.ganancia);
-                        console.log(`🎯 Ganancia desde ganancia: ${profit}`);
-                      }
-                      
-                      totalProfit += profit;
-                      console.log(`💰 Ganancia venta #${sale.numeroVenta}: ${profit} - Total acumulado: ${totalProfit}`);
-                    }
-                  });
-                  
-                  console.log(`🎯 GANANCIA TOTAL DEL DÍA: $${totalProfit.toLocaleString()}`);
-                  return totalProfit.toLocaleString();
-                })()}`}
+                value={`$${(currentReport.totalProfit || 0).toLocaleString('es-AR')}`}
                 change={15.2}
                 color="text-purple-600"
                 gradient="from-purple-500 to-violet-600"
