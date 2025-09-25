@@ -177,7 +177,26 @@ const AnimatedStat: React.FC<{
 }> = ({ icon, label, value, change, color, gradient, delay = 0 }) => {
   const [animatedValue, setAnimatedValue] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
-  const numericValue = typeof value === 'string' ? parseFloat(value.replace(/[^\d.-]/g, '')) || 0 : value;
+  const numericValue = typeof value === 'string' ? (() => {
+    // Para formato español: "$1.162.443" -> 1162443
+    const cleanValue = value.replace(/[^\d,.-]/g, ''); // Remove $ and other symbols
+    if (cleanValue.includes('.') && cleanValue.includes(',')) {
+      // If both . and , exist, . is thousands separator, , is decimal
+      return parseFloat(cleanValue.replace(/\./g, '').replace(',', '.')) || 0;
+    } else if (cleanValue.includes('.')) {
+      // If only . exists, check if it's thousands or decimal
+      const parts = cleanValue.split('.');
+      if (parts.length > 2 || (parts[1] && parts[1].length > 2)) {
+        // Multiple dots or more than 2 decimal places = thousands separator
+        return parseFloat(cleanValue.replace(/\./g, '')) || 0;
+      } else {
+        // Single dot with 1-2 digits = decimal separator
+        return parseFloat(cleanValue) || 0;
+      }
+    } else {
+      return parseFloat(cleanValue) || 0;
+    }
+  })() : value;
 
   useEffect(() => {
     setTimeout(() => setIsVisible(true), delay);
@@ -2000,7 +2019,17 @@ export const CashRegisterSystem: React.FC = () => {
           </div>
 
         {/* Estadísticas principales con animación */}
-        {currentReport && dayStats && (
+        {(() => {
+          console.log('🏁 RENDER CHECK:', {
+            hasCurrentReport: !!currentReport,
+            hasDayStats: !!dayStats,
+            currentReportId: currentReport?.id,
+            totalSales: currentReport?.totalSales,
+            willRender: !!(currentReport && dayStats)
+          });
+          return null;
+        })()}
+        {currentReport && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
               <AnimatedStat
@@ -2027,7 +2056,16 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<Banknote />}
                 label="Dinero en Caja"
-                value={`$${(currentReport.cashInBox || 0).toLocaleString('es-AR')}`}
+                value={`$${(() => {
+                  const cashInBox = currentReport.cashInBox || 0;
+                  console.log('💰 DEBUG DINERO EN CAJA:', {
+                    'currentReport.cashInBox': currentReport.cashInBox,
+                    'cashInBox calculado': cashInBox,
+                    'formato': cashInBox.toLocaleString('es-AR'),
+                    'tipo': typeof cashInBox
+                  });
+                  return cashInBox.toLocaleString('es-AR');
+                })()}`}
                 change={8.3}
                 color="text-blue-600"
                 gradient="from-blue-500 to-cyan-600"
@@ -2037,7 +2075,16 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<TrendingUp />}
                 label="Ganancias"
-                value={`$${(currentReport.totalProfit || 0).toLocaleString('es-AR')}`}
+                value={`$${(() => {
+                  const totalProfit = currentReport.totalProfit || 0;
+                  console.log('📈 DEBUG GANANCIAS:', {
+                    'currentReport.totalProfit': currentReport.totalProfit,
+                    'totalProfit calculado': totalProfit,
+                    'formato': totalProfit.toLocaleString('es-AR'),
+                    'tipo': typeof totalProfit
+                  });
+                  return totalProfit.toLocaleString('es-AR');
+                })()}`}
                 change={15.2}
                 color="text-purple-600"
                 gradient="from-purple-500 to-violet-600"
@@ -2047,7 +2094,7 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<Activity />}
                 label="Eficiencia"
-                value={`${dayStats.metrics.efficiency.toFixed(1)}%`}
+                value={`${(dayStats?.metrics?.efficiency || 0).toFixed(1)}%`}
                 change={5.1}
                 color="text-orange-600"
                 gradient="from-orange-500 to-amber-600"
@@ -2066,7 +2113,7 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<Target />}
                 label="Ticket Promedio"
-                value={`$${dayStats.avgTransactionValue.toFixed(0)}`}
+                value={`$${(dayStats?.avgTransactionValue || 0).toFixed(0)}`}
                 change={-3.2}
                 color="text-indigo-600"
                 gradient="from-indigo-500 to-blue-600"
