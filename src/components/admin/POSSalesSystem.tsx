@@ -259,8 +259,23 @@ interface SaleTab {
 }
 
 const POSSalesSystem: React.FC = () => {
-  console.log('🚀 POSSalesSystem - Componente iniciando...');
-  console.log('🚀 POSSalesSystem - Timestamp:', new Date().toISOString());
+
+  
+  // 🚀 NUEVO: Función para obtener ID del turno activo
+  const getCurrentReportId = (): string => {
+    // Intentar obtener el ID del turno activo desde localStorage
+    const activeShiftId = localStorage.getItem('activeShiftId');
+    
+    if (activeShiftId) {
+
+      return activeShiftId;
+    }
+    
+    // Fallback: usar solo la fecha si no hay turno activo guardado
+    const dateId = new Date().toISOString().split('T')[0]; // "2025-01-25"
+
+    return dateId;
+  };
   
   const [mode, setMode] = useState<'simple' | 'advanced'>('advanced');
   const [products, setProducts] = useState<Product[]>([]);
@@ -407,7 +422,7 @@ const POSSalesSystem: React.FC = () => {
   });
   const [openingBalance, setOpeningBalance] = useState('');
 
-  const { user } = useAuth();
+  const { user, currentUser } = useAuth();
 
   // Función auxiliar para obtener email de usuario de forma segura
   const getUserEmail = (): string | null => {
@@ -1162,14 +1177,15 @@ const POSSalesSystem: React.FC = () => {
     try {
       // Obtener datos del turno actual del cache
       const currentData = {
-        reportId: cashRegisterStatus.reportId,
+        reportId: getCurrentReportId(), // Usar fecha actual como reportId
         openingBalance: cashRegisterStatus.openingBalance,
         openedAt: cashRegisterStatus.openedAt
       };
 
-      // Calcular balance teórico basado en ventas locales
+      // Calcular balance teórico basado en ventas locales del día actual
+      const currentReportId = getCurrentReportId();
       const localSales = allSalesHistory.filter(sale => 
-        sale.reportId === cashRegisterStatus.reportId || 
+        sale.reportId === currentReportId || 
         (cashRegisterStatus.openedAt && new Date(sale.timestamp) >= cashRegisterStatus.openedAt)
       );
 
@@ -1531,18 +1547,68 @@ const POSSalesSystem: React.FC = () => {
         bankTransfers: 0,
         movements: [],
         createdBy: user?.email || 'unknown',
+        uid: currentUser?.uid || user?.id || 'unknown', // Usar Firebase UID o user ID
         status: 'open',
         shiftStart: Timestamp.now()
       };
 
       console.log('🚀 Creando nuevo corte de caja...');
-      const docRef = await addDoc(collection(db, 'cash_reports'), newReport);
-      console.log('✅ Reporte creado con ID:', docRef.id);
+      console.log('👤 Usuario completo:', user);
+      console.log('🔥 CurrentUser Firebase:', currentUser);
+      console.log('🆔 user.id:', user?.id);
+      console.log('🆔 currentUser.uid:', currentUser?.uid);
+      console.log('📧 user.email:', user?.email);
+      
+      // 🚀 NUEVO: Buscar turnos existentes del día para generar ID único
+      const currentDate = new Date();
+      const dateStr = currentDate.toISOString().split('T')[0]; // "2025-09-25"
+      
+      console.log('🔍 Buscando turnos existentes para la fecha:', dateStr);
+      
+      // Consultar turnos del día actual
+      const todayQuery = query(
+        collection(db, "cash_reports"),
+        where("date", ">=", Timestamp.fromDate(new Date(dateStr + "T00:00:00"))),
+        where("date", "<=", Timestamp.fromDate(new Date(dateStr + "T23:59:59"))),
+        orderBy("date", "desc")
+      );
+      
+      const existingShifts = await getDocs(todayQuery);
+      const shiftsCount = existingShifts.size;
+      
+      // Generar ID único para el turno
+      const shiftNumber = shiftsCount + 1;
+      const currentReportId = `${dateStr}-turno-${shiftNumber}`; // Ej: "2025-09-25-turno-1", "2025-09-25-turno-2"
+      
+      console.log('� Creando turno desde POS:', {
+        fecha: dateStr,
+        turnosExistentes: shiftsCount,
+        nuevoTurno: shiftNumber,
+        reportId: currentReportId
+      });
+      
+      // Verificar que el ID no exista (por seguridad)
+      const existingDocRef = doc(db, 'cash_reports', currentReportId);
+      const existingDoc = await getDoc(existingDocRef);
+      
+      if (existingDoc.exists()) {
+        console.log('⚠️ ID de turno ya existe (esto NO debería pasar):', currentReportId);
+        // Si existe, usar el ID existente
+        localStorage.setItem('activeShiftId', currentReportId);
+      } else {
+        console.log('✨ Creando nuevo turno:', currentReportId);
+        await setDoc(existingDocRef, newReport);
+        
+        // 💾 Guardar el ID del turno activo en localStorage
+        localStorage.setItem('activeShiftId', currentReportId);
+      }
+      
+      console.log('✅ Reporte creado/actualizado con ID:', currentReportId);
       
       const newStatus = {
         isOpen: true,
         isLoading: false,
-        reportId: docRef.id,
+        reportId: currentReportId, // Usar fecha como reportId
         openingBalance: openingBalanceNum,
         openedAt: new Date(),
         justClosed: false
@@ -1781,7 +1847,8 @@ const POSSalesSystem: React.FC = () => {
     console.log('📊 Estado actual:', {
       cashRegisterStatus: cashRegisterStatus.isOpen,
       isLoading: cashRegisterStatus.isLoading,
-      reportId: cashRegisterStatus.reportId
+      reportId: getCurrentReportId(), // Mostrar reportId basado en fecha actual
+      originalReportId: cashRegisterStatus.reportId // Para debugging
     });
     
     // Forzar carga inmediata si no hay turno activo
@@ -2513,95 +2580,90 @@ const POSSalesSystem: React.FC = () => {
     
     const setupSalesListener = () => {
       try {
-        // Crear query para ventas en tiempo real
-        let salesQuery;
-        
-        if (cashRegisterStatus.reportId) {
-          // Filtrar por reportId si está disponible
-          salesQuery = query(
-            collection(db, 'ventas'),
-            where('reportId', '==', cashRegisterStatus.reportId),
-            orderBy('timestamp', 'desc')
-          );
-        } else if (cashRegisterStatus.openedAt) {
-          // Filtrar por fecha de apertura como respaldo
-          salesQuery = query(
-            collection(db, 'ventas'),
-            where('timestamp', '>=', cashRegisterStatus.openedAt),
-            orderBy('timestamp', 'desc')
-          );
-        } else {
-          console.log('⚠️ No hay criterios para filtrar ventas del turno');
-          return;
+        // 🔥 NUEVO: Leer ventas directamente desde el documento del turno
+        if (!cashRegisterStatus.reportId) {
+          console.log('⚠️ No hay reportId del turno activo');
+          return () => {};
         }
 
-        console.log('👂 Iniciando listener de ventas en tiempo real...');
+        console.log('👂 Iniciando listener de ventas desde documento del turno:', cashRegisterStatus.reportId);
         
         const unsubscribe = onSnapshot(
-          salesQuery,
+          doc(db, 'cash_reports', cashRegisterStatus.reportId),
           (snapshot) => {
-            console.log('🔄 Actualización de ventas recibida:', snapshot.docs.length, 'documentos');
-            
-            const currentCashier = user?.email || 'admin@pos.local';
-            
-            const allSalesData = snapshot.docs.map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                ...data,
-                timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp)
-              } as Sale;
-            });
+            if (!snapshot.exists()) {
+              console.log('⚠️ Documento del turno no encontrado');
+              setAllSalesHistory([]);
+              return;
+            }
 
-            // Filtrar por cajero actual para mayor seguridad
-            const salesData = allSalesData.filter(sale => sale.cashier === currentCashier);
+            const turnoData = snapshot.data();
+            const ventasArray = turnoData.sales || [];
             
-            console.log(`💾 Actualizando historial de ventas en tiempo real: ${salesData.length} ventas del cajero ${currentCashier}`);
+            console.log(`🔄 Ventas actualizadas desde turno: ${ventasArray.length} ventas encontradas`);
+            
+            // Convertir ventas del turno a formato Sale
+            const salesData = ventasArray.map((venta: any) => ({
+              id: venta.id || venta.numeroVenta,
+              saleNumber: venta.numeroVenta || venta.id,
+              customer: venta.cliente || { name: 'Cliente' },
+              items: venta.items || [],
+              subtotal: venta.total || 0, // En el turno solo guardamos total
+              discounts: 0,
+              tax: 0,
+              total: venta.total || 0,
+              totalProfit: venta.ganancia || 0,
+              paymentMethod: venta.metodoPago || 'cash',
+              paymentDetails: {},
+              status: 'completed',
+              timestamp: venta.timestamp?.toDate ? venta.timestamp.toDate() : new Date(venta.timestamp),
+              cashier: turnoData.cashier || user?.email || 'admin@pos.local',
+              notes: `Productos: ${venta.productos || 0}`,
+              mode: 'advanced',
+              reportId: cashRegisterStatus.reportId
+            })) as Sale[];
+
+            // Ordenar por timestamp más reciente
+            salesData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            
+            console.log(`💾 Actualizando historial: ${salesData.length} ventas del turno`);
             setAllSalesHistory(salesData);
+            setRecentSales(salesData.slice(0, 50));
             calculateDailyStats(salesData);
             
             // Actualizar cache local
             const storage = OfflineStorage.getInstance();
             storage.setItem('sales_history_cache', salesData);
             
-            // Detectar nuevas ventas del cajero actual
-            snapshot.docChanges().forEach((change) => {
-              if (change.type === 'added') {
-                const newSaleData = change.doc.data();
-                const newSale = {
-                  id: change.doc.id,
-                  ...newSaleData,
-                  timestamp: newSaleData.timestamp?.toDate ? 
-                    newSaleData.timestamp.toDate() : 
-                    new Date(newSaleData.timestamp)
-                } as Sale;
-                
-                // Solo mostrar notificación si es del cajero actual
-                if (newSale.cashier === currentCashier) {
-                  console.log('🆕 Nueva venta detectada del cajero actual:', newSale.saleNumber || newSale.id);
-                  
-                  // Mostrar notificación discreta
-                  toast({
-                    title: "💰 Nueva venta registrada",
-                    description: `Venta por $${newSale.total?.toLocaleString()} - Cliente: ${newSale.customer?.name || 'N/A'}`,
-                    duration: 3000
-                  });
-                }
-              }
-            });
+            // Mostrar estadísticas del turno
+            const totalVentas = salesData.reduce((sum, sale) => sum + sale.total, 0);
+            const totalGanancias = salesData.reduce((sum, sale) => sum + (sale.totalProfit || 0), 0);
+            
+            console.log(`📊 Estadísticas del turno: ${salesData.length} ventas, $${totalVentas.toLocaleString()} en ventas, $${totalGanancias.toLocaleString()} en ganancias`);
           },
           (error) => {
-            console.error('❌ Error en listener de ventas:', error);
-            // En caso de error, recargar manualmente
+            console.error('❌ Error en listener del turno:', error);
+            // En caso de error, intentar recargar
             setTimeout(() => {
-              fetchAllSalesHistory();
+              console.log('🔄 Reintentando cargar ventas del turno...');
+              if (cashRegisterStatus.reportId) {
+                getDoc(doc(db, 'cash_reports', cashRegisterStatus.reportId))
+                  .then(docSnap => {
+                    if (docSnap.exists()) {
+                      const data = docSnap.data();
+                      const ventas = data.sales || [];
+                      console.log(`🔄 Recarga manual exitosa: ${ventas.length} ventas`);
+                    }
+                  })
+                  .catch(err => console.error('❌ Error en recarga manual:', err));
+              }
             }, 5000);
           }
         );
 
         return unsubscribe;
       } catch (error) {
-        console.error('❌ Error configurando listener de ventas:', error);
+        console.error('❌ Error configurando listener del turno:', error);
         return () => {};
       }
     };
@@ -3290,64 +3352,110 @@ const POSSalesSystem: React.FC = () => {
 
   const fetchRecentSales = async () => {
     try {
-      console.log('🔍 Obteniendo ventas recientes desde BD interna...');
+      console.log('🔍 Obteniendo ventas recientes desde turno activo...');
       
-      // Usar BD interna como fuente principal
-      const salesData = await internalDB.getSales({
-        status: 'completed',
-        cashier: user?.email,
-        endDate: new Date() // Solo ventas hasta hoy
-      });
-      
-      // Ordenar por fecha más reciente primero y limitar a 50
-      const recentSales = salesData
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 50)
-        .map(sale => ({
-          id: sale.id,
-          saleNumber: sale.saleNumber,
-          customer: sale.customer,
-          items: sale.items,
-          subtotal: sale.subtotal,
-          discounts: sale.discounts,
-          tax: sale.tax,
-          total: sale.total,
-          paymentMethod: sale.paymentMethod,
-          paymentDetails: sale.paymentDetails,
-          status: sale.status,
-          timestamp: new Date(sale.createdAt),
-          cashier: sale.cashier,
-          mode: sale.mode,
-          reportId: sale.reportId,
-          notes: sale.notes
-        })) as Sale[];
-      
-      setRecentSales(recentSales);
-      console.log(`✅ ${recentSales.length} ventas recientes cargadas desde BD interna`);
+      // Validar que hay un turno activo
+      if (!cashRegisterStatus.isOpen || !cashRegisterStatus.reportId) {
+        console.log('⚠️ No hay turno activo - mostrando lista vacía');
+        setRecentSales([]);
+        return;
+      }
 
-      // Calcular estadísticas del día
-      calculateDailyStats(recentSales);
+      let salesData: Sale[] = [];
+      
+      // 🔥 PRIORIDAD: Cargar desde documento del turno en Firebase
+      if (connectionStatus.isOnline) {
+        try {
+          console.log('🔥 Cargando ventas recientes desde turno:', cashRegisterStatus.reportId);
+          
+          const turnoDoc = await getDoc(doc(db, 'cash_reports', cashRegisterStatus.reportId));
+          
+          if (turnoDoc.exists()) {
+            const turnoData = turnoDoc.data();
+            const ventasArray = turnoData.sales || [];
+            
+            // Convertir a formato Sale y tomar las 50 más recientes
+            salesData = ventasArray
+              .map((venta: any) => ({
+                id: venta.id || venta.numeroVenta,
+                saleNumber: venta.numeroVenta || venta.id,
+                customer: venta.cliente || { name: 'Cliente' },
+                items: venta.items || [],
+                subtotal: venta.total || 0,
+                discounts: 0,
+                tax: 0,
+                total: venta.total || 0,
+                totalProfit: venta.ganancia || 0,
+                paymentMethod: venta.metodoPago || 'cash',
+                paymentDetails: {},
+                status: 'completed',
+                timestamp: venta.timestamp?.toDate ? venta.timestamp.toDate() : new Date(venta.timestamp),
+                cashier: turnoData.cashier || user?.email || 'admin@pos.local',
+                notes: `Productos: ${venta.productos || 0}`,
+                mode: 'advanced',
+                reportId: cashRegisterStatus.reportId
+              }))
+              .sort((a: Sale, b: Sale) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+              .slice(0, 50) as Sale[];
+              
+            console.log(`✅ ${salesData.length} ventas recientes cargadas desde turno`);
+          }
+        } catch (firebaseError) {
+          console.warn('⚠️ Error cargando desde Firebase:', firebaseError);
+        }
+      }
+      
+      // FALLBACK: BD interna si Firebase falla
+      if (salesData.length === 0) {
+        try {
+          const internalSales = await internalDB.getSales({
+            status: 'completed',
+            cashier: user?.email,
+            endDate: new Date()
+          });
+          
+          salesData = internalSales
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 50)
+            .map(sale => ({
+              id: sale.id,
+              saleNumber: sale.saleNumber,
+              customer: sale.customer,
+              items: sale.items,
+              subtotal: sale.subtotal,
+              discounts: sale.discounts,
+              tax: sale.tax,
+              total: sale.total,
+              totalProfit: sale.totalProfit,
+              paymentMethod: sale.paymentMethod,
+              paymentDetails: sale.paymentDetails,
+              status: sale.status,
+              timestamp: new Date(sale.createdAt),
+              cashier: sale.cashier,
+              mode: sale.mode,
+              reportId: sale.reportId,
+              notes: sale.notes
+            })) as Sale[];
+            
+          console.log(`💾 ${salesData.length} ventas recientes desde BD interna`);
+        } catch (internalError) {
+          console.error('❌ Error BD interna:', internalError);
+        }
+      }
+      
+      setRecentSales(salesData);
+      calculateDailyStats(salesData);
       
     } catch (error) {
-      console.error('❌ Error obteniendo ventas recientes de BD interna:', error);
-      
-      // Fallback a localStorage
-      try {
-        const localSales = JSON.parse(localStorage.getItem('internal_sales') || '[]');
-        const recentSales = localSales.slice(0, 50);
-        setRecentSales(recentSales);
-        console.log(`� Fallback: ${recentSales.length} ventas desde localStorage`);
-      } catch (fallbackError) {
-        console.error('❌ Error en fallback localStorage:', fallbackError);
-        setRecentSales([]);
-      }
+      console.error('❌ Error general obteniendo ventas recientes:', error);
+      setRecentSales([]);
     }
   };
 
   const fetchAllSalesHistory = async () => {
     try {
       setLoadingSalesHistory(true);
-      console.log('🔍 Obteniendo historial completo desde BD interna...');
+      console.log('🔍 Obteniendo historial desde documento del turno...');
 
       // Validar que hay un turno activo
       if (!cashRegisterStatus.isOpen || !cashRegisterStatus.reportId) {
@@ -3359,47 +3467,90 @@ const POSSalesSystem: React.FC = () => {
       let salesData: Sale[] = [];
 
       try {
-        // PRIORIDAD 1: Usar BD interna
-        console.log('💾 Obteniendo ventas desde BD interna...');
-        const internalSales = await internalDB.getSales({
-          reportId: cashRegisterStatus.reportId,
-          cashier: user?.email || 'admin@pos.local'
-        });
+        // 🔥 PRIORIDAD 1: Cargar desde Firebase turno directamente
+        console.log('� Cargando ventas desde documento del turno:', cashRegisterStatus.reportId);
         
-        // Convertir a formato de interfaz
-        salesData = internalSales.map(sale => ({
-          id: sale.id,
-          saleNumber: sale.saleNumber,
-          customer: sale.customer,
-          items: sale.items,
-          subtotal: sale.subtotal,
-          discounts: sale.discounts,
-          tax: sale.tax,
-          total: sale.total,
-          paymentMethod: sale.paymentMethod,
-          paymentDetails: sale.paymentDetails,
-          status: sale.status,
-          timestamp: new Date(sale.createdAt),
-          cashier: sale.cashier,
-          mode: sale.mode,
-          reportId: sale.reportId,
-          notes: sale.notes
-        })) as Sale[];
+        if (connectionStatus.isOnline) {
+          const turnoDoc = await getDoc(doc(db, 'cash_reports', cashRegisterStatus.reportId));
+          
+          if (turnoDoc.exists()) {
+            const turnoData = turnoDoc.data();
+            const ventasArray = turnoData.sales || [];
+            
+            console.log(`📋 ${ventasArray.length} ventas encontradas en el turno`);
+            
+            // Convertir ventas del turno a formato Sale
+            salesData = ventasArray.map((venta: any) => ({
+              id: venta.id || venta.numeroVenta,
+              saleNumber: venta.numeroVenta || venta.id,
+              customer: venta.cliente || { name: 'Cliente' },
+              items: venta.items || [],
+              subtotal: venta.total || 0,
+              discounts: 0,
+              tax: 0,
+              total: venta.total || 0,
+              totalProfit: venta.ganancia || 0,
+              paymentMethod: venta.metodoPago || 'cash',
+              paymentDetails: {},
+              status: 'completed',
+              timestamp: venta.timestamp?.toDate ? venta.timestamp.toDate() : new Date(venta.timestamp),
+              cashier: turnoData.cashier || user?.email || 'admin@pos.local',
+              notes: `Productos: ${venta.productos || 0}`,
+              mode: 'advanced',
+              reportId: cashRegisterStatus.reportId
+            })) as Sale[];
 
-        console.log(`✅ ${salesData.length} ventas cargadas desde BD interna`);
+            console.log(`✅ ${salesData.length} ventas cargadas desde Firebase turno`);
+          } else {
+            console.log('⚠️ Documento del turno no encontrado en Firebase');
+          }
+        }
 
-      } catch (internalError) {
-        console.warn('⚠️ Error con BD interna, intentando localStorage...', internalError);
+        // FALLBACK: BD interna
+        if (salesData.length === 0) {
+          console.log('💾 Fallback: Cargando desde BD interna...');
+          const currentReportId = getCurrentReportId();
+          const internalSales = await internalDB.getSales({
+            reportId: currentReportId,
+            cashier: user?.email || 'admin@pos.local'
+          });
+          
+          salesData = internalSales.map(sale => ({
+            id: sale.id,
+            saleNumber: sale.saleNumber,
+            customer: sale.customer,
+            items: sale.items,
+            subtotal: sale.subtotal,
+            discounts: sale.discounts,
+            tax: sale.tax,
+            total: sale.total,
+            totalProfit: sale.totalProfit,
+            paymentMethod: sale.paymentMethod,
+            paymentDetails: sale.paymentDetails,
+            status: sale.status,
+            timestamp: new Date(sale.createdAt),
+            cashier: sale.cashier,
+            mode: sale.mode,
+            reportId: sale.reportId,
+            notes: sale.notes
+          })) as Sale[];
+
+          console.log(`💾 ${salesData.length} ventas cargadas desde BD interna`);
+        }
+
+      } catch (error) {
+        console.warn('⚠️ Error cargando desde fuentes principales, intentando localStorage...', error);
         
-        // FALLBACK: localStorage
-        const localSalesKey = `pos_sales_${cashRegisterStatus.reportId}`;
+        // FALLBACK FINAL: localStorage
+        const currentReportId = getCurrentReportId();
+        const localSalesKey = `pos_sales_${currentReportId}`;
         const localSales = localStorage.getItem(localSalesKey);
         
         if (localSales) {
           try {
             const parsedSales = JSON.parse(localSales) as Sale[];
             salesData = parsedSales.filter(sale => 
-              sale.reportId === cashRegisterStatus.reportId &&
+              sale.reportId === currentReportId &&
               sale.cashier === (user?.email || 'admin@pos.local')
             );
             console.log(`📱 ${salesData.length} ventas cargadas desde localStorage`);
@@ -3414,6 +3565,8 @@ const POSSalesSystem: React.FC = () => {
       salesData = salesData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       
       setAllSalesHistory(salesData);
+      setRecentSales(salesData.slice(0, 50));
+      calculateDailyStats(salesData);
       console.log(`✅ ${salesData.length} ventas cargadas en historial`);
       
     } catch (error) {
@@ -3434,10 +3587,12 @@ const POSSalesSystem: React.FC = () => {
     console.log('📋 Filtros aplicados:', salesHistoryFilter);
     
     // ✅ DEBUG: Mostrar información del turno actual
+    const currentReportId = getCurrentReportId();
     console.log('🏪 Estado del turno actual:', {
       isOpen: cashRegisterStatus.isOpen,
       openedAt: cashRegisterStatus.openedAt,
-      reportId: cashRegisterStatus.reportId,
+      reportId: currentReportId, // Usar fecha actual como reportId
+      originalReportId: cashRegisterStatus.reportId, // Para debugging
       openedAtFormatted: cashRegisterStatus.openedAt ? new Date(cashRegisterStatus.openedAt).toLocaleString('es-ES') : null
     });
     
@@ -4051,13 +4206,7 @@ const POSSalesSystem: React.FC = () => {
   };
 
   const processSale = async () => {
-    console.log('🔄 Iniciando proceso de venta con BD interna...', {
-      cartLength: cart.length,
-      customerName: customer.name,
-      paymentMethod,
-      receivedAmount,
-      total: calculateTotals().total
-    });
+
 
     // Verificar que hay un corte de caja activo
     if (!cashRegisterStatus.isOpen) {
@@ -4240,7 +4389,7 @@ const POSSalesSystem: React.FC = () => {
         // Estado y metadata
         status: 'completed',
         mode: mode || 'advanced',
-        reportId: cashRegisterStatus.reportId,
+        reportId: getCurrentReportId(), // 🚀 NUEVO: Usar ID del turno activo
         cashier: user?.email || 'admin@pos.local',
         notes: `Venta POS - ${cart.length} productos`,
         
@@ -4249,7 +4398,11 @@ const POSSalesSystem: React.FC = () => {
           const costPrice = item.product.costPrice || 0;
           const salePrice = item.product.price || 0;
           const quantity = item.quantity || 0;
-          return sum + ((salePrice - costPrice) * quantity);
+          const itemProfit = (salePrice - costPrice) * quantity;
+          console.log(`💰 Ganancia item ${item.product.name}:`, {
+            costPrice, salePrice, quantity, itemProfit
+          });
+          return sum + itemProfit;
         }, 0),
         totalProfitMargin: totals.total > 0 ? (cart.reduce((sum, item) => {
           const costPrice = item.product.costPrice || 0;
@@ -4263,6 +4416,16 @@ const POSSalesSystem: React.FC = () => {
         timestamp: currentDateTime // Compatibilidad
       };
 
+      console.log('🧾 DATOS COMPLETOS DE LA VENTA:', {
+        numeroVenta: saleData.numeroVenta,
+        cliente: saleData.customer.name,
+        items: saleData.items.length,
+        subtotal: saleData.subtotal,
+        total: saleData.total,
+        totalProfit: saleData.totalProfit,
+        metodoPago: saleData.paymentMethod,
+        reportId: saleData.reportId
+      });
 
 
       try {
@@ -4415,12 +4578,90 @@ const POSSalesSystem: React.FC = () => {
               notas: saleData.notes
             };
 
-            // Guardar en Firebase sin bloquear
-            const docRef = await addDoc(collection(db, 'ventas'), firebaseSaleData);
-            console.log('✅ Venta sincronizada con Firebase:', docRef.id);
+            // 🚀 NUEVO: Guardar venta directamente en el documento del turno
+            const reportId = getCurrentReportId();
+
             
-            // Actualizar el ID de Firebase en la BD interna
-            await internalDB.updateSale(savedSale.id, { firebaseId: docRef.id });
+            // Obtener el documento actual del turno
+            const reportRef = doc(db, 'cash_reports', reportId);
+            const reportDoc = await getDoc(reportRef);
+            
+            if (reportDoc.exists()) {
+              const currentData = reportDoc.data();
+              const currentSales = currentData.sales || [];
+              const currentTotalSales = currentData.totalSales || 0;
+              const currentTotalProfit = currentData.totalProfit || 0;
+              const currentCashSales = currentData.cashSales || 0;
+              const currentCreditCardSales = currentData.creditCardSales || 0;
+              const currentCreditSales = currentData.creditSales || 0;
+              
+              // Agregar nueva venta al array
+              const newSale = {
+                id: savedSale.id,
+                numeroVenta: invoiceNumber,
+                timestamp: Timestamp.fromDate(currentDateTime),
+                cliente: saleData.customer,
+                total: saleData.total,
+                ganancia: saleData.totalProfit || 0,
+                metodoPago: saleData.paymentMethod,
+                productos: saleData.items.length,
+                items: saleData.items.map(item => ({
+                  nombre: item.product.name,
+                  precio: item.product.price,
+                  cantidad: item.quantity,
+                  subtotal: item.subtotal,
+                  ganancia: item.profit || 0
+                }))
+              };
+              
+              // 🔄 NUEVO: Recalcular totales desde el array completo (no sumar)
+              const allSales = [...currentSales, newSale];
+              
+              // Calcular totales desde todas las ventas del array
+              const newTotalSales = allSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+              const newTotalProfit = allSales.reduce((sum, sale) => sum + (sale.ganancia || 0), 0);
+              let newCashSales = 0;
+              let newCreditCardSales = 0;
+              let newCreditSales = 0;
+              
+              // Recalcular totales por método de pago desde el array
+              allSales.forEach(sale => {
+                if (sale.metodoPago === 'cash') {
+                  newCashSales += sale.total || 0;
+                } else if (sale.metodoPago === 'card') {
+                  newCreditCardSales += sale.total || 0;
+                } else if (sale.metodoPago === 'credit') {
+                  newCreditSales += sale.total || 0;
+                }
+              });
+              
+              // Actualizar documento del turno con totales recalculados
+              await updateDoc(reportRef, {
+                sales: allSales, // Usar el array completo
+                totalSales: newTotalSales,
+                totalProfit: newTotalProfit,
+                cashSales: newCashSales,
+                creditCardSales: newCreditCardSales,
+                creditSales: newCreditSales,
+                lastSaleAt: Timestamp.fromDate(currentDateTime),
+                updatedAt: serverTimestamp()
+              });
+              
+              console.log(`✅ Venta agregada al turno ${reportId}:`, {
+                ventaId: savedSale.id,
+                ventaTotal: saleData.total,
+                ventaGanancia: saleData.totalProfit,
+                ventasEnTurno: allSales.length,
+                totalVentasRecalculado: newTotalSales,
+                totalGananciasRecalculado: newTotalProfit,
+                metodoPago: saleData.paymentMethod,
+                cajero: saleData.cashier,
+                gananciasDetalle: allSales.map(s => ({ id: s.numeroVenta, ganancia: s.ganancia, total: s.total }))
+              });
+              
+            } else {
+              console.error('❌ No se encontró el documento del turno:', reportId);
+            }
             
           } else {
             console.log('� Sin conexión - Firebase sync se realizará cuando se restaure la conexión');
@@ -4431,7 +4672,8 @@ const POSSalesSystem: React.FC = () => {
         }
 
         // 🔥 También guardar en localStorage como respaldo adicional
-        const localSalesKey = `pos_sales_${cashRegisterStatus.reportId}`;
+        const currentReportId = getCurrentReportId();
+        const localSalesKey = `pos_sales_${currentReportId}`;
         const currentLocalSales = localStorage.getItem(localSalesKey);
         let localSalesArray = [];
         

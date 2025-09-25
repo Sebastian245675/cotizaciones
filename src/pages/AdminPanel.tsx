@@ -141,6 +141,11 @@ export const AdminPanel: React.FC = () => {
   const [todaySalesLoading, setTodaySalesLoading] = useState<boolean>(true);
   const [monthlySales, setMonthlySales] = useState<number>(0);
   const [monthlySalesLoading, setMonthlySalesLoading] = useState<boolean>(true);
+  
+  // 🚀 NUEVO: Estados para modal automático de apertura de turno
+  const [showAutoShiftModal, setShowAutoShiftModal] = useState(false);
+  const [openingBalance, setOpeningBalance] = useState('');
+  const [autoShiftLoading, setAutoShiftLoading] = useState(false);
 
   // Estados para configuración SAAS
   const [saasConfig, setSaasConfig] = useState<SaasConfig | null>(null);
@@ -154,7 +159,87 @@ export const AdminPanel: React.FC = () => {
   // Estado para controlar expansión del sidebar
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
+  // 🚀 Función para verificar el estado del turno y mostrar modal automático
+  const checkAndShowShiftModal = async () => {
+    try {
+      if (!auth.currentUser) return;
+      
+      // Generar fecha actual en formato YYYY-MM-DD
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      
+      // Buscar turnos activos (documentos que empiecen con la fecha de hoy)
+      const turno1Id = `${dateStr}-turno-1`;
+      const turno2Id = `${dateStr}-turno-2`;
+      
+      // Verificar si existe turno 1
+      const turno1Doc = await getDoc(doc(db, 'cash_reports', turno1Id));
+      const turno1Exists = turno1Doc.exists() && turno1Doc.data()?.isOpen;
+      
+      // Verificar si existe turno 2
+      const turno2Doc = await getDoc(doc(db, 'cash_reports', turno2Id));
+      const turno2Exists = turno2Doc.exists() && turno2Doc.data()?.isOpen;
+      
+      // Si no hay turnos abiertos, mostrar modal
+      if (!turno1Exists && !turno2Exists) {
+        setShowAutoShiftModal(true);
+      }
+    } catch (error) {
+      console.error('❌ Error verificando estado del turno:', error);
+    }
+  };
 
+  // 🚀 Función para crear turno automático
+  const createAutoShift = async () => {
+    if (!auth.currentUser || !openingBalance.trim()) return;
+    
+    setAutoShiftLoading(true);
+    try {
+      const balance = parseFloat(openingBalance);
+      if (isNaN(balance)) {
+        alert('Por favor ingresa un saldo inicial válido');
+        setAutoShiftLoading(false);
+        return;
+      }
+      
+      // Generar fecha y hora actual
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      
+      // Determinar si es turno 1 o 2
+      const turno1Id = `${dateStr}-turno-1`;
+      const turno1Doc = await getDoc(doc(db, 'cash_reports', turno1Id));
+      
+      const shiftNumber = turno1Doc.exists() ? 2 : 1;
+      const reportId = `${dateStr}-turno-${shiftNumber}`;
+      
+      // Crear documento de turno
+      const shiftData = {
+        id: reportId,
+        user: auth.currentUser.email,
+        openingBalance: balance,
+        currentBalance: balance,
+        totalSales: 0,
+        totalExpenses: 0,
+        isOpen: true,
+        openedAt: now.toISOString(),
+        sales: [],
+        expenses: [],
+        shiftNumber,
+        date: dateStr
+      };
+      
+      await setDoc(doc(db, 'cash_reports', reportId), shiftData);
+      
+      setShowAutoShiftModal(false);
+      setOpeningBalance('');
+    } catch (error) {
+      console.error('❌ Error creando turno automático:', error);
+      alert('Error al crear el turno. Intenta de nuevo.');
+    } finally {
+      setAutoShiftLoading(false);
+    }
+  };
 
   useEffect(() => {
 
@@ -182,21 +267,19 @@ export const AdminPanel: React.FC = () => {
             setShowOnboarding(true);
           }
         } else if (userData?.subCuenta === "si" || userData?.subCuenta === "pos-employee" || userData?.role === "cajero") {
-          console.log('🔑 Detectado como SUBCUENTA - isSubAdmin = true');
-          console.log('   - subCuenta:', userData?.subCuenta);
-          console.log('   - role:', userData?.role);
           setIsAdmin(false);
           setIsSubAdmin(true);
         } else {
-          console.log('❌ Usuario sin permisos - No es admin ni subcuenta');
-          console.log('   - Email:', firebaseUser.email);
-          console.log('   - subCuenta:', userData?.subCuenta);
           setIsAdmin(false);
           setIsSubAdmin(false);
         }
         setSessionStart(new Date());
+        
+        // Verificar turno si está en modo POS
+        if (currentMode === 'pos') {
+          checkAndShowShiftModal();
+        }
       } else {
-        console.log('❌ No hay usuario logueado');
         setIsAdmin(false);
         setIsSubAdmin(false);
       }
@@ -231,7 +314,6 @@ export const AdminPanel: React.FC = () => {
     const fetchOrders = async () => {
       const querySnapshot = await getDocs(collection(db, "pedidos"));
       const docs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log("Pedidos desde Firestore:", docs);
       setOrders(docs);
     };
     fetchOrders();
@@ -273,7 +355,6 @@ export const AdminPanel: React.FC = () => {
               // Si la fecha del pedido es hoy y está confirmado, sumarlo
               if (orderDay.getTime() === today.getTime()) {
                 salesTotal += Number(data.total || 0);
-                console.log("Venta de hoy encontrada en 'orders':", doc.id, "Total:", data.total);
               }
             }
           }
@@ -291,12 +372,9 @@ export const AdminPanel: React.FC = () => {
             // Si la fecha del pedido es hoy y está confirmado, sumarlo
             if (orderDay.getTime() === today.getTime()) {
               salesTotal += Number(data.total || 0);
-              console.log("Venta de hoy encontrada en 'pedidos':", doc.id, "Total:", data.total);
             }
           }
         });
-        
-        console.log("Total ventas de hoy calculadas:", salesTotal);
         setTodaySales(salesTotal);
       } catch (error) {
         console.error("Error al calcular ventas del día:", error);
@@ -316,19 +394,16 @@ export const AdminPanel: React.FC = () => {
     const handleDashboardUpdate = (event: CustomEvent) => {
       if (event.detail?.type === 'orderConfirmed') {
         const orderTotal = Number(event.detail.orderTotal);
-        console.log("Evento de actualización de ventas recibido en AdminPanel:", event.detail);
         
         // Actualizar ventas diarias directamente
         setTodaySales(prevSales => {
           const newSales = prevSales + orderTotal;
-          console.log("Actualizando ventas diarias:", prevSales, "+", orderTotal, "=", newSales);
           return newSales;
         });
         
         // Actualizar ventas mensuales
         setMonthlySales(prevSales => {
           const newSales = prevSales + orderTotal;
-          console.log("Actualizando ventas mensuales:", prevSales, "+", orderTotal, "=", newSales);
           return newSales;
         });
         
@@ -456,8 +531,6 @@ export const AdminPanel: React.FC = () => {
       // También guardar en localStorage como backup
       localStorage.setItem('saasConfig', JSON.stringify(config));
       localStorage.setItem('currentMode', config.businessType);
-      
-      console.log('Configuración SAAS guardada:', config);
       
       // Mostrar toast de confirmación
       toast({
@@ -701,18 +774,18 @@ export const AdminPanel: React.FC = () => {
 
   // APIs simuladas para el sistema de plugins
   const posAPI = {
-    addProduct: async (product: any) => { console.log('Adding product:', product); },
-    updateInventory: async (itemId: string, quantity: number) => { console.log('Updating inventory:', itemId, quantity); },
+    addProduct: async (product: any) => { /* agregar producto */ },
+    updateInventory: async (itemId: string, quantity: number) => { /* actualizar inventario */ },
     getCurrentSale: () => { return null; },
-    addToCart: (item: any) => { console.log('Adding to cart:', item); },
-    processSale: async (saleData: any) => { console.log('Processing sale:', saleData); }
+    addToCart: (item: any) => { /* agregar al carrito */ },
+    processSale: async (saleData: any) => { /* procesar venta */ }
   };
 
   const dbAPI = {
-    query: async (sql: string, params?: any[]) => { console.log('DB Query:', sql, params); return []; },
-    insert: async (table: string, data: any) => { console.log('DB Insert:', table, data); return Date.now(); },
-    update: async (table: string, data: any, where: any) => { console.log('DB Update:', table, data, where); },
-    delete: async (table: string, where: any) => { console.log('DB Delete:', table, where); }
+    query: async (sql: string, params?: any[]) => { return []; },
+    insert: async (table: string, data: any) => { return Date.now(); },
+    update: async (table: string, data: any, where: any) => { /* actualizar */ },
+    delete: async (table: string, where: any) => { /* eliminar */ }
   };
 
   const uiAPI = {
@@ -720,14 +793,13 @@ export const AdminPanel: React.FC = () => {
       toast({ title: message, variant: type === 'error' ? 'destructive' : 'default' });
     },
     showModal: async (component: React.ComponentType, props?: any) => { 
-      console.log('Show modal:', component, props);
       return null;
     },
     addMenuItem: (label: string, onClick: () => void, icon?: string) => {
-      console.log('Add menu item:', label, icon);
+      /* agregar item al menú */
     },
     addDashboardWidget: (widget: React.ComponentType) => {
-      console.log('Add dashboard widget:', widget);
+      /* agregar widget al dashboard */
     }
   };
 
@@ -1008,7 +1080,7 @@ export const AdminPanel: React.FC = () => {
                     </CardContent>
                   </Card>
                   
-                  <button className="dashboard-refresh-button hidden" onClick={() => console.log("Refresh button clicked")}></button>
+                  <button className="dashboard-refresh-button hidden" onClick={() => {}}></button>
                 </div>
                 
                 {/* Dashboard de Cotizaciones - Solo para modo híbrido */}
@@ -3194,7 +3266,67 @@ export const AdminPanel: React.FC = () => {
         }}
       />
 
-
+      {/* 🚀 Modal automático para apertura de turno en modo POS */}
+      {showAutoShiftModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="text-center mb-6">
+              <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <DollarSign className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Apertura de Turno
+              </h3>
+              <p className="text-gray-600">
+                Para iniciar en modo POS, necesitas abrir un turno con el saldo inicial en caja.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Saldo inicial en caja ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={openingBalance}
+                onChange={(e) => setOpeningBalance(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={autoShiftLoading}
+              />
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={createAutoShift}
+                disabled={autoShiftLoading || !openingBalance.trim()}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {autoShiftLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Abriendo...
+                  </>
+                ) : (
+                  'Abrir Turno'
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAutoShiftModal(false);
+                  setOpeningBalance('');
+                }}
+                disabled={autoShiftLoading}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       </div>
     </PluginProvider>

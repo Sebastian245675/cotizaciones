@@ -43,7 +43,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { collection, addDoc, getDocs, updateDoc, doc, getDoc, query, orderBy, where, Timestamp, onSnapshot, limit } from "firebase/firestore";
+import { collection, addDoc, getDocs, updateDoc, doc, getDoc, setDoc, query, orderBy, where, Timestamp, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import internalDB from '@/services/InternalDatabaseService';
@@ -141,6 +141,7 @@ export interface DailyCashReport {
   
   movements: CashMovement[];
   alerts: AlertSystem[];
+  sales?: any[]; // Ventas del turno
   createdBy: string;
   status: 'open' | 'closed' | 'review' | 'approved';
   shiftStart?: Date;
@@ -355,6 +356,24 @@ const AdvancedAlert: React.FC<{ alert: AlertSystem; onResolve: (id: string) => v
 
 export const CashRegisterSystem: React.FC = () => {
   
+  // 🚨 RESET FORZADO: Limpiar completamente el estado al iniciar
+  useEffect(() => {
+    console.log('🔄 RESET FORZADO COMPLETO - Iniciando con estado limpio');
+    
+    // Limpiar storage
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+      sessionStorage.clear();
+    }
+    
+    // Forzar recarga del DOM para limpiar cualquier estado residual
+    const interval = setTimeout(() => {
+      console.log('✅ Estado inicial limpiado');
+    }, 100);
+    
+    return () => clearTimeout(interval);
+  }, []);
+  
   // Función auxiliar para convertir fechas de Firebase
   const convertFirebaseDate = (dateValue: any): Date => {
     try {
@@ -385,6 +404,7 @@ export const CashRegisterSystem: React.FC = () => {
   const [reports, setReports] = useState<DailyCashReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(true);
   const [isCreatingReport, setIsCreatingReport] = useState(false);
+  const [justCreatedReport, setJustCreatedReport] = useState(false); // Evitar sobrescribir con datos de Firebase
   const [selectedDate, setSelectedDate] = useState(getLocalDateString()); // 🔧 CORREGIDO: usar fecha local
   const [activeTab, setActiveTab] = useState('dashboard');
   const [liveMode, setLiveMode] = useState(true); // Activado por defecto para actualización en tiempo real
@@ -452,27 +472,16 @@ export const CashRegisterSystem: React.FC = () => {
     const fechaISO = ahora.toISOString().split('T')[0];
     const fechaToDateString = ahora.toDateString();
     
-    console.log('🗓️ === DIAGNÓSTICO DE FECHAS ===');
-    console.log('⏰ Fecha/Hora actual:', ahora);
-    console.log('📅 Fecha local (es-ES):', fechaLocal);
-    console.log('🌐 Fecha ISO (UTC):', fechaISO);
-    console.log('📋 selectedDate actual:', selectedDate);
-    console.log('🔄 toDateString():', fechaToDateString);
-    console.log('⚠️ Zona horaria offset:', ahora.getTimezoneOffset());
-    console.log('===============================');
+
 
     (window as any).debugAdvancedCash = () => {
-      console.log('🔍 DEPURACIÓN ADVANCED CASH SYSTEM');
-      console.log('📊 currentReport:', currentReport);
-      console.log('📊 liveMode:', liveMode);
-      console.log('📊 selectedDate:', selectedDate);
-      console.log('📊 reports length:', reports.length);
+
     };
     
     (window as any).forceRefreshCash = () => {
-      console.log('🔄 Forzando actualización...');
+
       if (liveMode) {
-        console.log('LiveMode está activo, los datos deberían actualizarse automáticamente');
+
       } else {
         fetchReports();
         loadTodayReport();
@@ -481,10 +490,7 @@ export const CashRegisterSystem: React.FC = () => {
     };
 
     (window as any).debugSalesSync = () => {
-      console.log('🔍 DEPURACIÓN SINCRONIZACIÓN DE VENTAS');
-      console.log('📊 Ventas del día:', daySales);
-      console.log('💰 Total ventas POS:', daySales.reduce((sum, sale) => sum + (sale.displayTotal || 0), 0));
-      console.log('📋 Reporte actual - Total Sales:', currentReport?.totalSales || 0);
+
       console.log('💵 Reporte actual - Cash Sales:', currentReport?.cashSales || 0);
       console.log('💳 Reporte actual - Card Sales:', currentReport?.creditCardSales || 0);
       console.log('📱 Reporte actual - Digital:', currentReport?.digitalPayments || 0);
@@ -497,7 +503,7 @@ export const CashRegisterSystem: React.FC = () => {
       delete (window as any).forceRefreshCash;
       delete (window as any).debugSalesSync;
     };
-  }, [currentReport, liveMode, selectedDate, reports.length, daySales]);
+  }, [currentReport, liveMode, selectedDate, reports.length, currentReport?.sales?.length]);
 
   // Estados para movimientos manuales con categorías
   const [manualMovement, setManualMovement] = useState({
@@ -534,12 +540,40 @@ export const CashRegisterSystem: React.FC = () => {
     return () => {}; // clearInterval(timer);
   }, []);
 
-  // Función para sincronizar ventas del POS con el reporte de caja
+  // 🚨 FUNCIÓN DESHABILITADA TEMPORALMENTE PARA DEBUG
   const syncSalesWithCashReport = async (sales: any[], reportId?: string) => {
-    if (!sales.length || !currentReport) return;
+    console.log('🚫 syncSalesWithCashReport DESHABILITADA - No sincronizando ventas');
+    return; // SALIR INMEDIATAMENTE
+    
+    if (!currentReport) return; // Permitir sales.length = 0 para reset
 
     try {
       console.log('🔄 Sincronizando ventas con reporte de caja...');
+      console.log(`📊 Ventas a sincronizar: ${sales.length} (permitir reset con 0 ventas)`);
+      
+      // Verificar si el reporte es del día actual
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const selectedDateObj = new Date(year, month - 1, day);
+      const reportDate = new Date(currentReport.date);
+      const isSameDay = reportDate.toDateString() === selectedDateObj.toDateString();
+      
+      console.log('📅 VERIFICACIÓN DE FECHA:', {
+        selectedDate,
+        reportDate: reportDate.toDateString(),
+        selectedDateObj: selectedDateObj.toDateString(),
+        isSameDay,
+        reportId: currentReport.id
+      });
+      
+      console.log('📊 ANTES DE SYNC - Reporte actual:', {
+        id: currentReport.id,
+        totalSales: currentReport.totalSales,
+        cashSales: currentReport.cashSales,
+        openingBalance: currentReport.openingBalance,
+        cashEntries: currentReport.cashEntries,
+        cashExits: currentReport.cashExits,
+        expenses: currentReport.expenses
+      });
       
       // Calcular totales por método de pago
       let cashSales = 0;
@@ -555,7 +589,7 @@ export const CashRegisterSystem: React.FC = () => {
         // Usar la ganancia ya calculada en lugar de recalcular
         const profit = sale.ganancias?.totalGanancia || 0;
 
-        console.log(`💰 Venta ${sale.numeroVenta}: Total=$${total}, Ganancia=$${profit}`);
+        console.log(`💰 Venta ${sale.numeroVenta}: Total=$${total}, Ganancia=$${profit}, Fecha=${sale.fecha || sale.timestamp}`);
         
         totalSales += total;
         totalProfit += profit;
@@ -581,17 +615,25 @@ export const CashRegisterSystem: React.FC = () => {
         }
       });
 
-      // Calcular balance actual (balance inicial + entradas - salidas + ventas efectivo)
+      // Calcular balance actual (balance inicial + entradas - salidas + ventas efectivo del día)
       const newCashInBox = currentReport.openingBalance + 
-                          currentReport.cashEntries + 
+                          (currentReport.cashEntries || 0) + 
                           cashSales - 
-                          currentReport.cashExits - 
-                          currentReport.expenses;
+                          (currentReport.cashExits || 0) - 
+                          (currentReport.expenses || 0);
 
-      // Actualizar el reporte con los nuevos datos
+      // CORREGIDO: Actualizar reporte con datos SOLO del día actual
+      // Si el reporte es de un día diferente, resetear valores de venta
+      const shouldResetSales = !isSameDay;
+      
+      if (shouldResetSales) {
+        console.log('🔄 RESETEANDO ventas del reporte - Día diferente detectado');
+      }
+      
+      // Actualizar el reporte con los nuevos datos (reemplazar ventas del día)
       const updatedReport = {
         ...currentReport,
-        totalSales,
+        totalSales, // Reemplazar con ventas del día actual
         cashSales,
         creditCardSales,
         creditSales,
@@ -620,15 +662,15 @@ export const CashRegisterSystem: React.FC = () => {
           lastSyncAt: Timestamp.now()
         });
 
-        console.log('✅ Reporte sincronizado con ventas:', {
-          totalSales,
-          totalProfit,
-          cashSales,
-          creditCardSales,
-          creditSales,
-          digitalPayments,
-          cashInBox: newCashInBox,
-          ventasSincronizadas: sales.length
+        console.log('✅ Reporte sincronizado con ventas del día:', {
+          fechaFiltro: selectedDate,
+          ventasSincronizadas: sales.length,
+          'REEMPLAZADO totalSales': totalSales,
+          'REEMPLAZADO totalProfit': totalProfit,
+          'REEMPLAZADO cashSales': cashSales,
+          'CALCULADO cashInBox': newCashInBox,
+          'Fórmula balance': `${currentReport.openingBalance} + ${currentReport.cashEntries || 0} + ${cashSales} - ${currentReport.cashExits || 0} - ${currentReport.expenses || 0} = ${newCashInBox}`,
+          'Es mismo día': isSameDay
         });
 
         // Mostrar notificación de sincronización
@@ -674,32 +716,66 @@ export const CashRegisterSystem: React.FC = () => {
           setClosedReports(closedReportsData);
           console.log(`📋 Reportes cerrados actualizados en tiempo real: ${closedReportsData.length}`);
 
-          // Encontrar reporte actual - PRIORIZAR TURNOS ABIERTOS DE HOY
-          // 🔧 CORREGIDO: usar fecha local consistente
-          const [year, month, day] = selectedDate.split('-').map(Number);
-          const today = new Date(year, month - 1, day);
-          const todayStr = today.toDateString(); // Usar toDateString() para comparar
+          // 🚀 NUEVO: Buscar turno activo usando activeShiftId
 
-          console.log('📅 Buscando reporte del día:', { selectedDate, todayStr });
-
-          // 1. Buscar turnos abiertos del día actual (incluye turnos de POS)
-          let todayReport = reportsData.find(report => 
-            report.status === 'open' && 
-            report.date.toDateString() === todayStr
-          );
           
-          // 2. Si no hay turno abierto de hoy, buscar cualquier reporte del día
+          // 1. Primero intentar obtener el ID del turno activo desde localStorage
+          const activeShiftId = localStorage.getItem('activeShiftId');
+          console.log('� activeShiftId desde localStorage:', activeShiftId);
+          
+          let todayReport = null;
+
+          
+          if (activeShiftId) {
+            // Buscar por el ID específico del turno activo
+            todayReport = reportsData.find(report => report.id === activeShiftId);
+
+          }
+          
+          // 2. Si no hay activeShiftId o no se encuentra, buscar el último turno abierto del día
           if (!todayReport) {
-            todayReport = reportsData.find(report => 
-              report.date.toDateString() === todayStr
+
+            const dayReports = reportsData.filter(report => 
+              report.id.startsWith(selectedDate) && report.status === 'open'
             );
+            todayReport = dayReports.sort((a, b) => b.id.localeCompare(a.id))[0]; // Último turno del día
+            
+            // 🔧 CRUCIAL: Actualizar localStorage con el turno encontrado
+            if (todayReport) {
+              localStorage.setItem('activeShiftId', todayReport.id);
+              console.log('🔄 localStorage actualizado con turno encontrado:', todayReport.id);
+            }
+            
+
+          }
+          
+          console.log('� Resultado búsqueda por ID:', {
+            selectedDate,
+            encontrado: !!todayReport,
+            reportId: todayReport?.id,
+            reportStatus: todayReport?.status,
+            reportDate: todayReport?.date?.toDateString()
+          });
+          
+          // 2. NUEVO: Con el sistema de ID por fecha, no debería haber conflictos
+          if (!todayReport) {
+
+
           }
           
           if (todayReport) {
+            // Turno activo encontrado - mostrar datos del turno
+            
             // Solo actualizar si cambió el reporte o si es la primera carga
             if (!currentReport || currentReport.id !== todayReport.id) {
-              console.log(`✅ TURNO DETECTADO en tiempo real: ${todayReport.status} - $${todayReport.openingBalance}`);
-              setCurrentReport(todayReport);
+
+              
+              // 🚨 No sobrescribir si acabamos de crear un reporte limpio
+              if (!justCreatedReport) {
+                setCurrentReport(todayReport);
+              } else {
+                console.log('🛡️ Ignorando carga de Firebase - reporte recién creado con valores limpios');
+              }
               
               // Mostrar notificación para turnos recién detectados
               if (todayReport.status === 'open' && !currentReport) {
@@ -711,16 +787,37 @@ export const CashRegisterSystem: React.FC = () => {
               }
             }
             
-
+          } else {
+            console.log('❌ NO se encontró reporte para la fecha:', {
+              selectedDate,
+              totalReports: reportsData.length,
+              reportIds: reportsData.map(r => ({ id: r.id, status: r.status }))
+            });
+            // Si no hay reporte del día, limpiar currentReport
+            if (currentReport) {
+              setCurrentReport(null);
+            }
           }
         }
       );
       
-      // Escuchar cambios en ventas en tiempo real
-      const unsubscribeVentas = onSnapshot(
-        query(collection(db, "ventas"), orderBy("fecha", "desc")),
-        async (ventasSnapshot) => {
+      // � TEMPORAL: DESHABILITAR listener de ventas completamente para debug
+      let unsubscribeVentas = () => {};
+      
+      console.log('🚫 LISTENER DE VENTAS DESHABILITADO PARA DEBUG');
+      setDaySales([]); // Limpiar ventas
+      
+      /*
+      if (!currentReport || currentReport.status !== 'open') {
+        console.log('📊 Escuchando ventas individuales (sin turno activo)');
+        // Escuchar cambios en ventas en tiempo real
+        unsubscribeVentas = onSnapshot(
+          query(collection(db, "ventas"), orderBy("fecha", "desc")),
+          async (ventasSnapshot) => {
           console.log('🔄 Detectados cambios en ventas...');
+          console.log('🏪 currentReport completo:', currentReport);
+          console.log('🆔 currentReport.id:', currentReport?.id);
+          console.log('📊 Total de ventas en Firebase:', ventasSnapshot.docs.length);
 
           // Filtrar ventas de hoy - CORREGIDO: usar fecha local directamente
           console.log('📅 selectedDate para filtro:', selectedDate);
@@ -745,10 +842,26 @@ export const CashRegisterSystem: React.FC = () => {
                 }
               }
               
-              const matches = saleDate === selectedDate;
+              const dateMatches = saleDate === selectedDate;
+              
+              // 🔥 NUEVO: Filtrar también por reportId del turno actual
+              let reportIdMatches = true;
+              if (currentReport && currentReport.id) {
+                // Solo incluir ventas del turno actual (reportId debe coincidir)
+                // Y que la venta tenga reportId definido (no undefined/null)
+                reportIdMatches = sale.reportId && sale.reportId === currentReport.id;
+              } else {
+                // Si no hay turno actual, no mostrar ninguna venta
+                reportIdMatches = false;
+              }
+              
+              const matches = dateMatches && reportIdMatches;
 
               // Debug: mostrar fechas para entender el filtrado
-              console.log(`🔍 Venta ${sale.numeroVenta || sale.id}: Fecha=${saleDate}, Filtro=${selectedDate}, Match=${matches}`);
+              console.log(`🔍 Venta ${sale.numeroVenta || sale.id}:`);
+              console.log(`   📅 Fecha=${saleDate}, FiltroFecha=${selectedDate}, FechaMatch=${dateMatches}`);
+              console.log(`   🏪 ReportId=${sale.reportId}, TurnoActual=${currentReport?.id}, ReportMatch=${reportIdMatches}`);
+              console.log(`   ✅ Match final=${matches}`);
 
               return matches;
             })
@@ -758,7 +871,10 @@ export const CashRegisterSystem: React.FC = () => {
               timestamp: sale.timestamp?.toDate?.() || new Date(sale.fecha) || new Date()
             }));
 
-          console.log(`📊 Ventas de hoy encontradas: ${todaySales.length}, Total: $${todaySales.reduce((sum: number, sale: any) => sum + sale.displayTotal, 0)}`);
+          console.log(`📊 Ventas filtradas: ${todaySales.length} de ${ventasSnapshot.docs.length} totales`);
+          console.log(`💰 Total ventas filtradas: $${todaySales.reduce((sum: number, sale: any) => sum + sale.displayTotal, 0)}`);
+          console.log('🔍 IDs de ventas incluidas:', todaySales.map(s => s.numeroVenta || s.id));
+          console.log('🏪 ReportIds de ventas incluidas:', todaySales.map(s => s.reportId));
           
           setDaySales(todaySales);
           
@@ -766,8 +882,13 @@ export const CashRegisterSystem: React.FC = () => {
           if (currentReport && todaySales.length > 0) {
             await syncSalesWithCashReport(todaySales);
           }
-        }
-      );
+        });
+      } else {
+        console.log('🏪 Turno activo detectado - usando datos del documento en lugar de ventas individuales');
+        // Si hay turno activo, limpiar ventas individuales y usar datos del documento
+        setDaySales([]);
+      }
+      */
       
       return () => {
         unsubscribeReports();
@@ -776,12 +897,40 @@ export const CashRegisterSystem: React.FC = () => {
     }
   }, [selectedDate, liveMode, currentReport?.movements.length]);
 
-  // Efecto para sincronizar ventas cuando cambia el reporte actual
-  useEffect(() => {
-    if (currentReport && daySales.length > 0) {
-      syncSalesWithCashReport(daySales);
+  // 🚀 NUEVA FUNCIÓN: Calcular balance desde las ventas del turno
+  const updateBalanceFromShiftSales = (report: DailyCashReport) => {
+    if (!report.sales || report.sales.length === 0) {
+      // Sin ventas, balance = balance inicial + entradas - salidas
+      const newBalance = report.openingBalance + 
+                        (report.cashEntries || 0) - 
+                        (report.cashExits || 0) - 
+                        (report.expenses || 0);
+      return newBalance;
     }
-  }, [currentReport?.id]);
+
+    // Calcular ventas en efectivo desde el array de ventas
+    const cashSalesFromArray = report.sales
+      .filter(sale => sale.metodoPago === 'cash')
+      .reduce((sum, sale) => sum + (sale.total || 0), 0);
+
+    // Balance = inicial + entradas + ventas efectivo - salidas - gastos
+    const newBalance = report.openingBalance + 
+                      (report.cashEntries || 0) + 
+                      cashSalesFromArray - 
+                      (report.cashExits || 0) - 
+                      (report.expenses || 0);
+
+    console.log('💰 Calculando balance actual:', {
+      balanceInicial: report.openingBalance,
+      entradas: report.cashEntries || 0,
+      ventasEfectivo: cashSalesFromArray,
+      salidas: report.cashExits || 0,
+      gastos: report.expenses || 0,
+      balanceCalculado: newBalance
+    });
+
+    return newBalance;
+  };
 
   const fetchReports = async () => {
     setLoadingReports(true);
@@ -948,62 +1097,19 @@ export const CashRegisterSystem: React.FC = () => {
         setCurrentReport(updatedReport);
         console.log('✅ Reporte sincronizado con BD interna');
       } else {
-        // Si no hay datos en BD interna, calcular ganancias desde las ventas del día
-        console.log('⚠️ No hay datos en BD interna, calculando ganancias desde ventas...');
-        await calculateProfitFromSales(reportId);
+        // ✅ NUEVO: Las ganancias ya están en el documento del turno
+        console.log('✅ Usando ganancias del documento del turno directamente');
       }
     } catch (error) {
       console.log('⚠️ No se pudo sincronizar con BD interna:', error);
-      // Como fallback, intentar calcular desde las ventas
-      await calculateProfitFromSales(reportId);
+      console.log('✅ Usando datos del documento del turno');
     }
   };
 
-  // Función para calcular ganancias desde las ventas del día
+  // ✅ DESHABILITADO: Las ganancias ahora se guardan directamente en el turno
   const calculateProfitFromSales = async (reportId: string) => {
-    try {
-      console.log('🧮 Calculando ganancias desde ventas del día...');
-      
-      // Obtener ventas del día actual
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-      
-      const todaySales = daySales.filter(sale => {
-        const saleDate = new Date(sale.fechaVenta || sale.fecha || sale.timestamp);
-        return saleDate >= startOfToday && saleDate < endOfToday;
-      });
-      
-      let totalProfit = 0;
-      
-      todaySales.forEach(sale => {
-        // Usar la ganancia ya calculada de la estructura ganancias
-        if (sale.ganancias?.totalGanancia) {
-          totalProfit += sale.ganancias.totalGanancia;
-        } else if (sale.totalProfit) {
-          totalProfit += sale.totalProfit;
-        } else if (sale.productos) {
-          // Calcular ganancia desde productos si no está disponible
-          sale.productos.forEach(producto => {
-            const gananciaProducto = producto.ganancia || 0;
-            totalProfit += gananciaProducto;
-          });
-        }
-      });
-      
-      console.log('💰 Ganancia calculada desde ventas:', totalProfit);
-      
-      if (currentReport && totalProfit > 0) {
-        const updatedReport = {
-          ...currentReport,
-          totalProfit: totalProfit
-        };
-        setCurrentReport(updatedReport);
-        console.log('✅ Ganancia actualizada desde cálculo de ventas');
-      }
-    } catch (error) {
-      console.log('⚠️ Error calculando ganancias desde ventas:', error);
-    }
+    console.log('🚫 calculateProfitFromSales DESHABILITADO - Usando datos del turno directamente');
+    return;
   };
 
   // Función para cargar ventas desde la colección 'ventas'
@@ -1022,146 +1128,10 @@ export const CashRegisterSystem: React.FC = () => {
       }
       console.log('📅 Filtro de fecha:', dateRange);
 
-      const allSalesSnapshot = await getDocs(collection(db, 'ventas'));
-      console.log(`📦 Total documentos obtenidos de "ventas": ${allSalesSnapshot.docs.length}`);
-
-      if (allSalesSnapshot.docs.length === 0) {
-        console.log('⚠️ No se encontraron documentos en la colección "ventas"');
-        setDaySales([]);
-        return [];
-      }
-
-      const allSalesData = allSalesSnapshot.docs.map(doc => {
-        const data = doc.data();
-        
-        // Usar fechaVenta (YYYY-MM-DD) o fecha (ISO string) como fallback
-        let saleDate: Date;
-        if (data.fechaVenta) {
-          // fechaVenta está en formato YYYY-MM-DD
-          saleDate = new Date(data.fechaVenta + 'T00:00:00');
-        } else if (data.fecha) {
-          // fecha es string ISO
-          saleDate = new Date(data.fecha);
-        } else if (data.timestamp) {
-          // timestamp como fallback
-          saleDate = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-        } else {
-          saleDate = new Date();
-        }
-        
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: saleDate,
-          displayTotal: data.resumen?.total || data.total || 0,
-          displayCustomer: data.cliente?.name || 'Cliente General',
-          displayItems: data.productos?.length || 0,
-          displayCashier: data.operador?.email || data.operador?.nombre || 'admin@pos.local'
-        } as any;
-      });
-
-      console.log('📊 Procesando ventas con fechas:');
-      allSalesData.slice(0, 3).forEach((sale, i) => {
-        console.log(`${i + 1}. ID: ${sale.id} - FechaVenta: ${sale.fechaVenta} - Fecha: ${sale.fecha} - Timestamp: ${sale.timestamp.toISOString()}`);
-      });
-
-      let filteredSales = allSalesData;
-      
-      // Aplicar filtros de fecha según el tipo seleccionado
-      if (filterDate || endDate) {
-        // Crear fecha en timezone local usando los componentes de fecha
-        const [year, month, day] = selectedDate.split('-').map(Number);
-        const startDate = filterDate || new Date(year, month - 1, day); // month is 0-indexed
-        const finishDate = endDate || startDate;
-        
-        // Convertir fechas a formato YYYY-MM-DD para comparación usando fecha local
-        const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-        const endDateStr = `${finishDate.getFullYear()}-${String(finishDate.getMonth() + 1).padStart(2, '0')}-${String(finishDate.getDate()).padStart(2, '0')}`;
-        
-        console.log(`✅ FECHAS FINALMENTE CORREGIDAS - selectedDate:${selectedDate}, startDate:${startDate.toDateString()}, filtering:${startDateStr} to ${endDateStr}`);
-        
-        filteredSales = allSalesData.filter(sale => {
-          let saleDateStr: string;
-          
-          // Prioridad: fechaVenta > fecha > timestamp
-          if (sale.fechaVenta) {
-            saleDateStr = sale.fechaVenta;
-          } else if (sale.fecha) {
-            if (typeof sale.fecha === 'string') {
-              saleDateStr = sale.fecha.split('T')[0];
-            } else if (sale.fecha.toDate) {
-              saleDateStr = sale.fecha.toDate().toISOString().split('T')[0];
-            } else {
-              saleDateStr = sale.fecha.toISOString().split('T')[0];
-            }
-          } else {
-            // Fallback: usar timestamp
-            saleDateStr = sale.timestamp.toISOString().split('T')[0];
-          }
-          
-          const matches = saleDateStr >= startDateStr && saleDateStr <= endDateStr;
-          if (matches) {
-            console.log(`✅ Incluída: ${sale.numeroVenta} - ${saleDateStr} - $${sale.displayTotal}`);
-          }
-          
-          return matches;
-        });
-      } else {
-        // Si no se especifica, usar la fecha actual para filtrar por hoy
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        
-        console.log(`🎯 Filtrando solo ventas de hoy: ${todayStr}`);
-        
-        filteredSales = allSalesData.filter(sale => {
-          let saleDateStr: string;
-          
-          if (sale.fechaVenta) {
-            saleDateStr = sale.fechaVenta;
-          } else {
-            saleDateStr = sale.timestamp.toISOString().split('T')[0];
-          }
-          
-          const matches = saleDateStr === todayStr;
-          if (matches) {
-            console.log(`✅ Venta de hoy: ${sale.numeroVenta} - ${saleDateStr} - $${sale.displayTotal}`);
-          }
-          
-          return matches;
-        });
-      }
-
-      filteredSales.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      
-      console.log(`📈 Ventas encontradas después del filtro: ${filteredSales.length}`);
-      console.log('💰 Total ventas filtradas: $', filteredSales.reduce((sum, sale) => sum + (sale.displayTotal || 0), 0));
-      
-      if (filteredSales.length > 0) {
-        console.log('📋 Ventas filtradas encontradas:');
-        filteredSales.forEach((sale, index) => {
-          console.log(`${index + 1}. ${sale.numeroVenta || sale.id} - $${sale.displayTotal} - ${sale.fechaVenta || sale.timestamp.toLocaleDateString()}`);
-        });
-      } else {
-        console.log('⚠️ No se encontraron ventas para el rango especificado');
-        
-        if (allSalesData.length > 0) {
-          console.log('📅 Todas las fechas disponibles en la base de datos:');
-          const uniqueDates = [...new Set(allSalesData.map(sale => sale.fechaVenta || sale.timestamp.toISOString().split('T')[0]))];
-          uniqueDates.sort().forEach(date => console.log(`   - ${date}`));
-        }
-      }
-      
-      setDaySales(filteredSales);
-      
-      // Sincronizar con reporte de caja si hay ventas y un reporte activo
-      if (currentReport && filteredSales.length > 0) {
-        console.log(`✅ SYNC: Sincronizando ${filteredSales.length} ventas con reporte ${currentReport.id}`);
-        await syncSalesWithCashReport(filteredSales);
-      } else {
-        console.log(`⚠️ NO SYNC: currentReport=${!!currentReport}, filteredSales.length=${filteredSales.length}`);
-      }
-      
-      return filteredSales;
+      // 🚫 DESHABILITADO: No buscar en colección "ventas"
+      console.log('🚫 Búsqueda en colección "ventas" DESHABILITADA');
+      setDaySales([]);
+      return [];
 
     } catch (error) {
       console.error('❌ Error obteniendo ventas:', error);
@@ -1244,19 +1214,9 @@ export const CashRegisterSystem: React.FC = () => {
           break;
       }
 
-      // Cargar todas las ventas
-      const allSalesSnapshot = await getDocs(collection(db, 'ventas'));
-      const allSales = allSalesSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp || data.fecha),
-          total: data.resumen?.total || data.total || 0,
-          paymentMethod: data.pago?.method || data.paymentMethod || 'cash',
-          items: data.productos || data.items || []
-        };
-      });
+      // 🚫 DESHABILITADO: No cargar ventas de la colección "ventas"
+      console.log('🚫 Carga de ventas DESHABILITADA - usando datos del turno únicamente');
+      const allSales: any[] = [];
 
       // Filtrar ventas por rango de fechas
       const filteredSales = allSales.filter(sale => {
@@ -1709,6 +1669,59 @@ export const CashRegisterSystem: React.FC = () => {
     setShowClosedReportModal(true);
   };
 
+  // Función para cerrar el turno actual
+  const closeCurrentShift = async () => {
+    if (!currentReport || currentReport.status !== 'open') {
+      toast({
+        title: "❌ Error",
+        description: "No hay un turno abierto para cerrar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log('🔒 Cerrando turno:', currentReport.id);
+      
+      const reportRef = doc(db, 'cash_reports', currentReport.id);
+      const now = Timestamp.now();
+      
+      await updateDoc(reportRef, {
+        status: 'closed',
+        shiftEnd: now,
+        closedBy: currentReport.createdBy || 'admin'
+      });
+
+      // 🧹 Limpiar ID del turno activo del localStorage
+      localStorage.removeItem('activeShiftId');
+      console.log('🗑️ activeShiftId eliminado del localStorage');
+
+      // Actualizar estado local
+      setCurrentReport({
+        ...currentReport,
+        status: 'closed',
+        shiftEnd: now.toDate(),
+        closedBy: currentReport.createdBy || 'admin'
+      });
+
+      // Mostrar notificación de éxito
+      toast({
+        title: "✅ Turno Cerrado",
+        description: `Turno cerrado exitosamente. Total de ventas: $${(currentReport.totalSales || 0).toLocaleString('es-AR')}`,
+      });
+
+      console.log('✅ Turno cerrado exitosamente');
+      
+    } catch (error) {
+      console.error('❌ Error cerrando turno:', error);
+      toast({
+        title: "❌ Error",
+        description: "Error al cerrar el turno. Intenta de nuevo.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Cargar historial cuando se abra la pestaña
   useEffect(() => {
     if (activeTab === 'history' && closedReports.length === 0) {
@@ -1761,6 +1774,9 @@ export const CashRegisterSystem: React.FC = () => {
       netProfit: 0,
       operationalCosts: 0,
       
+      // 🚀 NUEVO: Array de ventas del turno
+      sales: [],
+      
       // Métodos de pago expandidos
       creditCardSales: 0,
       creditSales: 0,
@@ -1802,15 +1818,152 @@ export const CashRegisterSystem: React.FC = () => {
     };
 
     try {
-      const docRef = await addDoc(collection(db, "cash_reports"), {
+      // 🚀 NUEVO: Buscar turnos existentes del día para generar ID único
+      console.log('🔍 Buscando turnos existentes para la fecha:', selectedDate);
+      
+      // Consultar turnos del día actual
+      const todayQuery = query(
+        collection(db, "cash_reports"),
+        where("date", ">=", Timestamp.fromDate(new Date(selectedDate + "T00:00:00"))),
+        where("date", "<=", Timestamp.fromDate(new Date(selectedDate + "T23:59:59"))),
+        orderBy("date", "desc")
+      );
+      
+      const existingShifts = await getDocs(todayQuery);
+      const shiftsCount = existingShifts.size;
+      
+      // Generar ID único para el turno
+      const shiftNumber = shiftsCount + 1;
+      const documentId = `${selectedDate}-turno-${shiftNumber}`; // Ej: "2025-09-25-turno-1", "2025-09-25-turno-2"
+      
+      console.log('📄 Creando turno:', {
+        fecha: selectedDate,
+        turnosExistentes: shiftsCount,
+        nuevoTurno: shiftNumber,
+        documentId
+      });
+      
+      // Verificar que el ID no exista (por seguridad)
+      const existingDoc = await getDoc(doc(db, "cash_reports", documentId));
+      if (existingDoc.exists()) {
+        console.log('⚠️ Ya existe un reporte para esta fecha - RESETEANDO:', documentId);
+        toast({
+          title: "🔄 Reseteando Turno",
+          description: `Reseteando el reporte del ${selectedDate} y creando turno limpio.`,
+        });
+        
+        // 🔄 RESET EXHAUSTIVO: Resetear TODOS los campos de ventas acumulados
+        const existingData = existingDoc.data();
+        const resetData = {
+          // Ventas básicas
+          totalSales: 0,
+          cashSales: 0,
+          creditCardSales: 0,
+          creditSales: 0,
+          digitalPayments: 0,
+          
+          // 🚀 NUEVO: Limpiar array de ventas del turno
+          sales: [],
+          
+          // Ganancias
+          totalProfit: 0,
+          grossProfit: 0,
+          netProfit: 0,
+          
+          // Cash flow
+          cashInBox: openingBalance,
+          closingBalance: openingBalance,
+          openingBalance: openingBalance,
+          
+          // Reportes adicionales que se acumulan
+          finalReport: null,
+          averageTicket: 0,
+          hoursWorked: 0,
+          profitability: 0,
+          
+          // Pagos específicos
+          cashPayments: 0,
+          
+          // Metadata del turno
+          status: 'open',
+          date: Timestamp.fromDate(today),
+          shiftStart: Timestamp.now(),
+          
+          // Limpiar último sync para forzar recalcular
+          lastSyncAt: null
+        };
+        
+        console.log('🧹 Aplicando reset DIRECTO con valores:', resetData);
+        await updateDoc(doc(db, "cash_reports", documentId), resetData);
+        
+        // 🔍 VERIFICAR que el reset se aplicó correctamente
+        const verifyDoc = await getDoc(doc(db, "cash_reports", documentId));
+        const verifiedData = verifyDoc.data();
+        console.log('✅ DOCUMENTO DESPUÉS DEL RESET:', verifiedData);
+        
+        // 🚨 VERIFICACIÓN ADICIONAL: Si todavía tiene datos acumulados, forzar otro reset
+        if (verifiedData && (verifiedData.totalSales > 0 || (verifiedData.sales && verifiedData.sales.length > 0))) {
+          console.log('⚠️ RESET FALLÓ - Aplicando SEGUNDO reset más agresivo...');
+          await updateDoc(doc(db, "cash_reports", documentId), {
+            totalSales: 0,
+            cashSales: 0,
+            totalProfit: 0,
+            grossProfit: 0,
+            netProfit: 0,
+            sales: [] // 🚀 NUEVO: Limpiar array de ventas
+          });
+          console.log('🔄 Segundo reset aplicado');
+        }
+        
+        // Crear reporte local con valores limpios
+        const resetReport = {
+          id: documentId,
+          ...existingData,
+          ...resetData,
+          date: today,
+          shiftStart: new Date()
+        } as unknown as DailyCashReport;
+        
+        setCurrentReport(resetReport);
+        setJustCreatedReport(true);
+        setTimeout(() => setJustCreatedReport(false), 3000);
+        
+        // 🚀 NUEVO: Guardar ID del turno activo
+        localStorage.setItem('activeShiftId', documentId);
+        console.log('💾 ID del turno activo guardado:', documentId);
+        
+        toast({
+          title: "🚀 Turno Reseteado",
+          description: `Turno limpio iniciado con balance de $${openingBalance.toLocaleString()}`,
+        });
+        return;
+      }
+      
+      // Crear nuevo documento con ID específico
+      console.log('💾 Creando documento LIMPIO con valores:', {
+        totalSales: newReport.totalSales,
+        cashSales: newReport.cashSales,
+        totalProfit: newReport.totalProfit,
+        cashInBox: newReport.cashInBox
+      });
+      
+      await setDoc(doc(db, "cash_reports", documentId), {
         ...newReport,
         date: Timestamp.fromDate(today),
         shiftStart: Timestamp.now()
       });
       
-      const createdReport = { id: docRef.id, ...newReport };
+      const createdReport = { id: documentId, ...newReport };
       setCurrentReport(createdReport);
       setReports([createdReport, ...reports]);
+      
+      // � NUEVO: Guardar ID del turno activo
+      localStorage.setItem('activeShiftId', documentId);
+      console.log('💾 ID del turno activo guardado:', documentId);
+      
+      // �🚨 Evitar que el listener de Firebase sobrescriba los valores limpios
+      setJustCreatedReport(true);
+      setTimeout(() => setJustCreatedReport(false), 2000); // Desactivar después de 2 segundos
       
       // Efectos de éxito
       triggerSuccessEffect();
@@ -1876,9 +2029,37 @@ export const CashRegisterSystem: React.FC = () => {
   const dayStats = useMemo(() => {
     if (!currentReport) return null;
 
-    // Usar totalSales que incluye todas las ventas del POS + otros ingresos específicos
-    const totalIncome = currentReport.totalSales + currentReport.cashEntries;
-    const totalOutflow = currentReport.cashExits + currentReport.cashReturns + currentReport.expenses;
+    // 🚀 NUEVO: Calcular balance actual y totales desde las ventas del turno
+    const actualBalance = updateBalanceFromShiftSales(currentReport);
+    
+    // Calcular totales desde el array de ventas del turno
+    const actualTotalSales = currentReport.sales?.reduce((sum, sale) => sum + (sale.total || 0), 0) || currentReport.totalSales || 0;
+    const actualTotalProfit = currentReport.sales?.reduce((sum, sale) => sum + (sale.ganancia || 0), 0) || currentReport.totalProfit || 0;
+    
+    // Actualizar currentReport con los valores correctos si es necesario
+    const needsUpdate = currentReport.cashInBox !== actualBalance || 
+                       currentReport.totalSales !== actualTotalSales || 
+                       currentReport.totalProfit !== actualTotalProfit;
+                       
+    if (needsUpdate) {
+      console.log('🔄 Actualizando reporte local con valores calculados:', {
+        balance: { anterior: currentReport.cashInBox, nuevo: actualBalance },
+        totalSales: { anterior: currentReport.totalSales, nuevo: actualTotalSales },
+        totalProfit: { anterior: currentReport.totalProfit, nuevo: actualTotalProfit }
+      });
+      
+      // Actualizar el reporte local para reflejar los valores correctos
+      setCurrentReport(prev => prev ? {
+        ...prev, 
+        cashInBox: actualBalance,
+        totalSales: actualTotalSales,
+        totalProfit: actualTotalProfit
+      } : null);
+    }
+
+    // Usar totalSales que incluye todas las ventas del POS + otros ingresos específicos  
+    const totalIncome = currentReport.totalSales + (currentReport.cashEntries || 0);
+    const totalOutflow = (currentReport.cashExits || 0) + (currentReport.cashReturns || 0) + (currentReport.expenses || 0);
     const netFlow = totalIncome - totalOutflow;
     const expectedBalance = currentReport.openingBalance + netFlow;
     const updatedMetrics = calculateAdvancedMetrics(currentReport);
@@ -1894,14 +2075,14 @@ export const CashRegisterSystem: React.FC = () => {
       expectedBalance,
       variance: currentReport.cashInBox - expectedBalance,
       metrics: updatedMetrics,
-      totalTransactions: currentReport.movements.length + daySales.length, // Incluir transacciones del POS
-      avgTransactionValue: currentReport.totalSales / Math.max(1, daySales.length || 1),
+      totalTransactions: currentReport.movements.length + (currentReport.sales?.length || 0), // Incluir transacciones del POS desde turno
+      avgTransactionValue: currentReport.totalSales / Math.max(1, currentReport.sales?.length || 1),
       peakHour: getCurrentPeakHour(currentReport.movements),
       efficiency: updatedMetrics.efficiency,
       salesProgress, // Agregar progreso de ventas
       dailySalesGoal
     };
-  }, [currentReport, daySales.length]);
+  }, [currentReport, currentReport?.sales?.length]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
@@ -1950,8 +2131,8 @@ export const CashRegisterSystem: React.FC = () => {
             <span className="text-xs text-slate-500">{currentReport?.status === 'open' ? 'Abierta' : 'Cerrada'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${daySales.length > 0 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
-            <span className="text-xs text-slate-500">POS ({daySales.length})</span>
+            <div className={`w-3 h-3 rounded-full ${(currentReport?.sales?.length || 0) > 0 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
+            <span className="text-xs text-slate-500">POS ({currentReport?.sales?.length || 0})</span>
           </div>
         </div>
       </div>
@@ -1994,6 +2175,64 @@ export const CashRegisterSystem: React.FC = () => {
               Actualizar
             </Button>
 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                console.log('🔄 RESET MANUAL: Forzando reset DIRECTO de ventas del día');
+                if (currentReport) {
+                  try {
+                    // Reset DIRECTO en Firebase
+                    const reportRef = doc(db, 'cash_reports', currentReport.id);
+                    const resetData = {
+                      totalSales: 0,
+                      cashSales: 0,
+                      creditCardSales: 0,
+                      creditSales: 0,
+                      digitalPayments: 0,
+                      totalProfit: 0,
+                      grossProfit: 0,
+                      netProfit: 0,
+                      cashInBox: (currentReport.openingBalance || 0) + (currentReport.cashEntries || 0) - (currentReport.cashExits || 0) - (currentReport.expenses || 0),
+                      closingBalance: (currentReport.openingBalance || 0) + (currentReport.cashEntries || 0) - (currentReport.cashExits || 0) - (currentReport.expenses || 0)
+                    };
+                    
+                    await updateDoc(reportRef, resetData);
+                    
+                    // Actualizar estado local
+                    setCurrentReport({
+                      ...currentReport,
+                      ...resetData
+                    });
+                    
+                    console.log('✅ RESET DIRECTO completado:', resetData);
+                    
+                    // Recargar ventas reales del día después del reset
+                    setTimeout(() => {
+                      applySalesFilter();
+                    }, 1000);
+                    
+                    toast({
+                      title: "🔄 Reset Completado",
+                      description: "Valores de ventas reseteados. Recargando ventas del día...",
+                    });
+                    
+                  } catch (error) {
+                    console.error('❌ Error en reset:', error);
+                    toast({
+                      title: "❌ Error",
+                      description: "Error al resetear valores",
+                      variant: "destructive"
+                    });
+                  }
+                }
+              }}
+              className="bg-red-100 hover:bg-red-200 border-red-300 text-red-700"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset Día
+            </Button>
+
             {!currentReport ? (
               <Button
                 onClick={() => setIsCreatingReport(true)}
@@ -2009,7 +2248,10 @@ export const CashRegisterSystem: React.FC = () => {
                   Exportar
                 </Button>
                 {currentReport.status === 'open' && (
-                  <Button variant="destructive">
+                  <Button 
+                    variant="destructive"
+                    onClick={closeCurrentShift}
+                  >
                     <Archive className="h-4 w-4 mr-2" />
                     Cerrar Corte
                   </Button>
@@ -2036,15 +2278,8 @@ export const CashRegisterSystem: React.FC = () => {
                 icon={<DollarSign />}
                 label="Ventas Totales"
                 value={`$${(() => {
-                  const totalSales = currentReport.totalSales || 0;
-                  console.log('🔍 DEBUG VENTAS TOTALES:', {
-                    'currentReport.id': currentReport?.id,
-                    'currentReport.totalSales': totalSales,
-                    'currentReport.status': currentReport?.status,
-                    'currentReport.date': currentReport?.date,
-                    'daySales.length': daySales?.length || 0,
-                    'tipo de totalSales': typeof totalSales
-                  });
+                  // Calcular desde el array de ventas del turno
+                  const totalSales = currentReport.sales?.reduce((sum, sale) => sum + (sale.total || 0), 0) || currentReport.totalSales || 0;
                   return totalSales.toLocaleString('es-AR');
                 })()}`}
                 change={12.5}
@@ -2057,13 +2292,8 @@ export const CashRegisterSystem: React.FC = () => {
                 icon={<Banknote />}
                 label="Dinero en Caja"
                 value={`$${(() => {
-                  const cashInBox = currentReport.cashInBox || 0;
-                  console.log('💰 DEBUG DINERO EN CAJA:', {
-                    'currentReport.cashInBox': currentReport.cashInBox,
-                    'cashInBox calculado': cashInBox,
-                    'formato': cashInBox.toLocaleString('es-AR'),
-                    'tipo': typeof cashInBox
-                  });
+                  // Calcular balance actual desde las ventas del turno
+                  const cashInBox = updateBalanceFromShiftSales(currentReport);
                   return cashInBox.toLocaleString('es-AR');
                 })()}`}
                 change={8.3}
@@ -2076,13 +2306,8 @@ export const CashRegisterSystem: React.FC = () => {
                 icon={<TrendingUp />}
                 label="Ganancias"
                 value={`$${(() => {
-                  const totalProfit = currentReport.totalProfit || 0;
-                  console.log('📈 DEBUG GANANCIAS:', {
-                    'currentReport.totalProfit': currentReport.totalProfit,
-                    'totalProfit calculado': totalProfit,
-                    'formato': totalProfit.toLocaleString('es-AR'),
-                    'tipo': typeof totalProfit
-                  });
+                  // Calcular ganancias desde el array de ventas del turno
+                  const totalProfit = currentReport.sales?.reduce((sum, sale) => sum + (sale.ganancia || 0), 0) || currentReport.totalProfit || 0;
                   return totalProfit.toLocaleString('es-AR');
                 })()}`}
                 change={15.2}
@@ -2104,7 +2329,7 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<Zap />}
                 label="Transacciones POS"
-                value={daySales.length}
+                value={currentReport?.sales?.length || 0}
                 change={22.1}
                 color="text-pink-600"
                 gradient="from-pink-500 to-rose-600"
@@ -2781,10 +3006,10 @@ export const CashRegisterSystem: React.FC = () => {
                         </CardTitle>
                         <div className="flex space-x-2">
                           <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                            {daySales.length} ventas
+                            {currentReport?.sales?.length || 0} ventas
                           </Badge>
                           <Badge variant="outline" className="bg-green-50 text-green-700">
-                            ${daySales.reduce((sum, sale) => sum + (sale.displayTotal || 0), 0).toLocaleString('es-AR')}
+                            ${(currentReport?.totalSales || 0).toLocaleString('es-AR')}
                           </Badge>
                         </div>
                       </div>
@@ -2851,9 +3076,9 @@ export const CashRegisterSystem: React.FC = () => {
                           <RefreshCw className="h-8 w-8 mx-auto text-gray-400 mb-4 animate-spin" />
                           <p className="text-gray-500">Cargando ventas...</p>
                         </div>
-                      ) : daySales && daySales.length > 0 ? (
+                      ) : currentReport?.sales && currentReport.sales.length > 0 ? (
                         <div className="space-y-3">
-                          {daySales.map((sale, index) => (
+                          {currentReport.sales.map((sale, index) => (
                             <div key={sale.id || index} className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                               <div className="flex items-start justify-between">
                                 <div className="flex items-start space-x-4 flex-1">
@@ -2866,45 +3091,42 @@ export const CashRegisterSystem: React.FC = () => {
                                         Venta #{sale.numeroVenta || sale.id?.slice(-6) || 'N/A'}
                                       </p>
                                       <p className="text-lg font-bold text-green-600">
-                                        ${(sale.displayTotal || 0).toLocaleString('es-AR')}
+                                        ${(sale.total || 0).toLocaleString('es-AR')}
                                       </p>
                                     </div>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                       <p className="text-gray-600">
-                                        <strong>Cliente:</strong> {sale.displayCustomer || 'Cliente General'}
+                                        <strong>Cliente:</strong> {sale.cliente?.name || 'Cliente General'}
                                       </p>
                                       <p className="text-gray-600">
-                                        <strong>Cajero:</strong> {sale.displayCashier || 'Sistema'}
+                                        <strong>Ganancia:</strong> ${(sale.ganancia || 0).toLocaleString('es-AR')}
                                       </p>
                                       <p className="text-gray-500">
-                                        <strong>Fecha:</strong> {sale.timestamp instanceof Date && sale.timestamp.toLocaleDateString && sale.timestamp.toLocaleTimeString
-                                          ? `${sale.timestamp.toLocaleDateString('es-ES')} a las ${sale.timestamp.toLocaleTimeString('es-ES')}`
-                                          : 'Fecha no disponible'
-                                        }
+                                        <strong>Fecha:</strong> {sale.timestamp?.toDate ? sale.timestamp.toDate().toLocaleString('es-ES') : 'Ahora'}
                                       </p>
                                       <p className="text-gray-500">
-                                        <strong>Método:</strong> {sale.resumen?.metodoPago || 'Efectivo'}
+                                        <strong>Método:</strong> {sale.metodoPago || 'Efectivo'}
                                       </p>
                                     </div>
                                     
                                     {/* Productos vendidos */}
-                                    {sale.productos && sale.productos.length > 0 && (
+                                    {sale.items && sale.items.length > 0 && (
                                       <div className="mt-3 p-3 bg-white/70 rounded-lg">
                                         <p className="text-sm font-medium text-gray-700 mb-2">Productos:</p>
                                         <div className="space-y-1">
-                                          {sale.productos.slice(0, 3).map((producto: any, idx: number) => (
+                                          {sale.items.slice(0, 3).map((producto: any, idx: number) => (
                                             <div key={idx} className="flex justify-between text-xs text-gray-600">
-                                              <span>{producto.name || producto.nombre || 'Producto'}</span>
+                                              <span>{producto.nombre || 'Producto'}</span>
                                               <span>
-                                                {producto.quantity || producto.cantidad || 1}x 
-                                                ${(producto.price || producto.precio || 0).toLocaleString('es-AR')}
+                                                {producto.cantidad || 1}x 
+                                                ${(producto.precio || 0).toLocaleString('es-AR')}
                                               </span>
                                             </div>
                                           ))}
-                                          {sale.productos.length > 3 && (
+                                          {sale.items.length > 3 && (
                                             <p className="text-xs text-gray-500 italic">
-                                              +{sale.productos.length - 3} productos más...
+                                              +{sale.items.length - 3} productos más...
                                             </p>
                                           )}
                                         </div>
@@ -2914,7 +3136,7 @@ export const CashRegisterSystem: React.FC = () => {
                                     <div className="flex justify-between items-center mt-3">
                                       <div className="flex space-x-2">
                                         <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                                          {sale.displayItems || 0} productos
+                                          {sale.productos || sale.items?.length || 0} productos
                                         </span>
                                         <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
                                           {sale.status || 'Completada'}
