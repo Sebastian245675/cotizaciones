@@ -58,6 +58,8 @@ const POS_VENTAS_COLLECTION = 'pos_ventas';
 // Crear un nuevo cliente POS
 export async function createPOSClient(data: ClientFormData): Promise<string> {
   try {
+    console.log('📝 createPOSClient: Creando cliente con datos:', data);
+    
     const clientData = {
       ...data,
       puntos: 0,
@@ -66,7 +68,11 @@ export async function createPOSClient(data: ClientFormData): Promise<string> {
       ultimaActualizacion: serverTimestamp()
     };
 
+    console.log('💾 Guardando en colección:', POS_CLIENTS_COLLECTION);
+    
     const docRef = await addDoc(collection(db, POS_CLIENTS_COLLECTION), clientData);
+    console.log('✅ Cliente creado exitosamente con ID:', docRef.id);
+    
     return docRef.id;
   } catch (error) {
     console.error('Error creating POS client:', error);

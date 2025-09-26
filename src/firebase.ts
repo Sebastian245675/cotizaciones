@@ -1,16 +1,16 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { 
   getFirestore, 
   collection, 
   getDocs,
-  enableIndexedDbPersistence, 
   initializeFirestore, 
-  CACHE_SIZE_UNLIMITED,
-  connectFirestoreEmulator
+  connectFirestoreEmulator,
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { simulatedDB } from "./lib/simulatedDB";
@@ -21,25 +21,31 @@ import { simulatedDB } from "./lib/simulatedDB";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyD4Qi6WY1o0_i0e4fzkKUBa30y5RQRJDE0",
-  authDomain: "cumpleaos-d73b0.firebaseapp.com",
-  projectId: "cumpleaos-d73b0",
-  storageBucket: "cumpleaos-d73b0.firebasestorage.app",
-  messagingSenderId: "606342014715",
-  appId: "1:606342014715:web:accc621eb961eb85a1725e",
-  measurementId: "G-JEE4WT4CT2"
+  apiKey: "AIzaSyAg-e1g49FHAYfpEk6WdA6pfKAHJzmvjYM",
+  authDomain: "demos-d2610.firebaseapp.com",
+  projectId: "demos-d2610",
+  storageBucket: "demos-d2610.firebasestorage.app",
+  messagingSenderId: "545908718406",
+  appId: "1:545908718406:web:ec34672bc8894f90fb8347",
+  measurementId: "G-N7GKR55VN9"
 };
 
 // Initialize Firebase only if it hasn't been initialized
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Log para depuración
-
-
-const analytics = getAnalytics(app);
+// Initialize Analytics safely
+let analytics: any = null;
+(async () => {
+  if (await isSupported()) {
+    analytics = getAnalytics(app);
+  } else {
+    console.warn("Firebase Analytics is not supported in this environment");
+  }
+})();
 export const auth = getAuth(app);
 export const functions = getFunctions(app, 'us-central1');
 export const storage = getStorage(app);
+export { analytics };
 
 // Log para verificar que las funciones usen el proyecto correcto
 
@@ -54,16 +60,15 @@ let dbInstance: any = null;
 try {
   dbInstance = getFirestore(app);
 } catch (error) {
-  // Si falla, usar initializeFirestore
+  // Si falla, usar initializeFirestore con cache moderno
   dbInstance = initializeFirestore(app, {
-    cacheSizeBytes: CACHE_SIZE_UNLIMITED
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
   });
 }
 
 export const db = dbInstance;
-
-// Intentar habilitar la persistencia offline (solo intentar una vez)
-let persistenceEnabled = false;
 
 // Determinar si usar el emulador de Firestore (solo en desarrollo)
 const isEmulatorEnabled = false; // Cambiar a true para usar el emulador local
@@ -78,20 +83,7 @@ if (shouldUseEmulator) {
 // Verificar si Firestore está accesible y configurar modo de simulación si no lo está
 (async () => {
   try {
-    // Solo intentar habilitar la persistencia si no está habilitada ya
-    if (!persistenceEnabled) {
-      try {
-        await enableIndexedDbPersistence(db);
-        persistenceEnabled = true;
-
-      } catch (err: any) {
-        if (err.code === 'failed-precondition') {
-          console.warn("No se pudo habilitar la persistencia: múltiples pestañas abiertas");
-        } else if (err.code === 'unimplemented') {
-          console.warn("El navegador actual no soporta persistencia Firestore");
-        }
-      }
-    }
+    console.log("%c✅ Firestore inicializado con cache persistente y soporte multi-tab", "background: #4CAF50; color: white; padding: 4px; border-radius: 4px;");
     
     // Intentar acceder a la colección "access_test" para verificar permisos
     try {
@@ -117,6 +109,9 @@ if (shouldUseEmulator) {
         
         // Activar simulación para que la app siga funcionando
         simulatedDB.setSimulationMode(true);
+      } else if (accessError.code === 'unavailable') {
+        console.warn("Firestore temporalmente no disponible, usando modo offline");
+        simulatedDB.setSimulationMode(true);
       } else {
         // Otros errores, probablemente de conexión
         throw accessError;
@@ -133,7 +128,7 @@ if (shouldUseEmulator) {
     console.log(`
       %cProblemas detectados con Firebase:
       
-      1. %cVerificar que el proyecto "cumpleaos-d73b0" exista en Firebase Console
+      1. %cVerificar que el proyecto "demos-d2610" exista en Firebase Console
       2. %cVerificar que las reglas de Firestore permitan lectura/escritura
       3. %cVerificar que la IP/dominio actual esté autorizado en Firebase Console
       4. %cAñadir "${window.location.hostname}" a los dominios autorizados en Auth > Settings

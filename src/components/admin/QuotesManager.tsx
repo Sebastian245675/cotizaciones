@@ -60,12 +60,19 @@ import {
   ThumbsUp,
   ThumbsDown
 } from 'lucide-react';
-import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, Timestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, Timestamp, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { cleanFirestoreData, prepareQuoteFormFields } from '@/lib/firebase-utils';
 import { useQuoteExport } from '@/hooks/useQuoteExport';
 import CompanySettings from './CompanySettings';
 import QuoteTracking from '../QuoteTracking';
+import { createPOSClient, getPOSClients } from '@/lib/pos-clients-service';
+
+// DEBUG: Verificar que las funciones están disponibles
+console.log('🔍 VERIFICANDO IMPORTACIONES:', {
+  createPOSClient: typeof createPOSClient,
+  getPOSClients: typeof getPOSClients
+});
 
 // Interfaces
 interface QuoteField {
@@ -715,7 +722,153 @@ const QuotesManager: React.FC = () => {
     }));
   };
 
+  // NUEVA FUNCIÓN: Crear cliente automáticamente desde cotización manual
+  const createClientFromQuote = async (quoteId: string) => {
+    try {
+      console.log('🚀 === CREANDO CLIENTE AUTOMÁTICAMENTE ===');
+      console.log('Datos del cliente:', {
+        nombre: manualQuoteData.clientName,
+        telefono: manualQuoteData.clientPhone,
+        email: manualQuoteData.clientEmail,
+        direccion: manualQuoteData.clientAddress,
+        quoteId: quoteId
+      });
+
+      // Validar que tengamos al menos nombre y email
+      if (!manualQuoteData.clientName || !manualQuoteData.clientEmail) {
+        console.log('Datos insuficientes para crear cliente');
+        toast({
+          title: "Información incompleta",
+          description: "Se requiere al menos nombre y email para crear el cliente automáticamente.",
+          variant: "destructive"
+        });
+        return null;
+      }
+
+      // Verificar si ya existe un cliente con el mismo email o teléfono
+      console.log('Obteniendo clientes existentes...');
+      const existingClients = await getPOSClients();
+      console.log('Clientes encontrados:', existingClients.length);
+      
+      const existingClient = existingClients.find(client => 
+        (manualQuoteData.clientEmail && client.email === manualQuoteData.clientEmail) || 
+        (manualQuoteData.clientPhone && client.telefono === manualQuoteData.clientPhone)
+      );
+
+      if (existingClient) {
+        console.log('Cliente ya existe:', existingClient.nombre);
+        toast({
+          title: "Cliente existente",
+          description: `El cliente ${existingClient.nombre} ya está registrado en el sistema.`
+        });
+        return existingClient.id;
+      }
+
+      // Crear nuevo cliente si no existe
+      const clientData = {
+        nombre: manualQuoteData.clientName,
+        telefono: manualQuoteData.clientPhone || '',
+        email: manualQuoteData.clientEmail,
+        residencia: manualQuoteData.clientAddress,
+        estado: 'activo' as const,
+        origen: 'cotizacion' as const,
+        codigoCotizacion: quoteId
+      };
+
+      console.log('Creando nuevo cliente con datos:', clientData);
+      const newClientId = await createPOSClient(clientData);
+      console.log('Cliente creado exitosamente con ID:', newClientId);
+      
+      toast({
+        title: "Cliente creado",
+        description: `Nuevo cliente ${manualQuoteData.clientName} agregado automáticamente al sistema.`,
+        duration: 3000
+      });
+
+      return newClientId;
+    } catch (error) {
+      console.error('Error al crear/verificar cliente:', error);
+      // No fallar la cotización por esto, solo mostrar advertencia
+      toast({
+        title: "Advertencia",
+        description: "No se pudo crear el cliente automáticamente: " + (error as Error).message,
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+
+  // NUEVA función directa para crear cliente POS
+  const crearClienteDirecto = async (quoteId: string) => {
+    console.log('🎯 === FUNCIÓN DIRECTA: CREAR CLIENTE POS ===');
+    console.log('Datos disponibles:', {
+      nombre: manualQuoteData.clientName,
+      email: manualQuoteData.clientEmail,
+      telefono: manualQuoteData.clientPhone,
+      empresa: manualQuoteData.clientCompany,
+      direccion: manualQuoteData.clientAddress,
+      profesion: manualQuoteData.clientProfession
+    });
+
+    // PASO 1: Validar que tengamos los datos mínimos
+    if (!manualQuoteData.clientName || !manualQuoteData.clientEmail) {
+      console.error('❌ DATOS FALTANTES - No se puede crear cliente');
+      toast({
+        title: "❌ No se pudo crear cliente",
+        description: "Faltan nombre o email del cliente",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // PASO 2: Preparar los datos exactos que necesita POS
+    const datosCliente = {
+      nombre: manualQuoteData.clientName,
+      telefono: manualQuoteData.clientPhone || '',
+      email: manualQuoteData.clientEmail,
+      residencia: manualQuoteData.clientAddress || '',
+      estado: 'activo' as const,
+      origen: 'cotizacion' as const,
+      codigoCotizacion: quoteId
+    };
+
+    console.log('📦 Datos preparados para POS:', datosCliente);
+
+    // PASO 3: Intentar crear el cliente
+    try {
+      console.log('🔄 Llamando a createPOSClient...');
+      const clienteId = await createPOSClient(datosCliente);
+      console.log('✅ ÉXITO! Cliente creado con ID:', clienteId);
+
+      toast({
+        title: "✅ Cliente creado exitosamente",
+        description: `${manualQuoteData.clientName} fue agregado a Clientes POS`,
+        duration: 5000
+      });
+
+      return clienteId;
+    } catch (error) {
+      console.error('💥 ERROR al crear cliente:', error);
+      toast({
+        title: "❌ Error al crear cliente", 
+        description: `Error: ${(error as Error).message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
   const createManualQuote = async () => {
+    console.log('🎯🎯🎯 ===== BOTÓN CREAR COTIZACIÓN PRESIONADO =====');
+    console.log('📋 Estado actual del formulario:', {
+      clientName: manualQuoteData.clientName,
+      clientEmail: manualQuoteData.clientEmail,
+      clientPhone: manualQuoteData.clientPhone,
+      clientCompany: manualQuoteData.clientCompany,
+      clientAddress: manualQuoteData.clientAddress,
+      clientProfession: manualQuoteData.clientProfession,
+      products: manualQuoteData.products.length
+    });
+    
     try {
       // Validation
       if (!manualQuoteData.clientName || !manualQuoteData.clientEmail || manualQuoteData.products.length === 0) {
@@ -788,6 +941,24 @@ const QuotesManager: React.FC = () => {
         description: "La cotización manual ha sido creada exitosamente."
       });
 
+      // CREAR CLIENTE AUTOMÁTICAMENTE EN SISTEMA POS
+      console.log('🔍 VERIFICANDO CONDICIÓN PARA CREAR CLIENTE:');
+      console.log('  - clientName existe:', !!manualQuoteData.clientName, manualQuoteData.clientName);
+      console.log('  - clientEmail existe:', !!manualQuoteData.clientEmail, manualQuoteData.clientEmail);
+      console.log('  - Condición cumplida:', !!(manualQuoteData.clientName && manualQuoteData.clientEmail));
+      
+      if (manualQuoteData.clientName && manualQuoteData.clientEmail) {
+        console.log('✅ CONDICIÓN CUMPLIDA - Iniciando creación automática de cliente...');
+        console.log('📄 ID de cotización creada:', docRef.id);
+        await crearClienteDirecto(docRef.id);
+      } else {
+        console.log('❌ CONDICIÓN NO CUMPLIDA - No se creará cliente automáticamente');
+        console.log('   Faltan datos:', {
+          nombre: !manualQuoteData.clientName ? 'FALTANTE' : 'OK',
+          email: !manualQuoteData.clientEmail ? 'FALTANTE' : 'OK'
+        });
+      }
+
       // Ask if user wants to generate PDF immediately
       const generatePDF = window.confirm("¿Desea generar el PDF de la cotización ahora?");
       
@@ -856,6 +1027,18 @@ const QuotesManager: React.FC = () => {
   };
 
   const createManualQuoteAndEmail = async (sendEmail: boolean = false) => {
+    console.log('📧📧📧 ===== BOTÓN CREAR Y ENVIAR PRESIONADO =====');
+    console.log('📋 Estado actual del formulario (Email):', {
+      clientName: manualQuoteData.clientName,
+      clientEmail: manualQuoteData.clientEmail,
+      clientPhone: manualQuoteData.clientPhone,
+      clientCompany: manualQuoteData.clientCompany,
+      clientAddress: manualQuoteData.clientAddress,
+      clientProfession: manualQuoteData.clientProfession,
+      products: manualQuoteData.products.length,
+      sendEmail: sendEmail
+    });
+    
     try {
       // Validation
       if (!manualQuoteData.clientName || !manualQuoteData.clientEmail || manualQuoteData.products.length === 0) {
@@ -922,6 +1105,24 @@ const QuotesManager: React.FC = () => {
 
       // Save to database
       const docRef = await addDoc(collection(db, 'quoteSubmissions'), quoteSubmission);
+
+      // CREAR CLIENTE AUTOMÁTICAMENTE EN SISTEMA POS (FUNCIÓN EMAIL)
+      console.log('🔍 VERIFICANDO CONDICIÓN PARA CREAR CLIENTE (EMAIL):');
+      console.log('  - clientName existe:', !!manualQuoteData.clientName, manualQuoteData.clientName);
+      console.log('  - clientEmail existe:', !!manualQuoteData.clientEmail, manualQuoteData.clientEmail);
+      console.log('  - Condición cumplida:', !!(manualQuoteData.clientName && manualQuoteData.clientEmail));
+      
+      if (manualQuoteData.clientName && manualQuoteData.clientEmail) {
+        console.log('✅ CONDICIÓN CUMPLIDA (EMAIL) - Iniciando creación automática de cliente...');
+        console.log('📄 ID de cotización creada:', docRef.id);
+        await crearClienteDirecto(docRef.id);
+      } else {
+        console.log('❌ CONDICIÓN NO CUMPLIDA (EMAIL) - No se creará cliente automáticamente');
+        console.log('   Faltan datos:', {
+          nombre: !manualQuoteData.clientName ? 'FALTANTE' : 'OK',
+          email: !manualQuoteData.clientEmail ? 'FALTANTE' : 'OK'
+        });
+      }
 
       // Create a temporary submission object with the doc ID for PDF generation and email
       const tempSubmission = {
@@ -2399,6 +2600,15 @@ const QuotesManager: React.FC = () => {
             <DialogDescription>
               Complete la información del cliente y agregue los productos/servicios para generar una cotización.
             </DialogDescription>
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                <User className="h-4 w-4" />
+                <span className="text-sm font-medium">Creación automática de cliente</span>
+              </div>
+              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                Al crear la cotización, el cliente se agregará automáticamente al sistema de clientes si no existe.
+              </p>
+            </div>
           </DialogHeader>
 
           <div className="space-y-6">

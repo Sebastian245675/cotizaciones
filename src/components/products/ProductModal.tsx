@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Product } from '@/contexts/CartContext';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from '@/hooks/use-toast';
@@ -21,6 +23,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onC
   const { addToCart } = useCart();
   const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
+  const [quantityInput, setQuantityInput] = useState('1');
   const [viewRecorded, setViewRecorded] = useState(false);
 
   useEffect(() => {
@@ -38,25 +41,60 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onC
 
   if (!product) return null;
 
+  // Verificar si es un producto que permite decimales
+  const allowsDecimals = product.tipoVenta === 'granel' || product.tipoVenta === 'kilos';
+
   const handleAddToCart = () => {
-    addToCart(product, quantity);
+    const finalQuantity = allowsDecimals ? parseFloat(quantityInput) || 1 : quantity;
+    addToCart(product, finalQuantity);
     toast({
       title: "¡Producto agregado!",
-      description: `${quantity}x ${product.name} agregado a tu carrito`,
+      description: `${finalQuantity}${allowsDecimals && product.tipoVenta === 'kilos' ? 'kg' : 'x'} ${product.name} agregado a tu carrito`,
     });
     onClose();
   };
 
   const incrementQuantity = () => {
-    if (quantity < product.stock) {
-      setQuantity(quantity + 1);
+    if (allowsDecimals) {
+      const current = parseFloat(quantityInput) || 0;
+      const newValue = current + (product.tipoVenta === 'kilos' ? 0.1 : 0.5);
+      if (newValue <= product.stock) {
+        setQuantityInput(newValue.toFixed(2));
+      }
+    } else {
+      if (quantity < product.stock) {
+        const newQuantity = quantity + 1;
+        setQuantity(newQuantity);
+        setQuantityInput(newQuantity.toString());
+      }
     }
   };
 
   const decrementQuantity = () => {
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
+    if (allowsDecimals) {
+      const current = parseFloat(quantityInput) || 0;
+      const step = product.tipoVenta === 'kilos' ? 0.1 : 0.5;
+      const newValue = Math.max(step, current - step);
+      setQuantityInput(newValue.toFixed(2));
+    } else {
+      if (quantity > 1) {
+        const newQuantity = quantity - 1;
+        setQuantity(newQuantity);
+        setQuantityInput(newQuantity.toString());
+      }
     }
+  };
+
+  const handleQuantityInputChange = (value: string) => {
+    setQuantityInput(value);
+    if (!allowsDecimals) {
+      const intValue = parseInt(value) || 1;
+      setQuantity(intValue);
+    }
+  };
+
+  const getCurrentQuantity = () => {
+    return allowsDecimals ? parseFloat(quantityInput) || 0.01 : quantity;
   };
 
   return (
@@ -203,39 +241,80 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onC
               <div className="space-y-6">
                 <div className="bg-slate-50 dark:bg-slate-700/20 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">Cantidad</label>
-                      <div className="flex items-center">
-                        <button
-                          className={`h-10 w-10 rounded-l-lg border border-slate-300 dark:border-slate-600 flex items-center justify-center transition-colors ${
-                            quantity <= 1 
-                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed' 
-                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                          }`}
-                          onClick={decrementQuantity}
-                          disabled={quantity <= 1}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        
-                        <div className="h-10 w-14 border-t border-b border-slate-300 dark:border-slate-600 flex items-center justify-center">
-                          <span className="text-center font-semibold text-lg text-slate-800 dark:text-slate-200">
-                            {quantity}
-                          </span>
+                    <div className="flex-1 mr-4">
+                      <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+                        {allowsDecimals ? 
+                          (product.tipoVenta === 'kilos' ? 'Peso (kg)' : 'Cantidad') : 
+                          'Cantidad'
+                        }
+                      </Label>
+                      
+                      {allowsDecimals ? (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-10 w-10 p-0"
+                            onClick={decrementQuantity}
+                            disabled={getCurrentQuantity() <= 0.01}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          
+                          <Input
+                            type="number"
+                            step={product.tipoVenta === 'kilos' ? "0.1" : "0.5"}
+                            min="0.01"
+                            max={product.stock}
+                            value={quantityInput}
+                            onChange={(e) => handleQuantityInputChange(e.target.value)}
+                            className="text-center text-lg font-semibold w-20"
+                            placeholder="0.00"
+                          />
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-10 w-10 p-0"
+                            onClick={incrementQuantity}
+                            disabled={getCurrentQuantity() >= product.stock}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
                         </div>
-                        
-                        <button
-                          className={`h-10 w-10 rounded-r-lg border border-slate-300 dark:border-slate-600 flex items-center justify-center transition-colors ${
-                            quantity >= product.stock 
-                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed' 
-                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                          }`}
-                          onClick={incrementQuantity}
-                          disabled={quantity >= product.stock}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <button
+                            className={`h-10 w-10 rounded-l-lg border border-slate-300 dark:border-slate-600 flex items-center justify-center transition-colors ${
+                              quantity <= 1 
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed' 
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                            onClick={decrementQuantity}
+                            disabled={quantity <= 1}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          
+                          <div className="h-10 w-14 border-t border-b border-slate-300 dark:border-slate-600 flex items-center justify-center">
+                            <span className="text-center font-semibold text-lg text-slate-800 dark:text-slate-200">
+                              {quantity}
+                            </span>
+                          </div>
+                          
+                          <button
+                            className={`h-10 w-10 rounded-r-lg border border-slate-300 dark:border-slate-600 flex items-center justify-center transition-colors ${
+                              quantity >= product.stock 
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed' 
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                            onClick={incrementQuantity}
+                            disabled={quantity >= product.stock}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="text-right">
@@ -243,7 +322,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onC
                       <div className="flex items-center gap-1.5">
                         <span className={`h-2.5 w-2.5 rounded-full ${product.stock > 10 ? 'bg-green-500' : product.stock > 5 ? 'bg-yellow-500' : 'bg-red-500'}`}></span>
                         <span className="font-medium text-slate-700 dark:text-slate-300">
-                          {product.stock} disponibles
+                          {product.stock} {allowsDecimals && product.tipoVenta === 'kilos' ? 'kg' : 'disponibles'}
                         </span>
                       </div>
                     </div>
@@ -254,7 +333,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onC
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600 dark:text-slate-400 font-medium">Total:</span>
                       <span className="text-xl font-bold text-slate-800 dark:text-white">
-                        ${(product.price * quantity).toLocaleString()}
+                        ${(product.price * getCurrentQuantity()).toLocaleString()}
                       </span>
                     </div>
                   </div>

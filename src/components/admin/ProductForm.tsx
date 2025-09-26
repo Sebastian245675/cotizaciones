@@ -64,7 +64,7 @@ export const ProductForm: React.FC = () => {
     category: '',
     subcategory: '',  // Será "none" en la UI, pero guardamos como "" cuando no hay subcategoría
     terceraCategoria: '', // Será "none" en la UI, pero guardamos como "" cuando no hay tercera categoría
-    stock: '',
+    stock: '0.00', // Inicializar como decimal para productos granel/kilos
     image: '',
     additionalImages: ['', '', ''],
     specifications: [{ name: '', value: '' }],
@@ -260,7 +260,11 @@ export const ProductForm: React.FC = () => {
     const numericPrecioVenta = parseFloat(formData.precioVenta);
     const numericPrecioCosto = parseFloat(formData.precioCosto) || 0;
     const numericPrecioMayoreo = parseFloat(formData.precioMayoreo) || 0;
-    const numericStock = parseInt(formData.stock, 10);
+    
+    // Para productos a granel o por kilos, usar parseFloat; para el resto, parseInt
+    const numericStock = (formData.tipoVenta === 'granel' || formData.tipoVenta === 'kilos') 
+      ? parseFloat(formData.stock) 
+      : parseInt(formData.stock, 10);
     
     if (isNaN(numericPrecioVenta) || isNaN(numericStock)) {
       toast({
@@ -711,7 +715,7 @@ export const ProductForm: React.FC = () => {
       category: '',
       subcategory: '',
       terceraCategoria: '',
-      stock: '',
+      stock: '0.00',
       image: '',
       additionalImages: ['', '', ''],
       specifications: [{ name: '', value: '' }],
@@ -1524,7 +1528,7 @@ export const ProductForm: React.FC = () => {
                 category: '',
                 subcategory: '',
                 terceraCategoria: '',
-                stock: '',
+                stock: '0.00',
                 image: '',
                 additionalImages: ['', '', ''],
                 specifications: [{ name: '', value: '' }],
@@ -1623,7 +1627,7 @@ export const ProductForm: React.FC = () => {
                       category: '',
                       subcategory: '',
                       terceraCategoria: '',
-                      stock: '',
+                      stock: '0.00',
                       image: '',
                       additionalImages: ['', '', ''],
                       specifications: [{ name: '', value: '' }],
@@ -1997,17 +2001,31 @@ export const ProductForm: React.FC = () => {
                   <div className="space-y-3">
                     <Label htmlFor="stock" className="text-base font-semibold text-gray-700 flex items-center gap-2">
                       <Package className="h-4 w-4 text-purple-600" />
-                      Stock <span className="text-red-500">*</span>
+                      {formData.tipoVenta === 'kilos' ? 'Stock (kg)' : 
+                       formData.tipoVenta === 'granel' ? 'Stock disponible' : 
+                       'Stock'} <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="stock"
                       type="number"
+                      step={formData.tipoVenta === 'granel' || formData.tipoVenta === 'kilos' ? "0.01" : "1"}
+                      min="0"
                       value={formData.stock}
                       onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                      placeholder="100"
+                      placeholder={
+                        formData.tipoVenta === 'kilos' ? '0.00' :
+                        formData.tipoVenta === 'granel' ? '0.00' :
+                        '100'
+                      }
                       required
                       className="h-12 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
+                    {(formData.tipoVenta === 'granel' || formData.tipoVenta === 'kilos') && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        💡 Para productos {formData.tipoVenta === 'kilos' ? 'por kilogramo' : 'a granel'}, 
+                        puedes usar decimales (ej: 2.5{formData.tipoVenta === 'kilos' ? ' kg' : ''})
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -2365,7 +2383,15 @@ export const ProductForm: React.FC = () => {
                               name="tipoVenta"
                               value={tipo.value}
                               checked={formData.tipoVenta === tipo.value}
-                              onChange={() => setFormData({...formData, tipoVenta: tipo.value as 'unidad' | 'granel' | 'paquete' | 'kilos'})}
+                              onChange={() => {
+                                const newTipoVenta = tipo.value as 'unidad' | 'granel' | 'paquete' | 'kilos';
+                                setFormData({
+                                  ...formData, 
+                                  tipoVenta: newTipoVenta,
+                                  // Reset stock to 0.00 for granel and kilos, empty for others
+                                  stock: (newTipoVenta === 'granel' || newTipoVenta === 'kilos') ? '0.00' : ''
+                                });
+                              }}
                               className="w-4 h-4 text-blue-600"
                             />
                             <div>

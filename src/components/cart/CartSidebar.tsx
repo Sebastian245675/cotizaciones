@@ -201,23 +201,67 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose }) => 
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
-                        onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
-                        onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
+                      {(item.tipoVenta === 'granel' || item.tipoVenta === 'kilos') ? (
+                        // Input directo para productos a granel o por kilos
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            onClick={() => {
+                              const step = item.tipoVenta === 'kilos' ? 0.1 : 0.5;
+                              const newQuantity = Math.max(step, item.quantity - step);
+                              handleQuantityChange(item.id, Math.round(newQuantity * 100) / 100);
+                            }}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Input
+                            type="number"
+                            step={item.tipoVenta === 'kilos' ? "0.1" : "0.5"}
+                            min="0.01"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0.01;
+                              handleQuantityChange(item.id, Math.round(value * 100) / 100);
+                            }}
+                            className="w-16 h-8 text-center text-sm font-medium p-1"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            onClick={() => {
+                              const step = item.tipoVenta === 'kilos' ? 0.1 : 0.5;
+                              const newQuantity = item.quantity + step;
+                              handleQuantityChange(item.id, Math.round(newQuantity * 100) / 100);
+                            }}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        // Botones tradicionales para productos por unidad
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"

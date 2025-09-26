@@ -23,6 +23,7 @@ export interface Product {
   warranties?: string[];
   paymentMethods?: string[];
   colors?: { name: string; hexCode: string; image: string }[];
+  tipoVenta?: 'unidad' | 'granel' | 'paquete' | 'kilos';
 }
 
 export interface CartItem extends Product {

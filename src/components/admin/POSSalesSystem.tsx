@@ -3775,8 +3775,8 @@ const POSSalesSystem: React.FC = () => {
       return;
     }
 
-    // Si es un producto que se vende por kilos, abrir diálogo de peso
-    if (product.tipoVenta === 'kilos') {
+    // Si es un producto que se vende por kilos o a granel, abrir diálogo de peso/cantidad
+    if (product.tipoVenta === 'kilos' || product.tipoVenta === 'granel') {
       setSelectedProductForWeight(product);
       setWeightInput('');
       setShowWeightDialog(true);
@@ -4855,8 +4855,8 @@ ${customer.clientCode ? `🆔 Código Cliente: ${customer.clientCode}\n` : ''}${
 ────────────────────────────────────────────────
 ${cart.map((item, index) => {
   let line = `${(index + 1).toString().padStart(2, '0')}. ${item.product.name}\n`;
-  line += `    📦 Cantidad: ${item.product.tipoVenta === 'kilos' ? `${item.quantity.toFixed(2)} kg` : `${item.quantity} unidad(es)`}\n`;
-  line += `    💵 Precio Unit.: $${(item.product.price || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}${item.product.tipoVenta === 'kilos' ? '/kg' : ''}\n`;
+  line += `    📦 Cantidad: ${item.product.tipoVenta === 'kilos' ? `${item.quantity.toFixed(2)} kg` : item.product.tipoVenta === 'granel' ? `${item.quantity.toFixed(2)} unid.` : `${item.quantity} unidad(es)`}\n`;
+  line += `    💵 Precio Unit.: $${(item.product.price || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}${item.product.tipoVenta === 'kilos' ? '/kg' : item.product.tipoVenta === 'granel' ? '/unid.' : ''}\n`;
   
   if (item.discount > 0) {
     const discountText = item.discountType === 'percentage' ? `${item.discount}%` : `$${item.discount.toLocaleString()}`;
@@ -5840,11 +5840,14 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                                     {product.tipoVenta === 'kilos' && (
                                       <span className="text-xs text-blue-600 ml-1">/kg</span>
                                     )}
+                                    {product.tipoVenta === 'granel' && (
+                                      <span className="text-xs text-blue-600 ml-1">/unid.</span>
+                                    )}
                                   </p>
-                                  {product.tipoVenta === 'kilos' && (
+                                  {(product.tipoVenta === 'kilos' || product.tipoVenta === 'granel') && (
                                     <Badge variant="secondary" className="text-xs">
                                       <Scale className="h-3 w-3 mr-1" />
-                                      Por kilos
+                                      {product.tipoVenta === 'kilos' ? 'Por kilos' : 'A granel'}
                                     </Badge>
                                   )}
                                 </div>
@@ -5862,7 +5865,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                                 variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
                                 className="text-xs mt-1"
                               >
-                                📦 {product.stock} {product.tipoVenta === 'kilos' ? 'kg' : 'unid.'}
+                                📦 {product.stock} {product.tipoVenta === 'kilos' ? 'kg' : product.tipoVenta === 'granel' ? 'unid.' : 'unid.'}
                               </Badge>
                               {/* Debug info - solo en desarrollo */}
                               {product.price <= 0 && (
@@ -6072,7 +6075,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-600">
                               <span>💰 ${(item.product.price || 0).toLocaleString('es-ES')} 
-                                {item.product.tipoVenta === 'kilos' ? '/kg' : ' c/u'}
+                                {item.product.tipoVenta === 'kilos' ? '/kg' : item.product.tipoVenta === 'granel' ? '/unid.' : ' c/u'}
                               </span>
                               {item.product.category && (
                                 <span className="inline-flex items-center gap-1">
@@ -6098,9 +6101,9 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => updateQuantity(item.product.id, item.quantity - (item.product.tipoVenta === 'kilos' ? 0.1 : 1))}
+                            onClick={() => updateQuantity(item.product.id, item.quantity - (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel' ? 0.1 : 1))}
                             className="h-6 w-6 p-0 hover:bg-red-50 border-red-200"
-                            disabled={item.quantity <= (item.product.tipoVenta === 'kilos' ? 0.1 : 1)}
+                            disabled={item.quantity <= (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel' ? 0.1 : 1)}
                           >
                             <Minus className="h-2.5 w-2.5" />
                           </Button>
@@ -6108,7 +6111,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                             type="number"
                             value={item.quantity}
                             onChange={(e) => {
-                              const newQty = item.product.tipoVenta === 'kilos' 
+                              const newQty = (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel')
                                 ? parseFloat(e.target.value) || 0
                                 : parseInt(e.target.value) || 1;
                               if (newQty > 0 && newQty <= (item.product.stock || 0)) {
@@ -6116,21 +6119,21 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                               }
                             }}
                             className="w-12 h-6 text-center font-bold text-xs"
-                            min={item.product.tipoVenta === 'kilos' ? "0.01" : "1"}
+                            min={(item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel') ? "0.01" : "1"}
                             max={item.product.stock || 999}
-                            step={item.product.tipoVenta === 'kilos' ? "0.01" : "1"}
+                            step={(item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel') ? "0.01" : "1"}
                           />
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => updateQuantity(item.product.id, item.quantity + (item.product.tipoVenta === 'kilos' ? 0.1 : 1))}
+                            onClick={() => updateQuantity(item.product.id, item.quantity + (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel' ? 0.1 : 1))}
                             className="h-6 w-6 p-0 hover:bg-green-50 border-green-200"
                             disabled={item.quantity >= (item.product.stock || 0)}
                           >
                             <Plus className="h-2.5 w-2.5" />
                           </Button>
                           <span className="text-xs text-gray-500 ml-1">
-                            📦{item.product.stock || 0}{item.product.tipoVenta === 'kilos' ? 'kg' : ''}
+                            📦{item.product.stock || 0}{item.product.tipoVenta === 'kilos' ? 'kg' : item.product.tipoVenta === 'granel' ? '' : ''}
                           </span>
                         </div>
                         
@@ -7132,15 +7135,21 @@ ${totalPointsEarned > 0 && customer.clientCode ?
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Scale className="h-5 w-5 text-blue-600" />
-              Ingresar Peso
+              {selectedProductForWeight?.tipoVenta === 'granel' ? 'Ingresar Cantidad' : 'Ingresar Peso'}
             </DialogTitle>
             <DialogDescription>
               {selectedProductForWeight && (
                 <>
-                  Ingresa el peso en kilogramos para <strong>{selectedProductForWeight.name}</strong>
+                  {selectedProductForWeight.tipoVenta === 'granel' 
+                    ? `Ingresa la cantidad para ${selectedProductForWeight.name}` 
+                    : `Ingresa el peso en kilogramos para ${selectedProductForWeight.name}`
+                  }
                   <br />
                   <span className="text-sm text-gray-500">
-                    Precio por kilo: ${(selectedProductForWeight.price || 0).toLocaleString()}
+                    {selectedProductForWeight.tipoVenta === 'granel'
+                      ? `Precio por unidad: $${(selectedProductForWeight.price || 0).toLocaleString()}`
+                      : `Precio por kilo: $${(selectedProductForWeight.price || 0).toLocaleString()}`
+                    }
                   </span>
                 </>
               )}
@@ -7149,7 +7158,9 @@ ${totalPointsEarned > 0 && customer.clientCode ?
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="weight">Peso (kg)</Label>
+              <Label htmlFor="weight">
+                {selectedProductForWeight?.tipoVenta === 'granel' ? 'Cantidad' : 'Peso (kg)'}
+              </Label>
               <Input
                 id="weight"
                 type="number"
@@ -7169,7 +7180,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
               />
               {selectedProductForWeight && (
                 <div className="mt-2 text-sm text-gray-600">
-                  Stock disponible: {selectedProductForWeight.stock} kg
+                  Stock disponible: {selectedProductForWeight.stock} {selectedProductForWeight.tipoVenta === 'granel' ? 'unidades' : 'kg'}
                 </div>
               )}
             </div>
@@ -7177,11 +7188,15 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             {weightInput && !isNaN(parseFloat(weightInput)) && parseFloat(weightInput) > 0 && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex justify-between items-center text-sm">
-                  <span>Peso:</span>
-                  <span className="font-medium">{parseFloat(weightInput).toFixed(2)} kg</span>
+                  <span>{selectedProductForWeight?.tipoVenta === 'granel' ? 'Cantidad:' : 'Peso:'}</span>
+                  <span className="font-medium">
+                    {parseFloat(weightInput).toFixed(2)} {selectedProductForWeight?.tipoVenta === 'granel' ? '' : 'kg'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span>Precio por kg:</span>
+                  <span>
+                    {selectedProductForWeight?.tipoVenta === 'granel' ? 'Precio por unidad:' : 'Precio por kg:'}
+                  </span>
                   <span className="font-medium">${(selectedProductForWeight?.price || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg font-bold text-blue-700 mt-2 pt-2 border-t border-blue-300">

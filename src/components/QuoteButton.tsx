@@ -33,6 +33,7 @@ import {
 import { collection, getDocs, addDoc, Timestamp, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { cleanFirestoreData, prepareQuoteSubmissionData } from '@/lib/firebase-utils';
+import { createPOSClient, getPOSClients } from '@/lib/pos-clients-service';
 
 // Interfaces
 interface QuoteField {
@@ -202,6 +203,60 @@ const QuoteButton: React.FC<QuoteButtonProps> = ({
     return true;
   };
 
+  // Función para crear/verificar cliente desde formulario público
+  const createOrUpdateClientFromForm = async (quoteId: string, submissionData: any, customerEmail?: string, customerPhone?: string) => {
+    try {
+      // Extraer datos del cliente del formulario
+      const clientName = submissionData.name || submissionData.nombre || submissionData.client_name;
+      const clientEmail = customerEmail || submissionData.email;
+      const clientPhone = customerPhone || submissionData.phone || submissionData.telefono;
+      const clientAddress = submissionData.address || submissionData.direccion || submissionData.residencia;
+
+      // Validar que al menos tengamos nombre y email/teléfono
+      if (!clientName || (!clientEmail && !clientPhone)) {
+        console.log('Datos insuficientes para crear cliente automáticamente');
+        return null;
+      }
+
+      // Verificar si ya existe un cliente con el mismo email o teléfono
+      const existingClients = await getPOSClients();
+      const existingClient = existingClients.find(client => 
+        (clientEmail && client.email === clientEmail) || 
+        (clientPhone && client.telefono === clientPhone)
+      );
+
+      if (existingClient) {
+        console.log('Cliente ya existe:', existingClient.nombre);
+        return existingClient.id;
+      }
+
+      // Crear nuevo cliente si no existe
+      const clientData = {
+        nombre: clientName,
+        telefono: clientPhone || '',
+        email: clientEmail,
+        residencia: clientAddress,
+        estado: 'activo' as const,
+        origen: 'cotizacion' as const,
+        codigoCotizacion: quoteId
+      };
+
+      const newClientId = await createPOSClient(clientData);
+      
+      toast({
+        title: "Cliente registrado",
+        description: `${clientName} ha sido agregado automáticamente a nuestro sistema de clientes.`,
+        duration: 3000
+      });
+
+      return newClientId;
+    } catch (error) {
+      console.error('Error al crear/verificar cliente desde formulario:', error);
+      // No fallar la cotización por esto
+      return null;
+    }
+  };
+
   const submitQuote = async () => {
     if (!selectedForm || !validateForm()) return;
 
@@ -226,7 +281,10 @@ const QuoteButton: React.FC<QuoteButtonProps> = ({
       });
 
       // Guardar en Firestore
-      await addDoc(collection(db, 'quoteSubmissions'), submissionPayload);
+      const docRef = await addDoc(collection(db, 'quoteSubmissions'), submissionPayload);
+
+      // Crear cliente automáticamente si tiene los datos necesarios
+      await createOrUpdateClientFromForm(docRef.id, submissionData, customerEmail, customerPhone);
 
       setStep('success');
       
