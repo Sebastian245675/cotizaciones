@@ -102,6 +102,41 @@ export const ProductForm: React.FC = () => {
   // hasta que se verifique el permiso
   const [liberta, setLiberta] = useState("no");
 
+  // Función utilitaria para parsear números mexicanos (maneja ambos formatos)
+  const parseMexicanNumber = (str: string | number): number => {
+    if (!str) return 0;
+    const strValue = str.toString().trim();
+    
+    // Si contiene coma, es formato americano: 1,400.00 → 1400
+    if (strValue.includes(',')) {
+      return parseFloat(strValue.replace(/,/g, '')) || 0;
+    }
+    
+    // Si contiene punto, verificar si es separador de miles o decimal
+    if (strValue.includes('.')) {
+      const parts = strValue.split('.');
+      // Si la parte después del punto tiene exactamente 3 dígitos, es separador de miles
+      if (parts.length === 2 && parts[1].length === 3) {
+        return parseFloat(strValue.replace(/\./g, '')) || 0;
+      }
+      // Si tiene 1-2 dígitos después del punto, es decimal
+      else if (parts.length === 2 && parts[1].length <= 2) {
+        return parseFloat(strValue) || 0;
+      }
+    }
+    
+    // Si no tiene separadores, es un número normal
+    return parseFloat(strValue) || 0;
+  };
+
+  // Función para formatear números al estilo mexicano (1,400.00)
+  const formatMexicanNumber = (num: number): string => {
+    return num.toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+  };
+
   // Lista predefinida de beneficios
   const predefinedBenefits = [
     "Envío gratis",
@@ -257,9 +292,9 @@ export const ProductForm: React.FC = () => {
       }
     }
     
-    const numericPrecioVenta = parseFloat(formData.precioVenta);
-    const numericPrecioCosto = parseFloat(formData.precioCosto) || 0;
-    const numericPrecioMayoreo = parseFloat(formData.precioMayoreo) || 0;
+    const numericPrecioVenta = parseMexicanNumber(formData.precioVenta);
+    const numericPrecioCosto = parseMexicanNumber(formData.precioCosto);
+    const numericPrecioMayoreo = parseMexicanNumber(formData.precioMayoreo);
     
     // Para productos a granel o por kilos, usar parseFloat; para el resto, parseInt
     const numericStock = (formData.tipoVenta === 'granel' || formData.tipoVenta === 'kilos') 
@@ -1938,30 +1973,53 @@ export const ProductForm: React.FC = () => {
                       <DollarSign className="h-4 w-4 text-green-600" />
                       Precio de Venta <span className="text-red-500">*</span>
                     </Label>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-base">$</div>
-                      <Input
-                        id="precioVenta"
-                        type="number"
-                        step="0.01"
-                        value={formData.precioVenta}
-                        onChange={(e) => {
-                          const precioVenta = parseFloat(e.target.value) || 0;
-                          const precioCosto = parseFloat(formData.precioCosto) || 0;
-                          const ganancia = precioCosto > 0 ? precioVenta - precioCosto : 0;
-                          const porcentajeGanancia = precioCosto > 0 ? (ganancia / precioCosto) * 100 : 0;
-                          
-                          setFormData({
-                            ...formData, 
-                            precioVenta: e.target.value,
-                            ganancia: parseFloat(ganancia.toFixed(2)),
-                            porcentajeGanancia: parseFloat(porcentajeGanancia.toFixed(2))
-                          });
-                        }}
-                        placeholder="12500.00"
-                        required
-                        className="h-12 pl-10 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      />
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-base">$</div>
+                        <Input
+                          id="precioVenta"
+                          type="text"
+                          value={formData.precioVenta}
+                          onChange={(e) => {
+                            // Permitir escribir números, comas y puntos durante la edición
+                            const value = e.target.value;
+                            
+                            // Solo permitir números, comas, puntos
+                            if (/^[0-9,.]*$/.test(value)) {
+                              const precioVenta = parseMexicanNumber(value);
+                              const precioCosto = parseMexicanNumber(formData.precioCosto);
+                              const ganancia = precioCosto > 0 ? precioVenta - precioCosto : 0;
+                              const porcentajeGanancia = precioCosto > 0 ? (ganancia / precioCosto) * 100 : 0;
+                              
+                              setFormData({
+                                ...formData, 
+                                precioVenta: value,
+                                ganancia: parseFloat(ganancia.toFixed(2)),
+                                porcentajeGanancia: parseFloat(porcentajeGanancia.toFixed(2))
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Al salir del campo, formatear el valor si es válido
+                            const numValue = parseMexicanNumber(e.target.value);
+                            if (numValue > 0) {
+                              setFormData({
+                                ...formData,
+                                precioVenta: formatMexicanNumber(numValue)
+                              });
+                            } else if (e.target.value.trim() === '' || numValue === 0) {
+                              // Si está vacío, dejarlo vacío
+                              setFormData({
+                                ...formData,
+                                precioVenta: ''
+                              });
+                            }
+                          }}
+                          placeholder="12,500.00"
+                          required
+                          className="h-12 pl-10 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1971,29 +2029,177 @@ export const ProductForm: React.FC = () => {
                       <Calculator className="h-4 w-4 text-orange-600" />
                       Precio de Costo
                     </Label>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-base">$</div>
-                      <Input
-                        id="precioCosto"
-                        type="number"
-                        step="0.01"
-                        value={formData.precioCosto}
-                        onChange={(e) => {
-                          const precioCosto = parseFloat(e.target.value) || 0;
-                          const precioVenta = parseFloat(formData.precioVenta) || 0;
-                          const ganancia = precioCosto > 0 ? precioVenta - precioCosto : 0;
-                          const porcentajeGanancia = precioCosto > 0 ? (ganancia / precioCosto) * 100 : 0;
-                          
-                          setFormData({
-                            ...formData, 
-                            precioCosto: e.target.value,
-                            ganancia: parseFloat(ganancia.toFixed(2)),
-                            porcentajeGanancia: parseFloat(porcentajeGanancia.toFixed(2))
-                          });
-                        }}
-                        placeholder="8000.00"
-                        className="h-12 pl-10 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      />
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-base">$</div>
+                        <Input
+                          id="precioCosto"
+                          type="text"
+                          value={formData.precioCosto}
+                          onChange={(e) => {
+                            // Permitir escribir números, comas y puntos durante la edición
+                            const value = e.target.value;
+                            
+                            // Solo permitir números, comas, puntos
+                            if (/^[0-9,.]*$/.test(value)) {
+                              const precioCosto = parseMexicanNumber(value);
+                              const precioVenta = parseMexicanNumber(formData.precioVenta);
+                              const ganancia = precioCosto > 0 ? precioVenta - precioCosto : 0;
+                              const porcentajeGanancia = precioCosto > 0 ? (ganancia / precioCosto) * 100 : 0;
+                              
+                              setFormData({
+                                ...formData, 
+                                precioCosto: value,
+                                ganancia: parseFloat(ganancia.toFixed(2)),
+                                porcentajeGanancia: parseFloat(porcentajeGanancia.toFixed(2))
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Al salir del campo, formatear el valor si es válido
+                            const numValue = parseMexicanNumber(e.target.value);
+                            if (numValue > 0) {
+                              setFormData({
+                                ...formData,
+                                precioCosto: formatMexicanNumber(numValue)
+                              });
+                            } else if (e.target.value.trim() === '' || numValue === 0) {
+                              // Si está vacío, dejarlo vacío
+                              setFormData({
+                                ...formData,
+                                precioCosto: ''
+                              });
+                            }
+                          }}
+                          placeholder="8,000.00"
+                          className="h-12 pl-10 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selector de porcentaje de ganancia */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold text-gray-700 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      Porcentaje de Ganancia Deseado
+                    </Label>
+                    <div className="space-y-3">
+                      {/* Campo de porcentaje personalizado */}
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-base">%</div>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="-100"
+                          max="1000"
+                          value={formData.porcentajeGanancia || ''}
+                          onChange={(e) => {
+                            const porcentaje = parseFloat(e.target.value) || 0;
+                            
+                            // Validar rango del porcentaje
+                            if (porcentaje < -100) {
+                              toast({
+                                variant: "destructive",
+                                title: "Porcentaje inválido",
+                                description: "El porcentaje no puede ser menor a -100%"
+                              });
+                              return;
+                            }
+                            
+                            const precioCosto = parseMexicanNumber(formData.precioCosto);
+                            
+                            if (precioCosto > 0) {
+                              const precioVenta = precioCosto * (1 + porcentaje / 100);
+                              
+                              // Validar que el precio de venta no sea negativo
+                              if (precioVenta < 0) {
+                                toast({
+                                  variant: "destructive", 
+                                  title: "Precio inválido",
+                                  description: "El precio de venta no puede ser negativo"
+                                });
+                                return;
+                              }
+                              
+                              const ganancia = precioVenta - precioCosto;
+                              
+                              setFormData({
+                                ...formData,
+                                porcentajeGanancia: porcentaje,
+                                precioVenta: formatMexicanNumber(precioVenta),
+                                ganancia: parseFloat(ganancia.toFixed(2))
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                porcentajeGanancia: porcentaje
+                              });
+                            }
+                          }}
+                          placeholder="50.0"
+                          className="h-12 pl-10 text-base border-gray-300 focus:border-green-500 focus:ring-green-500"
+                        />
+                      </div>
+                      
+                      {/* Botones de porcentajes predefinidos */}
+                      <div className="grid grid-cols-4 gap-2">
+                        {[25, 40, 50, 75, 100, 150, 200, 300].map((percentage) => (
+                          <Button
+                            key={percentage}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const precioCosto = parseMexicanNumber(formData.precioCosto);
+                              
+                              if (precioCosto > 0) {
+                                const precioVenta = precioCosto * (1 + percentage / 100);
+                                const ganancia = precioVenta - precioCosto;
+                                
+                                setFormData({
+                                  ...formData,
+                                  porcentajeGanancia: percentage,
+                                  precioVenta: formatMexicanNumber(precioVenta),
+                                  ganancia: parseFloat(ganancia.toFixed(2))
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  porcentajeGanancia: percentage
+                                });
+                              }
+                            }}
+                            className={`h-9 text-xs transition-all duration-200 ${
+                              formData.porcentajeGanancia === percentage 
+                                ? 'bg-green-600 text-white border-green-600 hover:bg-green-700' 
+                                : 'hover:bg-green-50 hover:border-green-300'
+                            }`}
+                          >
+                            {percentage}%
+                          </Button>
+                        ))}
+                      </div>
+                      
+                      {/* Información adicional */}
+                      {formData.precioCosto && parseMexicanNumber(formData.precioCosto) > 0 && (
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-xs text-green-700 text-center">
+                            <span className="font-medium">💡 Cálculo automático:</span> Si el costo es ${formatMexicanNumber(parseMexicanNumber(formData.precioCosto))} 
+                            {formData.porcentajeGanancia > 0 && (
+                              <span> y agregas {formData.porcentajeGanancia}% de ganancia, el precio de venta será ${formatMexicanNumber(parseMexicanNumber(formData.precioCosto) * (1 + formData.porcentajeGanancia/100))}</span>
+                            )}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {!formData.precioCosto && (
+                        <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                          <p className="text-xs text-yellow-700 text-center">
+                            ⚠️ Ingresa primero el precio de costo para calcular automáticamente el precio de venta
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2120,14 +2326,13 @@ export const ProductForm: React.FC = () => {
                   <div className="space-y-3">
                     <Label htmlFor="description" className="text-base font-semibold text-gray-700 flex items-center gap-2">
                       <FileText className="h-4 w-4 text-gray-600" />
-                      Descripción <span className="text-red-500">*</span>
+                      Descripción
                     </Label>
                     <Textarea
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      placeholder="Describe el producto..."
-                      required
+                      placeholder="Describe el producto (opcional)..."
                       className="min-h-[120px] text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
                     />
                   </div>

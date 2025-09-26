@@ -50,6 +50,7 @@ interface PDFConfig {
     primary: [number, number, number];
     secondary: [number, number, number];
     text: [number, number, number];
+    lightBlue: [number, number, number];
     lightGray: [number, number, number];
     darkGray: [number, number, number];
   };
@@ -69,10 +70,11 @@ const PDF_CONFIG: PDFConfig = {
     small: 8
   },
   colors: {
-    primary: [41, 98, 255],
-    secondary: [147, 197, 253],
+    primary: [30, 79, 160],        // Azul profesional como en el PDF
+    secondary: [51, 100, 199],     // Azul medio para secciones
     text: [60, 60, 60],
-    lightGray: [220, 220, 220],
+    lightBlue: [239, 246, 255],    // Azul muy claro para fondos alternos
+    lightGray: [248, 250, 252],    // Gris claro para tablas como en el PDF
     darkGray: [31, 41, 55]
   },
   taxRate: 0.16,
@@ -491,10 +493,10 @@ export const useQuoteExport = () => {
       doc.setFontSize(28);
       doc.setFont('helvetica', 'bold');
       // Centrar el texto MIRG
-      const mirgText = 'MIRG';
-      const textWidth = doc.getTextWidth(mirgText);
-      const mirgCenterX = (pageWidth - textWidth) / 2;
-      doc.text(mirgText, mirgCenterX, 35);
+      const companyTitle = companyInfo.name.split(' - ')[0] || companyInfo.name; // Tomar solo la primera parte antes del gui�n
+      const textWidth = doc.getTextWidth(companyTitle);
+      const companyCenterX = (pageWidth - textWidth) / 2;
+      doc.text(companyTitle, companyCenterX, 35);
       
       // Línea decorativa bajo el nombre      doc.setLineWidth(1); // Reducido de 3 a 1 para más delgado
       const lineWidth = 60; // Ancho de la línea
@@ -542,24 +544,24 @@ export const useQuoteExport = () => {
       doc.text(companyInfo.phone, contactX + contactLabelWidth, 37);
       
       // Dirección dividida en dos líneas con alineación
-      const addressPart1 = '4TA VIDRIERA #927 COL 1 DE MAYO';
-      const addressPart2 = 'MONTERREY, C.P. 64220. N.L. MX';
+      const addressLines = doc.splitTextToSize(companyInfo.address, 45);
+      // Direcci�n din�mica basada en configuraci�n
       doc.text('Dir:', contactX, 40);
-      doc.text(addressPart1, contactX + contactLabelWidth, 40);
-      doc.text(addressPart2, contactX + contactLabelWidth, 43);
+      if (addressLines.length > 1) { doc.text(addressLines[0], contactX + contactLabelWidth, 40); } else { doc.text(addressLines[0], contactX + contactLabelWidth, 40); }
+      if (addressLines.length > 1) { doc.text(addressLines[1], contactX + contactLabelWidth, 43); }
       
       // RFC
       doc.text('RFC:', contactX, 46);
-      doc.text('RAGH931025DP4', contactX + contactLabelWidth, 46);
+      doc.text(companyInfo.website || 'RFC: RAGH931025DP4', contactX + contactLabelWidth, 46);
 
       yPosition = 85;
 
       // === TÍTULO PRINCIPAL SIMPLE ===
       // Fondo simple para el título
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(margin, yPosition, pageWidth - (margin * 2), 18, 'F');
       
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       
@@ -579,10 +581,10 @@ export const useQuoteExport = () => {
 
       // Sección izquierda - Info de cotización
       // === SECCIÓN IZQUIERDA - INFORMACIÓN DE COTIZACIÓN ===
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(margin, yPosition, (pageWidth - (margin * 2)) / 2, 40, 'F');
       
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('DATOS DE COTIZACIÓN', margin + 8, yPosition + 10);
@@ -661,10 +663,10 @@ export const useQuoteExport = () => {
       const centerX = pageWidth / 2;      doc.line(centerX, yPosition, centerX, yPosition + 65);
 
       // === COLUMNA IZQUIERDA - DATOS PRINCIPALES ===
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(margin, yPosition, centerX - margin, 25, 'F');
       
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('INFORMACION CORPORATIVA', margin + 10, yPosition + 12);
@@ -754,7 +756,7 @@ export const useQuoteExport = () => {
       doc.setFillColor(240, 240, 240);
       doc.rect(0, 0, pageWidth, 8, 'F');
       
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(0, 8, pageWidth, 6, 'F');
       
       doc.setFillColor(235, 235, 235);
@@ -1522,8 +1524,8 @@ export const useQuoteExport = () => {
       // Alinear exactamente con el título del resumen total
       let termsY = yPosition - totalsHeight + 10;
       
-      // Título organizado y limpio
-      doc.setFillColor(250, 250, 250);
+      // Título con fondo azul profesional como en el PDF de referencia
+      doc.setFillColor(51, 100, 199);  // Azul profesional
       doc.rect(termsX, termsY - 5, termsWidth, 15, 'F');
       
       // Borde sutil
@@ -1531,7 +1533,7 @@ export const useQuoteExport = () => {
       doc.setLineWidth(0.5);
       doc.rect(termsX, termsY - 5, termsWidth, 15, 'S');
       
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('TÉRMINOS Y CONDICIONES', termsX + 8, termsY + 4);
@@ -1793,10 +1795,10 @@ export const useQuoteExport = () => {
       doc.setFontSize(28);
       doc.setFont('helvetica', 'bold');
       // Centrar el texto MIRG
-      const mirgText = 'MIRG';
-      const textWidth = doc.getTextWidth(mirgText);
-      const mirgCenterX = (pageWidth - textWidth) / 2;
-      doc.text(mirgText, mirgCenterX, 35);
+      const companyTitle = companyInfo.name.split(' - ')[0] || companyInfo.name; // Tomar solo la primera parte antes del gui�n
+      const textWidth = doc.getTextWidth(companyTitle);
+      const companyCenterX = (pageWidth - textWidth) / 2;
+      doc.text(companyTitle, companyCenterX, 35);
       
       // Línea decorativa bajo el nombre      doc.setLineWidth(1); // Reducido de 3 a 1 para más delgado
       const lineWidth = 60; // Ancho de la línea
@@ -1844,24 +1846,24 @@ export const useQuoteExport = () => {
       doc.text(companyInfo.phone, contactX + contactLabelWidth, 37);
       
       // Dirección dividida en dos líneas con alineación
-      const addressPart1 = '4TA VIDRIERA #927 COL 1 DE MAYO';
-      const addressPart2 = 'MONTERREY, C.P. 64220. N.L. MX';
+      const addressLines = doc.splitTextToSize(companyInfo.address, 45);
+      // Direcci�n din�mica basada en configuraci�n
       doc.text('Dir:', contactX, 40);
-      doc.text(addressPart1, contactX + contactLabelWidth, 40);
-      doc.text(addressPart2, contactX + contactLabelWidth, 43);
+      if (addressLines.length > 1) { doc.text(addressLines[0], contactX + contactLabelWidth, 40); } else { doc.text(addressLines[0], contactX + contactLabelWidth, 40); }
+      if (addressLines.length > 1) { doc.text(addressLines[1], contactX + contactLabelWidth, 43); }
       
       // RFC
       doc.text('RFC:', contactX, 46);
-      doc.text('RAGH931025DP4', contactX + contactLabelWidth, 46);
+      doc.text(companyInfo.website || 'RFC: RAGH931025DP4', contactX + contactLabelWidth, 46);
 
       yPosition = 85;
 
       // === TÍTULO PRINCIPAL SIMPLE ===
       // Fondo simple para el título
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(margin, yPosition, pageWidth - (margin * 2), 18, 'F');
       
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       
@@ -1881,10 +1883,10 @@ export const useQuoteExport = () => {
 
       // Sección izquierda - Info de cotización
       // === SECCIÓN IZQUIERDA - INFORMACIÓN DE COTIZACIÓN ===
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(margin, yPosition, (pageWidth - (margin * 2)) / 2, 40, 'F');
       
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('DATOS DE COTIZACIÓN', margin + 8, yPosition + 10);
@@ -1963,10 +1965,10 @@ export const useQuoteExport = () => {
       const centerX = pageWidth / 2;      doc.line(centerX, yPosition, centerX, yPosition + 65);
 
       // === COLUMNA IZQUIERDA - DATOS PRINCIPALES ===
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(margin, yPosition, centerX - margin, 25, 'F');
       
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('INFORMACION CORPORATIVA', margin + 10, yPosition + 12);
@@ -2053,7 +2055,7 @@ export const useQuoteExport = () => {
       doc.setFillColor(240, 240, 240);
       doc.rect(0, 0, pageWidth, 8, 'F');
       
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(0, 8, pageWidth, 6, 'F');
       
       doc.setFillColor(235, 235, 235);
@@ -2089,7 +2091,7 @@ export const useQuoteExport = () => {
       doc.setFillColor(240, 240, 240);
       doc.rect(margin - 5, yPosition - 5, pageWidth - (margin * 2) + 10, 22, 'F');
       
-      doc.setFillColor(220, 220, 220);
+      doc.setFillColor(51, 100, 199)  // Azul profesional;
       doc.rect(margin - 3, yPosition - 3, pageWidth - (margin * 2) + 6, 18, 'F');
       
       doc.setTextColor(60, 60, 60);
@@ -2798,26 +2800,31 @@ export const useQuoteExport = () => {
 
       yPosition += totalsHeight + 10;
 
-      // === TÉRMINOS Y CONDICIONES AL LADO IZQUIERDO ===
-      // Configurar posición al lado izquierdo del total
+      // === TÉRMINOS Y CONDICIONES ORGANIZADOS ===
       const termsX = margin;
-      const termsWidth = totalsX - margin - 20;
-      let termsY = yPosition - totalsHeight + 20;
+      const termsWidth = totalsX - margin - 30;
       
-      // Asegurar posición válida
-      if (termsY < yPosition - totalsHeight + 10) {
-        termsY = yPosition - totalsHeight + 10;
-      }
+      // Alinear exactamente con el título del resumen total
+      let termsY = yPosition - totalsHeight + 10;
       
-      doc.setTextColor(31, 41, 55);
-      doc.setFontSize(11);
+      // Título con fondo azul profesional como en el PDF de referencia
+      doc.setFillColor(51, 100, 199);  // Azul profesional
+      doc.rect(termsX, termsY - 5, termsWidth, 15, 'F');
+      
+      // Borde sutil
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.rect(termsX, termsY - 5, termsWidth, 15, 'S');
+      
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text('TÉRMINOS Y CONDICIONES', termsX, termsY);
+      doc.text('TÉRMINOS Y CONDICIONES', termsX + 8, termsY + 4);
 
-      termsY += 15;
+      termsY += 20;
 
-      doc.setTextColor(55, 65, 81);
-      doc.setFontSize(8);
+      doc.setTextColor(70, 70, 70);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
 
       const termsAndConditions3 = [
@@ -2827,10 +2834,12 @@ export const useQuoteExport = () => {
       ];
 
       termsAndConditions3.forEach(term => {
-        const termLines = doc.splitTextToSize(term, pageWidth - (margin * 2));
-        doc.text(termLines, margin, yPosition);
-        yPosition += termLines.length * 3.5 + 2;
+        doc.text(term, termsX + 5, termsY);
+        termsY += 12;
       });
+      
+      // Actualizar yPosition para contenido siguiente
+      yPosition = Math.max(yPosition, termsY + 10);
 
       // === DESCRIPCIÓN DEL PROYECTO ===
       if (clientInfo.descripcionDelProyecto && clientInfo.descripcionDelProyecto.trim()) {
@@ -2990,15 +2999,29 @@ export const useQuoteExport = () => {
         yPosition = margin;
       }
 
-      doc.setTextColor(31, 41, 55);
-      doc.setFontSize(16);
+      // === TÉRMINOS Y CONDICIONES ORGANIZADOS ===
+      const termsXNew = margin;
+      const termsWidthNew = pageWidth - (margin * 2);
+      let termsYNew = yPosition;
+      
+      // Título con fondo azul profesional como en el PDF de referencia
+      doc.setFillColor(51, 100, 199);  // Azul profesional
+      doc.rect(termsXNew, termsYNew - 5, termsWidthNew, 15, 'F');
+      
+      // Borde sutil
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.rect(termsXNew, termsYNew - 5, termsWidthNew, 15, 'S');
+      
+      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text('TÉRMINOS Y CONDICIONES', termsX, termsY);
+      doc.text('TÉRMINOS Y CONDICIONES', termsXNew + 8, termsYNew + 4);
 
-      yPosition += 15;
+      termsYNew += 20;
 
-      doc.setTextColor(55, 65, 81);
-      doc.setFontSize(11);
+      doc.setTextColor(70, 70, 70);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
 
       const termsAndConditions4 = [
@@ -3008,10 +3031,12 @@ export const useQuoteExport = () => {
       ];
 
       termsAndConditions4.forEach((term, index) => {
-        const termLines = doc.splitTextToSize(term, pageWidth - (margin * 2));
-        doc.text(termLines, margin, yPosition);
-        yPosition += termLines.length * 6 + 3;
+        doc.text(term, termsXNew + 5, termsYNew);
+        termsYNew += 12;
       });
+      
+      // Actualizar yPosition para contenido siguiente
+      yPosition = Math.max(yPosition, termsYNew + 10);
 
       yPosition += 15;
 

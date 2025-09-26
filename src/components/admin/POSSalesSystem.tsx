@@ -183,6 +183,7 @@ interface Product {
   category: string;
   image?: string;
   barcode?: string;
+  claveNumerica?: string; // ¡Campo agregado!
   description?: string;
   brand?: string;
   supplier?: string;
@@ -336,6 +337,7 @@ const POSSalesSystem: React.FC = () => {
   const [loadingSalesHistory, setLoadingSalesHistory] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false); // Estado para mostrar/ocultar sidebar del admin - por defecto oculto
   const [showOfflineStatus, setShowOfflineStatus] = useState(false); // Modal de estado offline
+  const [showPaymentModal, setShowPaymentModal] = useState(false); // Modal de pago
   const [salesHistoryFilter, setSalesHistoryFilter] = useState<{
     dateFrom: string;
     dateTo: string;
@@ -369,6 +371,195 @@ const POSSalesSystem: React.FC = () => {
   const [showWeightDialog, setShowWeightDialog] = useState(false);
   const [selectedProductForWeight, setSelectedProductForWeight] = useState<Product | null>(null);
   const [weightInput, setWeightInput] = useState('');
+
+  // 🔥 NUEVO: Funciones para formato mexicano en cantidad a granel
+  const formatMexicanQuantity = (quantity: number): string => {
+    // Formato mexicano: separador de miles con coma, sin decimales para enteros
+    if (quantity >= 1000) {
+      return quantity.toLocaleString('en-US', { 
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    }
+    return quantity.toString();
+  };
+  
+  // 🔥 FUNCIÓN DE DEBUG: Verificar configuración de productos
+  const debugProductConfiguration = () => {
+    console.log('🔧 VERIFICANDO CONFIGURACIÓN DE PRODUCTOS...');
+    
+    const allProducts = products;
+    console.log(`📦 Total de productos cargados: ${allProducts.length}`);
+    
+    // Buscar productos sin claveNumerica
+    const sinClave = allProducts.filter(p => !p.claveNumerica);
+    console.log(`❌ Productos sin clave numérica: ${sinClave.length}`);
+    
+    // Buscar productos sin tipoVenta
+    const sinTipoVenta = allProducts.filter(p => !p.tipoVenta);
+    console.log(`❌ Productos sin tipo de venta: ${sinTipoVenta.length}`);
+    
+    // Buscar productos a granel
+    const productosGranel = allProducts.filter(p => p.tipoVenta === 'granel');
+    console.log(`🌾 Productos a granel: ${productosGranel.length}`, productosGranel);
+    
+    // Buscar específicamente maiz pira
+    const maizPira = allProducts.find(p => 
+      p.name?.toLowerCase().includes('maiz') && p.name?.toLowerCase().includes('pira')
+    );
+    
+    if (maizPira) {
+      console.log('🌽 PRODUCTO MAIZ PIRA ENCONTRADO:', {
+        id: maizPira.id,
+        name: maizPira.name,
+        claveNumerica: maizPira.claveNumerica,
+        barcode: maizPira.barcode,
+        tipoVenta: maizPira.tipoVenta,
+        necesitaActualizar: !maizPira.claveNumerica || !maizPira.tipoVenta
+      });
+    } else {
+      console.log('❌ PRODUCTO MAIZ PIRA NO ENCONTRADO');
+      console.log('🔍 Productos disponibles:', allProducts.map(p => p.name));
+    }
+  };
+  
+  // 🔥 FUNCIÓN MEJORADA: Verificar específicamente el producto 6767
+  const testProduct6767 = () => {
+    console.log('� PROBANDO BÚSQUEDA DE PRODUCTO 6767...');
+    
+    const searchTerm = '6767';
+    console.log('📝 Término de búsqueda:', searchTerm);
+    console.log('📦 Total productos cargados:', products.length);
+    
+    // Buscar por todos los métodos posibles
+    const byClaveNumerica = products.filter(p => p.claveNumerica && p.claveNumerica.includes(searchTerm));
+    const byBarcode = products.filter(p => p.barcode && p.barcode.includes(searchTerm));
+    const byName = products.filter(p => p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    console.log('🔍 Por claveNumerica:', byClaveNumerica.length, byClaveNumerica);
+    console.log('🔍 Por barcode:', byBarcode.length, byBarcode);
+    console.log('🔍 Por nombre:', byName.length, byName);
+    
+    // Simular el filtro exacto que se usa en la búsqueda
+    const filteredProducts = products.filter(product => {
+      const productCategoryName = getCategoryName(product.category);
+      const categoryMatch = selectedCategory === 'all' || productCategoryName === selectedCategory;
+      
+      const searchMatch = 
+        (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (productCategoryName && productCategoryName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (product.barcode && product.barcode.includes(searchTerm)) ||
+        (product.claveNumerica && product.claveNumerica.includes(searchTerm)) ||
+        (product.brand && product.brand.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      console.log(`🔍 Producto: ${product.name}`, {
+        categoryMatch,
+        searchMatch,
+        claveNumerica: product.claveNumerica,
+        barcode: product.barcode,
+        claveNumericaMatch: product.claveNumerica && product.claveNumerica.includes(searchTerm),
+        barcodeMatch: product.barcode && product.barcode.includes(searchTerm)
+      });
+      
+      return categoryMatch && searchMatch;
+    });
+    
+    console.log('✅ RESULTADO FINAL del filtro:', filteredProducts.length, filteredProducts);
+    
+    return filteredProducts;
+  };
+  
+  // 🔥 FUNCIÓN PARA FORZAR ACTUALIZAR EL TIPOВENTA
+  const fixMaizPiraProduct = async () => {
+    console.log('🔧 ARREGLANDO PRODUCTO MAIZ PIRA...');
+    
+    try {
+      // Buscar el producto por claveNumerica
+      let maizPira = products.find(p => p.claveNumerica === '6767');
+      
+      if (!maizPira) {
+        // Si no existe, buscarlo por nombre
+        maizPira = products.find(p => 
+          p.name?.toLowerCase().includes('maiz') && p.name?.toLowerCase().includes('pira')
+        );
+      }
+      
+      if (maizPira) {
+        console.log('✅ Producto encontrado:', maizPira);
+        
+        // Verificar si necesita tipoVenta
+        if (!maizPira.tipoVenta || maizPira.tipoVenta !== 'granel') {
+          // Actualizar en Firebase
+          const productRef = doc(db, 'products', maizPira.id);
+          const updateData = {
+            tipoVenta: 'granel',
+            lastModified: new Date()
+          };
+          
+          await updateDoc(productRef, updateData);
+          
+          console.log('✅ Producto actualizado en Firebase con tipoVenta: granel');
+          
+          // Actualizar en el estado local
+          setProducts(prev => prev.map(p => 
+            p.id === maizPira!.id 
+              ? { ...p, ...updateData }
+              : p
+          ));
+          
+          toast({
+            title: "✅ Producto actualizado",
+            description: "El producto se configuró correctamente como a granel",
+          });
+          
+          // Forzar recarga de productos
+          await fetchProducts();
+          
+          return true;
+        } else {
+          console.log('✅ Producto ya tiene tipoVenta configurado:', maizPira.tipoVenta);
+          return true;
+        }
+      } else {
+        console.log('❌ Producto maiz pira no encontrado en el array de productos');
+        console.log('🔍 Productos disponibles:', products.map(p => ({name: p.name, clave: p.claveNumerica})));
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error actualizando producto:', error);
+      toast({
+        title: "❌ Error",
+        description: "Error al actualizar el producto: " + error.message,
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+  
+  const parseMexicanQuantity = (input: string): number => {
+    // En formato mexicano: 1,250 = mil doscientos cincuenta
+    // Quitar espacios en blanco
+    let cleanInput = input.trim();
+    
+    // Si tiene una sola coma, es separador de miles (ej: 1,250 = 1250)
+    if (cleanInput.includes(',') && cleanInput.indexOf(',') === cleanInput.lastIndexOf(',')) {
+      // Solo una coma, es separador de miles
+      cleanInput = cleanInput.replace(',', '');
+    }
+    
+    const parsed = parseFloat(cleanInput);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+  
+  const incrementQuantity = (currentQuantity: number, increment: number): string => {
+    const newQuantity = currentQuantity + increment;
+    return formatMexicanQuantity(newQuantity);
+  };
+  
+  const decrementQuantity = (currentQuantity: number, decrement: number): string => {
+    const newQuantity = Math.max(0, currentQuantity - decrement);
+    return formatMexicanQuantity(newQuantity);
+  };
 
   // Configuración de funciones de la barra
   const { barFunctionsConfig } = useBarConfig();
@@ -1505,10 +1696,32 @@ const POSSalesSystem: React.FC = () => {
       }
     };
     
+    // 🔥 NUEVO: Exponer funciones de debug de productos
+    (window as any).debugProducts = () => {
+      debugProductConfiguration();
+      return products;
+    };
+    
+    (window as any).fixMaizPira = async () => {
+      return await fixMaizPiraProduct();
+    };
+    
+    (window as any).testProduct6767 = () => {
+      return testProduct6767();
+    };
+    
+    console.log('🌍 Funciones debug disponibles:');
+    console.log('  - debugProducts()');
+    console.log('  - fixMaizPira()');
+    console.log('  - testProduct6767()');
+    
     return () => {
       delete (window as any).debugCashRegister;
       delete (window as any).debugSaleUpdate;
       delete (window as any).checkCashRegisterStatus;
+      delete (window as any).debugProducts;
+      delete (window as any).fixMaizPira;
+      delete (window as any).testProduct6767;
     };
   }, [cashRegisterStatus]);
 
@@ -3187,6 +3400,8 @@ const POSSalesSystem: React.FC = () => {
           category: data.category || data.categoria || 'Sin categoría',
           stock: Number(data.stock || data.inventory || data.inventario || 0),
           barcode: data.barcode || data.codigoBarras,
+          claveNumerica: data.claveNumerica || data.clave || '', // ¡Campo agregado!
+          tipoVenta: data.tipoVenta || undefined, // 🔥 NUEVO: Campo tipoVenta
           brand: data.brand || data.marca,
           supplier: data.supplier || data.proveedor,
           costPrice: Number(data.costPrice || data.precioCosto || 0),
@@ -3199,6 +3414,73 @@ const POSSalesSystem: React.FC = () => {
       console.log(`✅ ${productsData.length} productos cargados exitosamente`);
       console.log('📊 Productos con precio > 0:', productsData.filter(p => p.price > 0).length);
       console.log('⚠️ Productos con precio = 0:', productsData.filter(p => p.price === 0).length);
+      console.log('🔍 PRODUCTOS CARGADOS - MUESTRA:', productsData.slice(0, 3).map(p => ({
+        name: p.name,
+        barcode: p.barcode,
+        claveNumerica: p.claveNumerica,
+        tipoVenta: p.tipoVenta,
+        keys: Object.keys(p)
+      })));
+      
+      // 🔥 BUSCAR ESPECÍFICAMENTE EL PRODUCTO 6767
+      const producto6767 = productsData.find(p => 
+        p.claveNumerica === '6767' || 
+        p.barcode === '6767' ||
+        p.name?.toLowerCase().includes('maiz') ||
+        p.name?.toLowerCase().includes('pira')
+      );
+      
+      if (producto6767) {
+        console.log('✅ PRODUCTO 6767 ENCONTRADO:', {
+          id: producto6767.id,
+          name: producto6767.name,
+          claveNumerica: producto6767.claveNumerica,
+          barcode: producto6767.barcode,
+          tipoVenta: producto6767.tipoVenta,
+          price: producto6767.price,
+          stock: producto6767.stock,
+          allData: producto6767
+        });
+        
+        // 🔥 AUTO-ARREGLAR: Si no tiene tipoVenta='granel', agregarlo automáticamente
+        if (!producto6767.tipoVenta || producto6767.tipoVenta !== 'granel') {
+          console.log('🔧 AUTO-ARREGLANDO: Agregando tipoVenta=granel al producto 6767...');
+          
+          try {
+            // Actualizar en Firebase
+            const productRef = doc(db, 'products', producto6767.id);
+            await updateDoc(productRef, {
+              tipoVenta: 'granel',
+              lastModified: new Date(),
+              lastModifiedBy: user?.email || 'sistema'
+            });
+            
+            // Actualizar en el array local
+            const updatedProduct = { ...producto6767, tipoVenta: 'granel' as const };
+            const updatedProductsData = productsData.map(p => 
+              p.id === producto6767.id ? updatedProduct : p
+            );
+            
+            console.log('✅ PRODUCTO 6767 ARREGLADO AUTOMÁTICAMENTE - Ahora es tipo granel');
+            
+            // Actualizar productos con el fix aplicado
+            productsData = updatedProductsData;
+            
+          } catch (error) {
+            console.error('❌ Error auto-arreglando producto 6767:', error);
+          }
+        } else {
+          console.log('✅ PRODUCTO 6767 YA ESTÁ CONFIGURADO COMO GRANEL');
+        }
+      } else {
+        console.log('❌ PRODUCTO 6767 NO ENCONTRADO');
+        console.log('🔍 Productos que contienen "6767":', productsData.filter(p => 
+          JSON.stringify(p).toLowerCase().includes('6767')
+        ));
+        console.log('🔍 Productos que contienen "maiz":', productsData.filter(p => 
+          JSON.stringify(p).toLowerCase().includes('maiz')
+        ));
+      }
       
       setProducts(productsData);
       
@@ -3697,10 +3979,28 @@ const POSSalesSystem: React.FC = () => {
     const categoryMatch = selectedCategory === 'all' || productCategoryName === selectedCategory;
     
     const searchTerm_unified = searchTerm || barcodeInput;
+    
+    // DEBUG: Log para buscar el producto específico
+    if (searchTerm_unified === '6767') {
+      console.log('🔍 BUSCANDO PRODUCTO 6767:', {
+        productName: product.name,
+        barcode: product.barcode,
+        claveNumerica: product.claveNumerica,
+        tipoVenta: product.tipoVenta,
+        hasClaveNumerica: !!product.claveNumerica,
+        matchesClaveNumerica: product.claveNumerica && product.claveNumerica.includes('6767'),
+        matchesBarcode: product.barcode && product.barcode.includes('6767'),
+        matchesName: product.name && product.name.toLowerCase().includes('6767'),
+        productKeys: Object.keys(product),
+        fullProduct: product
+      });
+    }
+    
     const searchMatch = !searchTerm_unified || 
       (product.name && product.name.toLowerCase().includes(searchTerm_unified.toLowerCase())) ||
       (productCategoryName && productCategoryName.toLowerCase().includes(searchTerm_unified.toLowerCase())) ||
       (product.barcode && product.barcode.includes(searchTerm_unified)) ||
+      (product.claveNumerica && product.claveNumerica.includes(searchTerm_unified)) ||
       (product.brand && product.brand.toLowerCase().includes(searchTerm_unified.toLowerCase()));
     
     return categoryMatch && searchMatch;
@@ -3778,7 +4078,12 @@ const POSSalesSystem: React.FC = () => {
     // Si es un producto que se vende por kilos o a granel, abrir diálogo de peso/cantidad
     if (product.tipoVenta === 'kilos' || product.tipoVenta === 'granel') {
       setSelectedProductForWeight(product);
-      setWeightInput('');
+      // 🔥 NUEVO: Para productos a granel, iniciar con 1.000 en formato mexicano
+      if (product.tipoVenta === 'granel') {
+        setWeightInput('1,000');
+      } else {
+        setWeightInput('');
+      }
       setShowWeightDialog(true);
       return;
     }
@@ -3845,7 +4150,13 @@ const POSSalesSystem: React.FC = () => {
 
     setCart(cart.map(item => {
       if (item.product.id === productId) {
-        const price = item.product.price || 0;
+        let price = item.product.price || 0;
+        
+        // Aplicar corrección de precio para productos a granel
+        if (item.product.tipoVenta === 'granel' && price >= 1000) {
+          price = price / 1000;
+        }
+        
         const discountAmount = item.discountType === 'percentage' 
           ? (price * roundedQuantity * item.discount / 100)
           : item.discount;
@@ -3868,30 +4179,44 @@ const POSSalesSystem: React.FC = () => {
   const confirmWeight = () => {
     if (!selectedProductForWeight) return;
     
-    const weight = parseFloat(weightInput);
-    if (isNaN(weight) || weight <= 0) {
-      toast({
-        title: "Peso inválido",
-        description: "Por favor ingresa un peso válido en kilogramos",
-        variant: "destructive"
-      });
-      return;
+    // Para productos a granel, usar formato mexicano
+    let weight: number;
+    if (selectedProductForWeight.tipoVenta === 'granel') {
+      weight = parseMexicanQuantity(weightInput);
+      if (isNaN(weight) || weight <= 0) {
+        toast({
+          title: "Cantidad inválida",
+          description: "Por favor ingresa una cantidad válida",
+          variant: "destructive"
+        });
+        return;
+      }
+    } else {
+      weight = parseFloat(weightInput);
+      if (isNaN(weight) || weight <= 0) {
+        toast({
+          title: "Peso inválido",
+          description: "Por favor ingresa un peso válido en kilogramos",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
-    if (weight > selectedProductForWeight.stock) {
-      toast({
-        title: "Stock insuficiente",
-        description: `Solo hay ${selectedProductForWeight.stock} kg disponibles`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const existingItem = cart.find(item => item.product.id === selectedProductForWeight.id);
-    
-    if (existingItem) {
-      const newQuantity = existingItem.quantity + weight;
-      if (newQuantity > selectedProductForWeight.stock) {
+    // � ARREGLO: Para productos a granel, ignorar validación de stock si es muy bajo
+    if (selectedProductForWeight.tipoVenta === 'granel') {
+      // Para productos a granel, permitir cualquier cantidad razonable
+      if (weight > 50000) { // Solo limitar cantidades excesivamente grandes
+        toast({
+          title: "Cantidad muy grande",
+          description: "Por favor ingresa una cantidad menor",
+          variant: "destructive"
+        });
+        return;
+      }
+    } else {
+      // Para productos por kilos, sí validar stock
+      if (weight > selectedProductForWeight.stock) {
         toast({
           title: "Stock insuficiente",
           description: `Solo hay ${selectedProductForWeight.stock} kg disponibles`,
@@ -3899,14 +4224,25 @@ const POSSalesSystem: React.FC = () => {
         });
         return;
       }
-      updateQuantity(selectedProductForWeight.id, newQuantity);
+    }
+
+    const existingItem = cart.find(item => item.product.id === selectedProductForWeight.id);
+    
+    if (existingItem) {
+      updateQuantity(selectedProductForWeight.id, existingItem.quantity + weight);
     } else {
+      // Aplicar la misma corrección de precio que en el diálogo
+      let realPrice = selectedProductForWeight.price || 0;
+      if (realPrice >= 1000) {
+        realPrice = realPrice / 1000;
+      }
+      
       const newItem: CartItem = {
         product: selectedProductForWeight,
         quantity: weight,
         discount: 0,
         discountType: 'percentage',
-        subtotal: (selectedProductForWeight.price || 0) * weight
+        subtotal: realPrice * weight
       };
       setCart([...cart, newItem]);
     }
@@ -3918,9 +4254,15 @@ const POSSalesSystem: React.FC = () => {
     setSearchTerm('');
     setBarcodeInput('');
     
+    // Mensaje de confirmación
+    const unit = selectedProductForWeight.tipoVenta === 'granel' ? 'unidades' : 'kg';
+    const formattedQuantity = selectedProductForWeight.tipoVenta === 'granel' 
+      ? formatMexicanQuantity(weight) 
+      : weight.toFixed(2);
+    
     toast({
-      title: "Producto agregado",
-      description: `${weight} kg de ${selectedProductForWeight.name} agregados al carrito`,
+      title: "✅ Producto agregado",
+      description: `${formattedQuantity} ${unit} de ${selectedProductForWeight.name}`,
     });
   };
 
@@ -5476,10 +5818,6 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             <span className="text-gray-700">Cliente</span>
           </div>
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-semibold">F4</kbd>
-            <span className="text-gray-700">Monto Recibido</span>
-          </div>
-          <div className="flex items-center gap-2">
             <kbd className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">F5</kbd>
             <span className="text-gray-700">Completar Compra</span>
           </div>
@@ -6139,7 +6477,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                         
                         <div className="text-right">
                           <p className="font-bold text-green-600 text-lg">
-                            ${(item.subtotal || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                            ${formatMexicanQuantity(item.subtotal || 0)}
                           </p>
                           {mode === 'advanced' && (
                             <div className="flex items-center gap-1 mt-1">
@@ -6171,8 +6509,8 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                           <div className="flex justify-between text-xs text-green-600">
                             <span>Ahorro:</span>
                             <span>
-                              -${(((item.product.price || 0) * item.quantity) - (item.subtotal || 0)).toLocaleString('es-ES')}
-                              ({item.discountType === 'percentage' ? `${item.discount}%` : `$${item.discount}`})
+                              -${formatMexicanQuantity(((item.product.price || 0) * item.quantity) - (item.subtotal || 0))}
+                              ({item.discountType === 'percentage' ? `${item.discount}%` : `$${formatMexicanQuantity(item.discount)}`})
                             </span>
                           </div>
                         </div>
@@ -6268,49 +6606,6 @@ ${totalPointsEarned > 0 && customer.clientCode ?
         {/* Panel lateral derecho - Ultra compacto con botón fijo */}
         <div className="lg:col-span-2 flex flex-col h-full overflow-hidden">
           
-          {/* Resumen de totales - Compacto */}
-          <Card className="shadow-sm flex-shrink-0">
-            <CardHeader className="py-1">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Calculator className="h-3 w-3 text-blue-600" />
-                Resumen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-2">
-              <div className="bg-gray-50 p-2 rounded space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span>Subtotal:</span>
-                  <span className="font-semibold">${totals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="border-t pt-1">
-                  <div className="flex justify-between text-sm font-bold text-green-600">
-                    <span>TOTAL:</span>
-                    <span>${totals.total.toFixed(2)}</span>
-                  </div>
-                </div>
-                
-                {/* Mostrar puntos que ganará el cliente si hay productos con puntos */}
-                {cart.length > 0 && calculatePointsFromCurrentCart() > 0 && (
-                  <div className="border-t pt-1">
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-1 rounded border border-purple-200">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-purple-700 font-medium">⭐ +{calculatePointsFromCurrentCart()}</span>
-                        {customer.clientCode && customer.points !== undefined && (
-                          <span className="text-purple-600">→ {customer.points + calculatePointsFromCurrentCart()} pts</span>
-                        )}
-                      </div>
-                      {!customer.clientCode && (
-                        <p className="text-xs text-purple-600">
-                          ⚠️ Registre cliente
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Método de pago */}
           <Card className="shadow-sm">
             <CardHeader 
@@ -6455,7 +6750,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       </span>
                     </div>
                     <div className="text-xs text-orange-700 space-y-1">
-                      <p>• Monto a crédito: <span className="font-bold">${totals.total.toLocaleString('es-ES', {minimumFractionDigits: 2})}</span></p>
+                      <p>• Monto a crédito: <span className="font-bold">${formatMexicanQuantity(totals.total)}</span></p>
                       {customer.creditLimit && customer.creditLimit > 0 && (
                         <p>• Límite del cliente: <span className="font-bold">${customer.creditLimit.toLocaleString('es-ES', {minimumFractionDigits: 2})}</span></p>
                       )}
@@ -6510,92 +6805,229 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             </Card>
           )}
 
-          {/* Botón de Completar y Pagar */}
-          <Card className="shadow-lg border-0 bg-white">
-            <CardContent className="p-3">
-              {/* Mostrar cambio si es efectivo */}
-              {paymentMethod === 'cash' && receivedAmount > 0 && (
-                <div className="mb-3 p-2 bg-yellow-50 rounded-md border border-yellow-200">
-                  <div className="flex justify-between text-sm">
-                    <span>Recibido:</span>
-                    <span className="font-semibold">${receivedAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Cambio:</span>
-                    <span className={`font-semibold ${totals.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${Math.abs(totals.change).toFixed(2)}
-                      {totals.change < 0 && ' (Falta)'}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Botón de Completar y Pagar */}
-              <Button
-                onClick={processSale}
-                disabled={processing || cart.length === 0 || 
-                  (paymentMethod === 'cash' && receivedAmount < totals.total) ||
-                  (paymentMethod === 'credit' && !creditDueDate)}
-                className="w-full h-16 text-lg font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mb-3"
-              >
-                {processing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                    Procesando Venta...
-                  </>
-                ) : (
-                  <div className="w-full flex items-center justify-between">
-                    <div className="flex items-center">
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      💳 Completar y Cobrar
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-bold">
-                        ${totals.total.toLocaleString('es-ES', {minimumFractionDigits: 0})}
-                      </div>
-                      <div className="text-xs opacity-90">
-                        {cart.reduce((sum, item) => sum + item.quantity, 0)} productos
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </Button>
-
-              {/* Botones adicionales */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => printReceipt()} 
-                  className="h-10 border-blue-300 text-blue-700 hover:bg-blue-50"
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  Vista Previa
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (cart.length === 0) {
-                      toast({
-                        title: "Datos incompletos",
-                        description: "Asegúrate de tener productos antes de imprimir",
-                        variant: "destructive"
-                      });
-                      return;
-                    }
-                    printReceipt();
-                  }}
-                  className="h-10 border-purple-300 text-purple-700 hover:bg-purple-50"
-                >
-                  <Printer className="h-4 w-4 mr-1" />
-                  Imprimir
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
+      {/* Área de Pago Fija - Elementos Separados */}
+      <div className="fixed bottom-4 right-6 z-50 flex gap-4 items-start">
+        {/* Botón de Completar y Pagar - Independiente */}
+        <Card className="shadow-xl border-0 bg-white">
+          <CardContent className="p-3">
+            <Button
+              onClick={() => setShowPaymentModal(true)}
+              disabled={cart.length === 0}
+              className="w-48 h-20 text-lg font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {processing ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                  Procesando Venta...
+                </>
+              ) : (
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <CheckCircle className="h-5 w-5 mr-2" />
+                    💳 Cobrar
+                  </div>
+                  <div className="text-xs opacity-90">
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)} productos
+                  </div>
+                </div>
+              )}
+            </Button>
+
+            {/* Mostrar cambio si es efectivo - Dentro del card del botón */}
+            {paymentMethod === 'cash' && receivedAmount > 0 && (
+              <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+                <div className="flex justify-between text-xs">
+                  <span>Recibido:</span>
+                  <span className="font-semibold">${receivedAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Cambio:</span>
+                  <span className={`font-semibold ${totals.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    ${Math.abs(totals.change).toFixed(2)}
+                    {totals.change < 0 && ' (Falta)'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Total - Card Separado */}
+        <Card className="shadow-xl border-0 bg-white">
+          <CardContent className="p-4">
+            <div className="w-60 text-center">
+              <div className="text-6xl font-bold text-green-600">
+                ${formatMexicanQuantity(totals.total)}
+              </div>
+              <div className="text-base text-gray-600 mt-2">
+                TOTAL A PAGAR
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Modales */}
+      {/* Modal de Pago */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <CreditCard className="h-6 w-6 text-green-600" />
+              Completar Pago
+            </DialogTitle>
+            <DialogDescription>
+              Configure los detalles del pago para completar la venta
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Resumen de la venta */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-green-800">Resumen de la Venta</h3>
+                <Badge variant="secondary" className="bg-green-100 text-green-700">
+                  {cart.reduce((sum, item) => sum + item.quantity, 0)} artículos
+                </Badge>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal:</span>
+                  <span className="font-semibold">${formatMexicanQuantity(totals.subtotal)}</span>
+                </div>
+                <div className="border-t border-green-300 pt-2">
+                  <div className="flex justify-between text-xl font-bold text-green-700">
+                    <span>TOTAL:</span>
+                    <span>${formatMexicanQuantity(totals.total)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Selección de método de pago */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Método de Pago</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('cash')}
+                  className="h-12 justify-start text-base"
+                >
+                  <Banknote className="h-5 w-5 mr-3" />
+                  Efectivo
+                </Button>
+                <Button
+                  variant={paymentMethod === 'card' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('card')}
+                  className="h-12 justify-start text-base"
+                >
+                  <CreditCard className="h-5 w-5 mr-3" />
+                  Tarjeta
+                </Button>
+              </div>
+              
+              {mode === 'advanced' && (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <Button
+                    variant={paymentMethod === 'transfer' ? 'default' : 'outline'}
+                    onClick={() => setPaymentMethod('transfer')}
+                    className="h-12 justify-start text-base"
+                  >
+                    <DollarSign className="h-5 w-5 mr-3" />
+                    Transferencia
+                  </Button>
+                  <Button
+                    variant={paymentMethod === 'credit' ? 'default' : 'outline'}
+                    onClick={() => setPaymentMethod('credit')}
+                    className="h-12 justify-start text-base bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 hover:from-orange-100 hover:to-red-100"
+                  >
+                    <Clock className="h-5 w-5 mr-3" />
+                    Crédito
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Campo de monto recibido para efectivo */}
+            {paymentMethod === 'cash' && (
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Monto Recibido</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={receivedAmount || ''}
+                    onChange={(e) => setReceivedAmount(Number(e.target.value))}
+                    className="pl-8 h-14 text-xl font-semibold"
+                    autoFocus
+                  />
+                </div>
+                
+                {receivedAmount > 0 && (
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-yellow-800">Cambio:</span>
+                      <span className={`text-2xl font-bold ${totals.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${Math.abs(totals.change).toFixed(2)}
+                        {totals.change < 0 && ' (Falta)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Información del cliente */}
+            {customer.id && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-2">Cliente</h4>
+                <p className="text-blue-700">{customer.name}</p>
+                {customer.clientCode && (
+                  <p className="text-sm text-blue-600">Código: {customer.clientCode}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                processSale();
+                setShowPaymentModal(false);
+              }}
+              disabled={processing || 
+                (paymentMethod === 'cash' && receivedAmount < totals.total) ||
+                (paymentMethod === 'credit' && !creditDueDate)}
+              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+            >
+              {processing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Completar Venta
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal de Estado Offline */}
       <Dialog open={showOfflineStatus} onOpenChange={setShowOfflineStatus}>
         <DialogContent className="sm:max-w-2xl z-[10010]">
@@ -7129,104 +7561,157 @@ ${totalPointsEarned > 0 && customer.clientCode ?
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo para ingresar peso en productos por kilos */}
+      {/* 🎯 DIÁLOGO ESTILO ELEVENTA - Cantidad de Productos A Granel */}
       <Dialog open={showWeightDialog} onOpenChange={setShowWeightDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Scale className="h-5 w-5 text-blue-600" />
-              {selectedProductForWeight?.tipoVenta === 'granel' ? 'Ingresar Cantidad' : 'Ingresar Peso'}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedProductForWeight && (
-                <>
-                  {selectedProductForWeight.tipoVenta === 'granel' 
-                    ? `Ingresa la cantidad para ${selectedProductForWeight.name}` 
-                    : `Ingresa el peso en kilogramos para ${selectedProductForWeight.name}`
-                  }
-                  <br />
-                  <span className="text-sm text-gray-500">
-                    {selectedProductForWeight.tipoVenta === 'granel'
-                      ? `Precio por unidad: $${(selectedProductForWeight.price || 0).toLocaleString()}`
-                      : `Precio por kilo: $${(selectedProductForWeight.price || 0).toLocaleString()}`
-                    }
+        <DialogContent className="sm:max-w-2xl w-full !top-[15%] !left-1/2 !translate-x-[-50%] !translate-y-0 !transform !fixed !z-50">
+          {selectedProductForWeight && (
+            <div className="text-center space-y-6">
+              {/* Header del producto */}
+              <div className="border-b pb-4">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  {selectedProductForWeight.name}
+                </h2>
+                <p className="text-lg text-gray-600">
+                  Precio por {selectedProductForWeight.tipoVenta === 'granel' ? 'unidad' : 'kilo'}: 
+                  <span className="font-bold text-green-600 ml-2">
+                    ${(() => {
+                      let price = selectedProductForWeight.price || 0;
+                      if (selectedProductForWeight.tipoVenta === 'granel' && price >= 1000) {
+                        price = price / 1000;
+                      }
+                      return formatMexicanQuantity(price);
+                    })()}
                   </span>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="weight">
-                {selectedProductForWeight?.tipoVenta === 'granel' ? 'Cantidad' : 'Peso (kg)'}
-              </Label>
-              <Input
-                id="weight"
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={selectedProductForWeight?.stock || 999}
-                value={weightInput}
-                onChange={(e) => setWeightInput(e.target.value)}
-                placeholder="0.00"
-                className="text-lg font-medium"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    confirmWeight();
-                  }
-                }}
-              />
-              {selectedProductForWeight && (
-                <div className="mt-2 text-sm text-gray-600">
-                  Stock disponible: {selectedProductForWeight.stock} {selectedProductForWeight.tipoVenta === 'granel' ? 'unidades' : 'kg'}
-                </div>
-              )}
-            </div>
-            
-            {weightInput && !isNaN(parseFloat(weightInput)) && parseFloat(weightInput) > 0 && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex justify-between items-center text-sm">
-                  <span>{selectedProductForWeight?.tipoVenta === 'granel' ? 'Cantidad:' : 'Peso:'}</span>
-                  <span className="font-medium">
-                    {parseFloat(weightInput).toFixed(2)} {selectedProductForWeight?.tipoVenta === 'granel' ? '' : 'kg'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span>
-                    {selectedProductForWeight?.tipoVenta === 'granel' ? 'Precio por unidad:' : 'Precio por kg:'}
-                  </span>
-                  <span className="font-medium">${(selectedProductForWeight?.price || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-lg font-bold text-blue-700 mt-2 pt-2 border-t border-blue-300">
-                  <span>Total:</span>
-                  <span>${((selectedProductForWeight?.price || 0) * parseFloat(weightInput)).toLocaleString()}</span>
-                </div>
+                </p>
               </div>
-            )}
-          </div>
-          
-          <DialogFooter className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowWeightDialog(false);
-                setSelectedProductForWeight(null);
-                setWeightInput('');
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={confirmWeight}
-              disabled={!weightInput || isNaN(parseFloat(weightInput)) || parseFloat(weightInput) <= 0}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar al Carrito
-            </Button>
-          </DialogFooter>
+
+              {/* 🎯 DISEÑO SOFISTICADO ESTILO ELEVENTA - Compacto y Elegante */}
+              <div className="grid grid-cols-2 gap-6 h-64">
+                
+                {/* 🔢 LADO IZQUIERDO - Cantidad del producto */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-300 rounded-2xl p-5 shadow-lg">
+                  <div className="text-center h-full flex flex-col justify-between">
+                    <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wider block mb-3">
+                      Cantidad del producto
+                    </Label>
+                    
+                    <div className="flex-1 flex flex-col justify-center">
+                      <Input
+                        type="text"
+                        value={weightInput}
+                        onChange={(e) => setWeightInput(e.target.value)}
+                        placeholder="1,000"
+                        className="text-8xl font-black text-center py-8 px-6 text-gray-900 bg-white/90 border-2 border-gray-200 focus:border-gray-400 rounded-xl shadow-inner"
+                        style={{ fontSize: '4rem', lineHeight: '1' }}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            confirmWeight();
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const current = parseMexicanQuantity(weightInput);
+                            setWeightInput(incrementQuantity(current, 500));
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const current = parseMexicanQuantity(weightInput);
+                            if (current > 500) {
+                              setWeightInput(decrementQuantity(current, 500));
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 💰 LADO DERECHO - Importe Actual */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-300 rounded-2xl p-5 shadow-lg">
+                  <div className="text-center h-full flex flex-col justify-between">
+                    <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wider block mb-3">
+                      Importe actual
+                    </Label>
+                    
+                    <div className="flex-1 flex flex-col justify-center">
+                      {weightInput && (() => {
+                        const quantity = selectedProductForWeight.tipoVenta === 'granel' 
+                          ? parseMexicanQuantity(weightInput)
+                          : parseFloat(weightInput);
+                        
+                        if (isNaN(quantity) || quantity <= 0) {
+                          return (
+                            <div className="text-center">
+                              <div className="text-5xl font-bold text-gray-400 mb-1">$0</div>
+                              <div className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-lg">
+                                Esperando cantidad...
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // El precio real del producto 
+                        let realPrice = selectedProductForWeight.price || 0;
+                        
+                        // Si el precio parece estar en centavos (muy grande), dividir por 1000
+                        if (realPrice >= 1000) {
+                          realPrice = realPrice / 1000;
+                        }
+                        
+                        const total = realPrice * quantity;
+                        
+                        return (
+                          <div className="text-center">
+                            <div className="text-4xl font-bold text-green-700 mb-2 bg-white/80 py-2 px-3 rounded-xl shadow-inner">
+                              ${formatMexicanQuantity(total)}
+                            </div>
+                            <div className="text-xs text-green-600 bg-white/60 px-2 py-1 rounded-lg">
+                              {formatMexicanQuantity(quantity)} × ${formatMexicanQuantity(realPrice)}
+                            </div>
+                          </div>
+                        );
+                      })() || (
+                        <div className="text-center">
+                          <div className="text-5xl font-bold text-gray-400 mb-1">$0</div>
+                          <div className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-lg">
+                            Esperando cantidad...
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex gap-4 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 py-3 text-lg"
+                  onClick={() => {
+                    setShowWeightDialog(false);
+                    setSelectedProductForWeight(null);
+                    setWeightInput('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={confirmWeight}
+                  disabled={(() => {
+                    if (!weightInput) return true;
+                    const quantity = selectedProductForWeight?.tipoVenta === 'granel' 
+                      ? parseMexicanQuantity(weightInput)
+                      : parseFloat(weightInput);
+                    return isNaN(quantity) || quantity <= 0;
+                  })()}
+                  className="flex-1 py-3 text-lg bg-blue-600 hover:bg-blue-700 font-semibold"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Agregar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -7408,130 +7893,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
           </div>
         </div>
       )}
-      
-      {/* Diálogo para ingresar peso de productos por kilos */}
-      <Dialog open={showWeightDialog} onOpenChange={setShowWeightDialog}>
-        <DialogContent className="sm:max-w-lg md:max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Scale className="h-6 w-6 text-blue-600" />
-              Ingresa el peso en kilogramos
-            </DialogTitle>
-            <DialogDescription className="text-base mt-3">
-              {selectedProductForWeight && (
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <div className="text-gray-800">
-                    <span className="text-gray-600">Producto:</span> <strong className="text-lg">{selectedProductForWeight.name}</strong>
-                  </div>
-                  <div className="text-gray-800">
-                    <span className="text-gray-600">Precio por kg:</span> <strong className="text-green-600 text-lg">${selectedProductForWeight.price.toLocaleString('es-ES')}</strong>
-                  </div>
-                  <div className="text-gray-800">
-                    <span className="text-gray-600">Stock disponible:</span> <strong className="text-blue-600">{selectedProductForWeight.stock} kg</strong>
-                  </div>
-                </div>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6 py-4">
-            <div className="space-y-3">
-              <Label htmlFor="weight" className="text-base font-semibold">Peso (kg)</Label>
-              <Input
-                id="weight"
-                type="number"
-                placeholder="Ej: 2.5"
-                value={weightInput}
-                onChange={(e) => setWeightInput(e.target.value)}
-                min="0.01"
-                max={selectedProductForWeight?.stock || 999}
-                step="0.01"
-                className="text-2xl text-center font-bold h-16 text-blue-800"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    confirmWeight();
-                  } else if (e.key === 'Escape') {
-                    setShowWeightDialog(false);
-                    setSelectedProductForWeight(null);
-                    setWeightInput('');
-                  }
-                }}
-              />
-            </div>
-            
-            {weightInput && !isNaN(parseFloat(weightInput)) && selectedProductForWeight && (
-              <div className="bg-gradient-to-r from-blue-50 to-green-50 p-6 rounded-xl border-2 border-blue-200">
-                <div className="text-center space-y-3">
-                  <div className="text-lg text-blue-800">
-                    <div>Peso: <strong className="text-xl">{parseFloat(weightInput).toFixed(2)} kg</strong></div>
-                    <div>Precio por kg: <strong className="text-xl">${selectedProductForWeight.price.toLocaleString('es-ES')}</strong></div>
-                  </div>
-                  <div className="text-3xl font-bold text-green-700 bg-white py-3 px-6 rounded-lg border-2 border-green-200">
-                    Total: ${(parseFloat(weightInput) * selectedProductForWeight.price).toLocaleString('es-ES', {minimumFractionDigits: 2})}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Botones de peso rápido */}
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">Pesos rápidos:</Label>
-              <div className="grid grid-cols-4 gap-3">
-                {[0.25, 0.5, 1, 2].map(peso => (
-                  <Button
-                    key={peso}
-                    variant="outline"
-                    size="lg"
-                    onClick={() => setWeightInput(peso.toString())}
-                    className="text-base font-semibold h-12 hover:bg-blue-50 border-2"
-                  >
-                    {peso} kg
-                  </Button>
-                ))}
-              </div>
-              <div className="grid grid-cols-4 gap-3">
-                {[3, 5, 10, 25].map(peso => (
-                  <Button
-                    key={peso}
-                    variant="outline"
-                    size="lg"
-                    onClick={() => setWeightInput(peso.toString())}
-                    className="text-base font-semibold h-12 hover:bg-blue-50 border-2"
-                  >
-                    {peso} kg
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter className="gap-4 pt-4">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => {
-                setShowWeightDialog(false);
-                setSelectedProductForWeight(null);
-                setWeightInput('');
-              }}
-              className="flex-1 h-12 text-base"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Cancelar
-            </Button>
-            <Button
-              onClick={confirmWeight}
-              disabled={!weightInput || isNaN(parseFloat(weightInput)) || parseFloat(weightInput) <= 0}
-              size="lg"
-              className="flex-1 h-12 text-base bg-green-600 hover:bg-green-700 font-semibold"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Agregar al carrito
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
       
       {/* Cierre del div principal del POS */}
       </div>
