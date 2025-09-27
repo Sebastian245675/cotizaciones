@@ -383,6 +383,46 @@ const POSSalesSystem: React.FC = () => {
     }
     return quantity.toString();
   };
+
+  // Función para activar pantalla completa y ocultar barra de Windows
+  const enterFullscreen = () => {
+    const element = document.documentElement;
+    if (element.requestFullscreen) {
+      element.requestFullscreen();
+    } else if ((element as any).mozRequestFullScreen) {
+      (element as any).mozRequestFullScreen();
+    } else if ((element as any).webkitRequestFullscreen) {
+      (element as any).webkitRequestFullscreen();
+    } else if ((element as any).msRequestFullscreen) {
+      (element as any).msRequestFullscreen();
+    }
+  };
+
+  // Activar pantalla completa al cargar el componente
+  useEffect(() => {
+    // Verificar si ya estamos en pantalla completa
+    if (!document.fullscreenElement) {
+      enterFullscreen();
+    }
+
+    // Manejar tecla F11 para alternar pantalla completa
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key === 'F11') {
+        event.preventDefault();
+        if (!document.fullscreenElement) {
+          enterFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
   
   // 🔥 FUNCIÓN DE DEBUG: Verificar configuración de productos
   const debugProductConfiguration = () => {
@@ -5266,8 +5306,7 @@ ${creditNotes ? `📝 Notas: ${creditNotes}` : ''}
 💵 Efectivo: $${receivedAmount.toLocaleString('es-ES', {minimumFractionDigits: 2})}
 💳 Tarjeta: $${cardAmount.toLocaleString('es-ES', {minimumFractionDigits: 2})}
 🏦 Transferencia: $${transferAmount.toLocaleString('es-ES', {minimumFractionDigits: 2})}
-💰 Total Pagado: $${(receivedAmount + cardAmount + transferAmount).toLocaleString('es-ES', {minimumFractionDigits: 2})}`
-}
+💰 Total Pagado: $${(receivedAmount + cardAmount + transferAmount).toLocaleString('es-ES', {minimumFractionDigits: 2})}`}
 
 ────────────────────────────────────────────────
 📋 RESUMEN DE LA TRANSACCIÓN:
@@ -5503,7 +5542,13 @@ ${totalPointsEarned > 0 && customer.clientCode ?
       </Dialog>
       )}
 
-      <div className={`pos-container ${!showSidebar ? 'fixed inset-0 w-full h-screen z-[9999] overflow-hidden flex flex-col' : 'min-h-screen'} bg-gradient-to-br from-gray-50 to-blue-50`}>
+      <div className={`pos-container ${!showSidebar ? 'fixed inset-0 w-full h-screen z-[9999] overflow-hidden flex flex-col' : 'min-h-screen'} bg-gradient-to-br from-gray-50 to-blue-50`}
+           style={{
+             userSelect: 'none',
+             overflow: 'hidden',
+             height: '100vh',
+             maxHeight: '100vh'
+           } as React.CSSProperties}>
       {/* Header Principal del POS - Compacto */}
       <div className={`bg-white shadow-sm border-b-2 border-blue-600 ${!showSidebar ? 'flex-shrink-0' : ''}`}>
         <div className="max-w-full mx-auto px-3 py-1.5">
@@ -5526,11 +5571,8 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                   </p>
                   {/* Indicador de turno activo */}
                   {cashRegisterStatus.isOpen && (
-                    <div className="flex items-center space-x-1.5 bg-green-50 px-2 py-0.5 rounded-md">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs text-green-700 font-medium">
-                        Turno Activo
-                      </span>
+                    <div className="flex items-center px-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                     </div>
                   )}
 
@@ -5684,11 +5726,12 @@ ${totalPointsEarned > 0 && customer.clientCode ?
               {cashRegisterStatus.isOpen && barFunctionsConfig.showCloseShiftButton && (
                 <Button
                   onClick={openCloseShiftModal}
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="h-7 px-2 text-xs border border-red-100 bg-red-50/30 hover:bg-red-50 text-red-500 hover:text-red-600 hover:border-red-200 transition-all duration-300 rounded-md shadow-sm"
+                  className="h-8 px-3 text-sm border-red-200 bg-white hover:bg-red-50 text-red-600 hover:text-red-700 font-medium shadow-sm hover:shadow-md transition-all duration-200"
                 >
-                  <LogOut className="h-3 w-3" />
+                  <LogOut className="h-4 w-4 mr-1" />
+                  <span>Cerrar Turno</span>
                 </Button>
               )}
 
@@ -5715,7 +5758,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                   <div className="flex items-center gap-2 justify-center">
                     <div className={`w-2 h-2 rounded-full ${cashRegisterStatus.isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
                     <p className={`text-sm font-medium ${cashRegisterStatus.isOpen ? 'text-green-600' : 'text-red-600'}`}>
-                      {cashRegisterStatus.isOpen ? '🟢 Turno Activo' : 'Sin Turno'}
+                      {cashRegisterStatus.isOpen ? '' : 'Sin Turno'}
                     </p>
                   </div>
                   {!cashRegisterStatus.isOpen && (
@@ -5806,27 +5849,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
         </div>
       </div>
 
-      {/* Barra de teclas rápidas */}
-      <div className="bg-gradient-to-r from-blue-50 to-green-50 border-b border-gray-200 px-4 py-2">
-        <div className="flex items-center justify-center space-x-6 text-sm">
-          <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">F2</kbd>
-            <span className="text-gray-700">Buscar Producto</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">F3</kbd>
-            <span className="text-gray-700">Cliente</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">F5</kbd>
-            <span className="text-gray-700">Completar Compra</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-semibold">ESC</kbd>
-            <span className="text-gray-700">Limpiar</span>
-          </div>
-        </div>
-      </div>
+
 
       {/* Barra de pestañas para ventas múltiples */}
       <div className="bg-white border-b border-gray-200 px-4 py-2">
@@ -5976,9 +5999,8 @@ ${totalPointsEarned > 0 && customer.clientCode ?
       </div>
 
       <div className={`${!showSidebar ? 'flex-1 px-1 py-1 overflow-hidden' : 'max-w-full mx-auto px-1 py-1'}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-2 h-full">
-          {/* Panel principal de ventas */}
-          <div className="lg:col-span-4 space-y-2 overflow-y-auto">
+        <div className="w-full space-y-4 overflow-y-auto">
+          {/* Panel principal de ventas - Ancho completo */}
           {/* Información del cliente - Compacta */}
           <Card className="shadow-sm border-0 bg-white">
             <CardHeader 
@@ -6037,24 +6059,12 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             )}
           </Card>
 
-          {/* Selector y búsqueda de productos - Diseño compacto y amplio */}
+          {/* Búsqueda de productos - Sin barra de título para ahorrar espacio */}
           <Card className="shadow-lg border-0 bg-white">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-green-50 border-b border-gray-100 pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <div className="p-1.5 bg-green-600 rounded-lg">
-                  <Package className="h-4 w-4 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900">Productos</h3>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4 mb-4">
-                {/* Búsqueda unificada: código de barras y nombre de producto */}
+            <CardContent className="p-4">
+              <div className="space-y-3 mb-3">
+                {/* Búsqueda directa sin etiquetas para ahorrar espacio */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    Buscar por código de barra/nombre de producto
-                    <kbd className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">F2</kbd>
-                  </Label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <div className="flex items-center absolute left-3 top-1/2 transform -translate-y-1/2 gap-2">
@@ -6062,7 +6072,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                         <Search className="h-4 w-4 text-gray-500" />
                       </div>
                       <Input
-                        placeholder="Escanear código de barras o buscar por nombre, marca, descripción..."
+                        placeholder="🔍 F2: Escanear código o buscar producto..."
                         value={searchTerm || barcodeInput}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -6091,11 +6101,11 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                             }
                           }
                         }}
-                        className="pl-16 h-10 text-sm bg-white border-2 focus:border-blue-500"
+                        className="pl-14 h-10 text-sm bg-white border-2 focus:border-blue-500 rounded-lg shadow-sm"
                       />
                     </div>
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger className="w-48 h-10 text-sm bg-white border-2 relative">
+                      <SelectTrigger className="w-44 h-10 text-sm bg-white border-2 rounded-lg shadow-sm relative">
                         <SelectValue placeholder="Categoría" />
                       </SelectTrigger>
                       <SelectContent className="z-[10010] bg-white shadow-lg border">
@@ -6350,17 +6360,18 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             </CardContent>
           </Card>
 
-          {/* Carrito de productos - Con scroll interno */}
-          <Card className="shadow-sm border-0 bg-white flex-1 flex flex-col min-h-0">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-orange-50 border-b border-gray-100 py-2 flex-shrink-0">
+          
+          {/* Carrito de productos - Barra compacta */}
+          <Card className="shadow-lg border-0 bg-white">
+            <CardHeader className="bg-gradient-to-r from-slate-50 to-orange-50 border-b border-gray-100 py-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 bg-orange-600 rounded-md">
-                    <ShoppingBag className="h-3 w-3 text-white" />
+                  <div className="p-1 bg-orange-600 rounded">
+                    <ShoppingBag className="h-4 w-4 text-white" />
                   </div>
-                  <h3 className="text-sm font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-gray-900">
                     Carrito
-                    <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-800 text-xs rounded-full">
+                    <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-800 text-sm rounded-full font-medium">
                       {cart.length}
                     </span>
                   </h3>
@@ -6371,7 +6382,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                       variant="outline"
                       size="sm"
                       onClick={clearSale}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 h-7 px-2 text-xs"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 h-7 px-2 text-xs font-medium"
                     >
                       <X className="h-3 w-3 mr-1" />
                       Limpiar
@@ -6380,494 +6391,272 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-3 flex-1 overflow-y-auto">
+            <CardContent className="p-6">
               {cart.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <ShoppingCart className="h-8 w-8 text-gray-400" />
+                <div className="text-center py-12">
+                  <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <ShoppingCart className="h-12 w-12 text-gray-400" />
                   </div>
-                  <h4 className="text-lg font-medium text-gray-700 mb-2">Carrito Vacío</h4>
-                  <p className="text-sm text-gray-500">
+                  <h4 className="text-2xl font-bold text-gray-700 mb-3">Carrito Vacío</h4>
+                  <p className="text-lg text-gray-500">
                     Agregue productos usando el escáner o búsqueda
                   </p>
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {cart.map((item, index) => (
-                    <div key={item.product.id} className="bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          {item.product.image && (
-                            <img
-                              src={item.product.image}
-                              alt={item.product.name}
-                              className="w-8 h-8 object-cover rounded border"
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1 mb-1">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium">
-                                #{index + 1}
-                              </span>
-                              <h4 className="font-medium text-gray-800 truncate text-sm">{item.product.name}</h4>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-600">
-                              <span>💰 ${(item.product.price || 0).toLocaleString('es-ES')} 
-                                {item.product.tipoVenta === 'kilos' ? '/kg' : item.product.tipoVenta === 'granel' ? '/unid.' : ' c/u'}
-                              </span>
-                              {item.product.category && (
-                                <span className="inline-flex items-center gap-1">
-                                  <Tag className="h-2.5 w-2.5" />
-                                  {item.product.category}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFromCart(item.product.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-100 h-6 w-6 p-0"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateQuantity(item.product.id, item.quantity - (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel' ? 0.1 : 1))}
-                            className="h-6 w-6 p-0 hover:bg-red-50 border-red-200"
-                            disabled={item.quantity <= (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel' ? 0.1 : 1)}
-                          >
-                            <Minus className="h-2.5 w-2.5" />
-                          </Button>
-                          <Input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const newQty = (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel')
-                                ? parseFloat(e.target.value) || 0
-                                : parseInt(e.target.value) || 1;
-                              if (newQty > 0 && newQty <= (item.product.stock || 0)) {
-                                updateQuantity(item.product.id, newQty);
-                              }
-                            }}
-                            className="w-12 h-6 text-center font-bold text-xs"
-                            min={(item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel') ? "0.01" : "1"}
-                            max={item.product.stock || 999}
-                            step={(item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel') ? "0.01" : "1"}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateQuantity(item.product.id, item.quantity + (item.product.tipoVenta === 'kilos' || item.product.tipoVenta === 'granel' ? 0.1 : 1))}
-                            className="h-6 w-6 p-0 hover:bg-green-50 border-green-200"
-                            disabled={item.quantity >= (item.product.stock || 0)}
-                          >
-                            <Plus className="h-2.5 w-2.5" />
-                          </Button>
-                          <span className="text-xs text-gray-500 ml-1">
-                            📦{item.product.stock || 0}{item.product.tipoVenta === 'kilos' ? 'kg' : item.product.tipoVenta === 'granel' ? '' : ''}
-                          </span>
-                        </div>
-                        
-                        <div className="text-right">
-                          <p className="font-bold text-green-600 text-lg">
-                            ${formatMexicanQuantity(item.subtotal || 0)}
-                          </p>
-                          {mode === 'advanced' && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <Input
-                                type="number"
-                                placeholder="0"
-                                value={item.discount || ''}
-                                onChange={(e) => updateItemDiscount(item.product.id, Number(e.target.value) || 0, item.discountType)}
-                                className="w-12 h-5 text-xs"
-                                min="0"
-                              />
-                              <Select value={item.discountType} onValueChange={(value: string) => updateItemDiscount(item.product.id, item.discount, value as 'percentage' | 'amount')}>
-                                <SelectTrigger className="w-8 h-5 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="z-[10010] bg-white shadow-lg border">
-                                  <SelectItem value="percentage">%</SelectItem>
-                                  <SelectItem value="amount">$</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Mostrar ahorro si hay descuento */}
-                      {item.discount > 0 && (
-                        <div className="mt-1 pt-1 border-t border-gray-100">
-                          <div className="flex justify-between text-xs text-green-600">
-                            <span>Ahorro:</span>
-                            <span>
-                              -${formatMexicanQuantity(((item.product.price || 0) * item.quantity) - (item.subtotal || 0))}
-                              ({item.discountType === 'percentage' ? `${item.discount}%` : `$${formatMexicanQuantity(item.discount)}`})
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Código</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Nombre</th>
+                        <th className="text-right py-3 px-4 font-semibold text-gray-700">Precio</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Cantidad</th>
+                        <th className="text-right py-3 px-4 font-semibold text-gray-700">Importe</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Existencia</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cart.map((item, index) => (
+                        <tr key={item.product.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          {/* Código de barras */}
+                          <td className="py-3 px-4">
+                            <span className="text-sm font-mono text-gray-600">
+                              {item.product.barcode || 'N/A'}
                             </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  
-                  {/* Resumen rápido del carrito */}
-                  <div className="bg-blue-50 border border-blue-200 rounded p-1.5 mt-2">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-blue-700 font-medium">📊 {cart.reduce((sum, item) => sum + item.quantity, 0)} productos • {cart.length} líneas</span>
-                    </div>
-                  </div>
+                          </td>
+                          
+                          {/* Nombre del producto */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              {item.product.image && (
+                                <img
+                                  src={item.product.image}
+                                  alt={item.product.name}
+                                  className="w-8 h-8 object-cover rounded border"
+                                />
+                              )}
+                              <div>
+                                <div className="font-medium text-gray-900">{item.product.name}</div>
+                                {item.product.category && (
+                                  <div className="text-xs text-gray-500">{item.product.category}</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          
+                          {/* Precio de venta */}
+                          <td className="py-3 px-4 text-right">
+                            <span className="font-medium text-green-700">
+                              ${(item.product.price || 0).toLocaleString('es-ES')}
+                              <span className="text-xs text-gray-500 ml-1">
+                                {item.product.tipoVenta === 'kilos' ? '/kg' : item.product.tipoVenta === 'granel' ? '/unid.' : 'c/u'}
+                              </span>
+                            </span>
+                          </td>
+                          
+                          {/* Cantidad con controles */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                                disabled={item.quantity <= 1}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="text-sm font-semibold text-gray-900 min-w-[2rem] text-center">
+                                {item.quantity}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                          
+                          {/* Importe total */}
+                          <td className="py-3 px-4 text-right">
+                            <span className="text-lg font-bold text-gray-900">
+                              ${(item.quantity * item.product.price).toLocaleString('es-ES')}
+                            </span>
+                          </td>
+                          
+                          {/* Existencia */}
+                          <td className="py-3 px-4 text-center">
+                            <span className={`text-sm font-medium ${
+                              (item.product.stock || 0) > 10 ? 'text-green-600' : 
+                              (item.product.stock || 0) > 5 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {item.product.stock || 0}
+                            </span>
+                          </td>
+                          
+                          {/* Acciones */}
+                          <td className="py-3 px-4 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFromCart(item.product.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>
           </Card>
+        </div>
+      </div>
 
-          {/* Botones de Control del Sistema */}
-          <Card className="shadow-lg border-0 bg-white">
-            <CardContent className="p-4">
-              {/* Header expandible para configuración del Panel Admin */}
+      {/* Área de Pago con Diseño Elegante y Curvo - Oculta barra de Windows */}
+      <div className="fixed bottom-0 right-0 left-0 z-[9999] pb-0" style={{paddingBottom: '0px'}}>
+        {/* Fondo azul suave con líneas rectas y curva hacia abajo en el medio */}
+        <div className="relative"
+             style={{
+               userSelect: 'none',
+               msOverflowStyle: 'none',
+               scrollbarWidth: 'none'
+             } as React.CSSProperties}>
+          <svg
+            className="w-full h-32"
+            viewBox="0 0 1200 128"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="softBlueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style={{stopColor: '#dbeafe', stopOpacity: 0.6}} />
+                <stop offset="50%" style={{stopColor: '#bfdbfe', stopOpacity: 0.7}} />
+                <stop offset="100%" style={{stopColor: '#93c5fd', stopOpacity: 0.8}} />
+              </linearGradient>
+            </defs>
+            {/* Forma con líneas rectas y curva hacia ABAJO en el centro */}
+            <path
+              d="M0,40 L300,40 Q600,80 900,40 L1200,40 L1200,128 L0,128 Z"
+              fill="url(#softBlueGradient)"
+            />
+          </svg>
+          
+          {/* Contenido sobre el fondo curvo */}
+          <div className="absolute inset-0 flex items-center pb-4">
+            {/* Controles izquierda - Admin y Pantalla Completa */}
+            <div className="pl-12 flex gap-4">
+              {/* Botón Admin */}
               <Button
-                variant="ghost"
-                onClick={() => setIsAdminPanelExpanded(!isAdminPanelExpanded)}
-                className="w-full justify-between p-2 h-auto mb-3 hover:bg-gray-50"
+                onClick={() => setShowSidebar(!showSidebar)}
+                variant="outline"
+                className="h-12 px-6 flex items-center gap-2 bg-white border-gray-300 hover:bg-gray-50 text-gray-700 hover:text-gray-900 font-medium shadow-sm hover:shadow-md transition-all duration-200"
               >
-                <div className="flex items-center gap-2">
-                  <Settings className="h-4 w-4 text-gray-600" />
-                  <span className="font-medium text-gray-700">Ver más configuración</span>
-                </div>
-                <ChevronRight 
-                  className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
-                    isAdminPanelExpanded ? 'rotate-90' : ''
-                  }`} 
-                />
+                {showSidebar ? (
+                  <>
+                    <PanelRightClose className="h-4 w-4" />
+                    <span>Ocultar Panel</span>
+                  </>
+                ) : (
+                  <>
+                    <Settings className="h-4 w-4" />
+                    <span>Administración</span>
+                  </>
+                )}
               </Button>
 
-              {isAdminPanelExpanded && (
-                <div className="space-y-3">
-                  {/* Botón para mostrar/ocultar panel admin */}
-                  <Button
-                    onClick={() => setShowSidebar(!showSidebar)}
-                    variant="outline"
-                    className="w-full flex items-center justify-center gap-2 border-blue-200 hover:bg-blue-50 text-blue-700 h-10"
-                  >
-                    {showSidebar ? (
-                      <>
-                        <PanelRightClose className="h-4 w-4" />
-                        Ocultar Panel Admin
-                      </>
-                    ) : (
-                      <>
-                        <PanelRightOpen className="h-4 w-4" />
-                        Mostrar Panel Admin
-                      </>
-                    )}
-                  </Button>
-                  
-                  {/* Modo POS */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-gray-700">Modo POS:</label>
-                    <Tabs value={mode} onValueChange={(value) => setMode(value as 'simple' | 'advanced')} className="w-full">
-                      <TabsList className="grid w-full grid-cols-2 bg-gray-100">
-                        <TabsTrigger value="simple" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                          Básico
-                        </TabsTrigger>
-                        <TabsTrigger value="advanced" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                          Avanzado
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
+              {/* Botón Pantalla Completa */}
+              <Button
+                onClick={() => {
+                  if (!document.fullscreenElement) {
+                    enterFullscreen();
+                  } else {
+                    document.exitFullscreen();
+                  }
+                }}
+                variant="outline"
+                className="h-12 px-4 flex items-center gap-2 bg-white border-gray-300 hover:bg-gray-50 text-gray-700 hover:text-gray-900 font-medium shadow-sm hover:shadow-md transition-all duration-200"
+              >
+                {document.fullscreenElement ? (
+                  <>
+                    <X className="h-4 w-4" />
+                    <span>Salir</span>
+                  </>
+                ) : (
+                  <>
+                    <Grid3X3 className="h-4 w-4" />
+                    <span>Pantalla Completa</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Área derecha: Botón Cobrar + Total - EN LA ESQUINA DERECHA */}
+            <div className="ml-auto pr-12 flex items-center gap-6">
+              {/* Botón Cobrar Profesional - PRIMERO en la esquina derecha */}
+              <Button
+                onClick={() => setShowPaymentModal(true)}
+                disabled={cart.length === 0}
+                className="w-60 h-14 text-white font-bold text-base bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 disabled:cursor-not-allowed transition-all duration-200 rounded-lg shadow-lg border-2 border-emerald-500 hover:border-emerald-600 disabled:border-gray-600"
+                style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}
+              >
+                {processing ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <span>Procesando venta...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center w-full">
+                    <span className="text-sm font-medium bg-green-600 px-2 py-1 rounded mr-3">F12</span>
+                    <span className="text-lg font-bold">COBRAR</span>
+                  </div>
+                )}
+              </Button>
+
+              {/* Total - Diseño profesional mejorado */}
+              <div className="text-center px-10 py-6 relative">
+                {/* Fondo sutil para el total */}
+                <div className="absolute inset-0 bg-white/10 rounded-2xl backdrop-blur-sm border border-white/20 shadow-lg"></div>
+                
+                <div className="relative z-10">
+                  {/* Total con efectos premium */}
+                  <div className="text-7xl font-extrabold text-slate-800 mb-1 tracking-tight font-mono drop-shadow-2xl">
+                    ${formatMexicanQuantity(totals.total)}
                   </div>
                   
-                  {/* Historial */}
+                  {/* Texto descriptivo elegante */}
+                  <div className="text-xs font-bold text-slate-600 mb-4 tracking-[0.3em] uppercase font-sans opacity-90">
+                    Total a Pagar
+                  </div>
+                  
+                  {/* Línea decorativa */}
+                  <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto mb-4"></div>
+                  
+                  {/* Ventas del turno premium */}
                   <Button
                     onClick={() => {
                       setShowSalesHistory(true);
                       fetchAllSalesHistory();
                     }}
                     variant="outline"
-                    className="w-full flex items-center justify-center gap-2 bg-white border-blue-200 hover:bg-blue-50 text-blue-700 h-10"
+                    size="sm"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-slate-50/80 to-white/60 border-slate-300/60 hover:bg-gradient-to-r hover:from-slate-100/80 hover:to-white/80 text-slate-700 h-10 text-xs font-semibold shadow-lg backdrop-blur-md font-sans transition-all duration-200 hover:scale-105 rounded-xl"
                   >
                     <History className="h-4 w-4" />
-                    Ventas Turno ({allSalesHistory.length})
+                    Historial de Ventas ({allSalesHistory.length})
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Panel lateral derecho - Ultra compacto con botón fijo */}
-        <div className="lg:col-span-2 flex flex-col h-full overflow-hidden">
-          
-          {/* Método de pago */}
-          <Card className="shadow-sm">
-            <CardHeader 
-              className="pb-2 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() => setIsPaymentSectionExpanded(!isPaymentSectionExpanded)}
-            >
-              <CardTitle className="flex items-center justify-between text-base">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-green-600" />
-                  <span>Pago</span>
-                  <span className="text-sm bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
-                    {paymentMethod === 'cash' ? 'Efectivo' : 
-                     paymentMethod === 'card' ? 'Tarjeta' :
-                     paymentMethod === 'transfer' ? 'Transferencia' :
-                     paymentMethod === 'mixed' ? 'Mixto' : 'Crédito'}
-                  </span>
-                </div>
-                <ChevronRight 
-                  className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
-                    isPaymentSectionExpanded ? 'rotate-90' : ''
-                  }`} 
-                />
-              </CardTitle>
-            </CardHeader>
-            {isPaymentSectionExpanded && (
-            <CardContent className="space-y-3 pt-2">
-              <div className="grid grid-cols-1 gap-1">
-                <Button
-                  variant={paymentMethod === 'cash' ? 'default' : 'outline'}
-                  onClick={() => setPaymentMethod('cash')}
-                  className="h-9 justify-start text-sm"
-                >
-                  <Banknote className="h-3 w-3 mr-2" />
-                  Efectivo
-                </Button>
-                <Button
-                  variant={paymentMethod === 'card' ? 'default' : 'outline'}
-                  onClick={() => setPaymentMethod('card')}
-                  className="h-9 justify-start text-sm"
-                >
-                  <CreditCard className="h-3 w-3 mr-2" />
-                  Tarjeta
-                </Button>
-                {mode === 'advanced' && (
-                  <>
-                    <Button
-                      variant={paymentMethod === 'transfer' ? 'default' : 'outline'}
-                      onClick={() => setPaymentMethod('transfer')}
-                      className="h-9 justify-start text-sm"
-                    >
-                      <DollarSign className="h-3 w-3 mr-2" />
-                      Transferencia
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'mixed' ? 'default' : 'outline'}
-                      onClick={() => setPaymentMethod('mixed')}
-                      className="h-9 justify-start text-sm"
-                    >
-                      <Calculator className="h-3 w-3 mr-2" />
-                      Mixto
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'credit' ? 'default' : 'outline'}
-                      onClick={() => setPaymentMethod('credit')}
-                      className="h-9 justify-start text-sm bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 hover:from-orange-100 hover:to-red-100"
-                    >
-                      <Clock className="h-3 w-3 mr-2" />
-                      Crédito
-                    </Button>
-                  </>
-                )}
-              </div>
-
-              {paymentMethod === 'mixed' && mode === 'advanced' && (
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-sm">Efectivo</Label>
-                    <Input
-                      type="number"
-                      value={receivedAmount || ''}
-                      onChange={(e) => setReceivedAmount(Number(e.target.value))}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Tarjeta</Label>
-                    <Input
-                      type="number"
-                      value={cardAmount || ''}
-                      onChange={(e) => setCardAmount(Number(e.target.value))}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Transferencia</Label>
-                    <Input
-                      type="number"
-                      value={transferAmount || ''}
-                      onChange={(e) => setTransferAmount(Number(e.target.value))}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {paymentMethod === 'credit' && mode === 'advanced' && (
-                <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border-2 border-orange-200 space-y-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Clock className="h-5 w-5 text-orange-600" />
-                    <h4 className="font-semibold text-orange-800">Configuración de Crédito</h4>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium text-orange-800">
-                      Fecha de Vencimiento *
-                    </Label>
-                    <Input
-                      type="date"
-                      value={creditDueDate}
-                      onChange={(e) => setCreditDueDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="mt-2 border-orange-300 focus:border-orange-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium text-orange-800">
-                      Notas del Crédito
-                    </Label>
-                    <Input
-                      placeholder="Ej: Cliente frecuente, términos especiales..."
-                      value={creditNotes}
-                      onChange={(e) => setCreditNotes(e.target.value)}
-                      className="mt-2 border-orange-300 focus:border-orange-500"
-                    />
-                  </div>
-                  
-                  <div className="bg-orange-100 p-3 rounded-md">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-bold text-orange-800">
-                        ⚠️ Información del Crédito:
-                      </span>
-                    </div>
-                    <div className="text-xs text-orange-700 space-y-1">
-                      <p>• Monto a crédito: <span className="font-bold">${formatMexicanQuantity(totals.total)}</span></p>
-                      {customer.creditLimit && customer.creditLimit > 0 && (
-                        <p>• Límite del cliente: <span className="font-bold">${customer.creditLimit.toLocaleString('es-ES', {minimumFractionDigits: 2})}</span></p>
-                      )}
-                      {creditDueDate && (
-                        <p>• Vence: <span className="font-bold">{new Date(creditDueDate).toLocaleDateString('es-ES')}</span></p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {(!customer.phone && !customer.email) && (
-                    <div className="bg-yellow-100 p-2 rounded-md">
-                      <p className="text-xs text-yellow-800">
-                        💡 <strong>Recomendación:</strong> Agregue teléfono o email del cliente para facilitar el seguimiento del crédito
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-            )}
-          </Card>
-
-          {/* Campo de Monto Recibido - Siempre visible para efectivo */}
-          {paymentMethod === 'cash' && (
-            <Card className="shadow-sm">
-              <CardContent className="p-4">
-                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <Label className="text-sm font-medium text-yellow-800 flex items-center gap-2">
-                    Monto Recibido
-                    <kbd className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-semibold">F4</kbd>
-                  </Label>
-                  <Input
-                    type="number"
-                    placeholder="$0.00"
-                    value={receivedAmount || ''}
-                    onChange={(e) => setReceivedAmount(Number(e.target.value))}
-                    className="mt-2 text-lg font-semibold"
-                  />
-                  {receivedAmount > 0 && (
-                    <div className="mt-3 pt-2 border-t border-yellow-300">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-yellow-800">Cambio:</span>
-                        <span className={`text-lg font-bold ${totals.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${Math.abs(totals.change).toFixed(2)}
-                          {totals.change < 0 && ' (Falta)'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-        </div>
-      </div>
-
-      {/* Área de Pago Fija - Elementos Separados */}
-      <div className="fixed bottom-4 right-6 z-50 flex gap-4 items-start">
-        {/* Botón de Completar y Pagar - Independiente */}
-        <Card className="shadow-xl border-0 bg-white">
-          <CardContent className="p-3">
-            <Button
-              onClick={() => setShowPaymentModal(true)}
-              disabled={cart.length === 0}
-              className="w-48 h-20 text-lg font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {processing ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                  Procesando Venta...
-                </>
-              ) : (
-                <div className="text-center">
-                  <div className="flex items-center justify-center mb-1">
-                    <CheckCircle className="h-5 w-5 mr-2" />
-                    💳 Cobrar
-                  </div>
-                  <div className="text-xs opacity-90">
-                    {cart.reduce((sum, item) => sum + item.quantity, 0)} productos
-                  </div>
-                </div>
-              )}
-            </Button>
-
-            {/* Mostrar cambio si es efectivo - Dentro del card del botón */}
-            {paymentMethod === 'cash' && receivedAmount > 0 && (
-              <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
-                <div className="flex justify-between text-xs">
-                  <span>Recibido:</span>
-                  <span className="font-semibold">${receivedAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>Cambio:</span>
-                  <span className={`font-semibold ${totals.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    ${Math.abs(totals.change).toFixed(2)}
-                    {totals.change < 0 && ' (Falta)'}
-                  </span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Total - Card Separado */}
-        <Card className="shadow-xl border-0 bg-white">
-          <CardContent className="p-4">
-            <div className="w-60 text-center">
-              <div className="text-6xl font-bold text-green-600">
-                ${formatMexicanQuantity(totals.total)}
-              </div>
-              <div className="text-base text-gray-600 mt-2">
-                TOTAL A PAGAR
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Modales */}
@@ -6890,7 +6679,7 @@ ${totalPointsEarned > 0 && customer.clientCode ?
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-green-800">Resumen de la Venta</h3>
                 <Badge variant="secondary" className="bg-green-100 text-green-700">
-                  {cart.reduce((sum, item) => sum + item.quantity, 0)} artículos
+                  Lista de productos
                 </Badge>
               </div>
               
@@ -7876,13 +7665,14 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                     setCurrentReportData(null);
                     setMovementTotals({ totalInflows: 0, totalOutflows: 0 });
                   }}
-                  className="flex-1 h-16 text-xl"
+                  className="flex-1 h-12 text-base border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200"
                 >
-                  ❌ Cancelar
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
                 </Button>
                 <Button
                   onClick={closeCashRegister}
-                  className="flex-1 h-12 text-base bg-red-500 hover:bg-red-600 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                  className="flex-1 h-12 text-base bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200"
                   disabled={!actualCashCount || parseFloat(actualCashCount) < 0}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -7896,8 +7686,6 @@ ${totalPointsEarned > 0 && customer.clientCode ?
 
       
       {/* Cierre del div principal del POS */}
-      </div>
-      {/* Cierre del div contenedor pos-container */}
       </div>
     </>
   );
