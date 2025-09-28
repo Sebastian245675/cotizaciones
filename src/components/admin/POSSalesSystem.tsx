@@ -374,6 +374,13 @@ const POSSalesSystem: React.FC = () => {
   const [weightInput, setWeightInput] = useState('');
   const [priceInput, setPriceInput] = useState('');
 
+  // Estados para entrada/salida de dinero
+  const [showMoneyModal, setShowMoneyModal] = useState(false);
+  const [moneyModalType, setMoneyModalType] = useState<'entrada' | 'salida'>('entrada');
+  const [moneyAmount, setMoneyAmount] = useState('');
+  const [moneyReason, setMoneyReason] = useState('');
+  const [moneyLoading, setMoneyLoading] = useState(false);
+  const [currentCashInBox, setCurrentCashInBox] = useState(0);
 
   // 🔥 NUEVO: Funciones para formato mexicano en cantidad a granel
   const formatMexicanQuantity = (quantity: number): string => {
@@ -1961,17 +1968,26 @@ const POSSalesSystem: React.FC = () => {
         const data = reportSnapshot.data();
         console.log('📊 Datos del reporte actual:', data);
         
-        // Calcular totales desde los movimientos
+        // Calcular totales directamente desde los campos del reporte
+        const totalInflows = data.cashEntries || 0;
+        const totalOutflows = data.cashExits || 0;
+        
+        // También calcular desde movimientos como respaldo
         const movements = data.movements || [];
-        let totalInflows = 0;
-        let totalOutflows = 0;
+        let movementInflows = 0;
+        let movementOutflows = 0;
         
         movements.forEach((movement: any) => {
-          if (movement.type === 'entry') {
-            totalInflows += movement.amount || 0;
-          } else if (movement.type === 'exit') {
-            totalOutflows += movement.amount || 0;
+          if (movement.type === 'entry' || movement.type === 'entrada') {
+            movementInflows += movement.amount || 0;
+          } else if (movement.type === 'exit' || movement.type === 'salida') {
+            movementOutflows += movement.amount || 0;
           }
+        });
+
+        console.log('💰 Comparación de cálculos:', {
+          fromFields: { totalInflows, totalOutflows },
+          fromMovements: { movementInflows, movementOutflows }
         });
         
         const processedData = {
@@ -2040,7 +2056,8 @@ const POSSalesSystem: React.FC = () => {
 
       const currentReport = reportSnapshot.data();
       const expectedBalance = currentReport.openingBalance + 
-                             currentReport.totalSales - 
+                             currentReport.totalSales + 
+                             (currentReport.cashEntries || 0) - 
                              currentReport.cashExits - 
                              currentReport.expenses;
 
@@ -2126,6 +2143,193 @@ const POSSalesSystem: React.FC = () => {
         title: "Error",
         description: "No se pudo cerrar el turno. Intenta nuevamente."
       });
+    }
+  };
+
+  // Función para obtener el dinero actual en caja
+  const getCurrentCashInBox = async (): Promise<number> => {
+    try {
+      if (!cashRegisterStatus.reportId) return 0;
+      
+      const reportRef = doc(db, 'cash_reports', cashRegisterStatus.reportId);
+      const reportDoc = await getDoc(reportRef);
+      
+      if (reportDoc.exists()) {
+        const data = reportDoc.data();
+        return data.cashInBox || 0;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error obteniendo dinero en caja:', error);
+      return 0;
+    }
+  };
+
+  // Función para abrir modal de entrada de dinero
+  const handleMoneyEntry = async () => {
+    setMoneyModalType('entrada');
+    setMoneyAmount('');
+    setMoneyReason('');
+    
+    // Actualizar el dinero actual en caja
+    const currentCash = await getCurrentCashInBox();
+    setCurrentCashInBox(currentCash);
+    
+    setShowMoneyModal(true);
+  };
+
+  // Función para abrir modal de salida de dinero
+  const handleMoneyExit = async () => {
+    setMoneyModalType('salida');
+    setMoneyAmount('');
+    setMoneyReason('');
+    
+    // Actualizar el dinero actual en caja
+    const currentCash = await getCurrentCashInBox();
+    setCurrentCashInBox(currentCash);
+    
+    setShowMoneyModal(true);
+  };
+
+  // Función para procesar entrada/salida de dinero
+  const processMoneyMovement = async () => {
+    if (!moneyAmount || parseFloat(moneyAmount) <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor ingresa un monto válido"
+      });
+      return;
+    }
+
+    if (!moneyReason.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor ingresa un concepto"
+      });
+      return;
+    }
+
+    if (!cashRegisterStatus.reportId) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No hay un turno activo"
+      });
+      return;
+    }
+
+    setMoneyLoading(true);
+    
+    try {
+      const amount = parseFloat(moneyAmount);
+      const reportRef = doc(db, 'cash_reports', cashRegisterStatus.reportId);
+
+      // Obtener el reporte actual
+      const reportDoc = await getDoc(reportRef);
+      if (!reportDoc.exists()) {
+        throw new Error('No se encontró el reporte de caja');
+      }
+
+      const currentReport = reportDoc.data();
+      
+      // Calcular nuevos valores según el tipo de movimiento
+      let updateData: any = {};
+      
+      if (moneyModalType === 'entrada') {
+        // Entrada de dinero: sumar al dinero en caja y registrar como ingreso adicional
+        updateData = {
+          cashInBox: (currentReport.cashInBox || 0) + amount,
+          cashEntries: (currentReport.cashEntries || 0) + amount,
+          movements: [
+            ...(currentReport.movements || []),
+            {
+              type: 'entrada',
+              amount: amount,
+              reason: moneyReason,
+              timestamp: Timestamp.now(),
+              user: user?.email || 'unknown'
+            }
+          ]
+        };
+      } else {
+        // Salida de dinero: restar del dinero en caja y registrar como gasto
+        const currentCash = currentReport.cashInBox || 0;
+        if (amount > currentCash) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "No hay suficiente dinero en caja para esta salida"
+          });
+          setMoneyLoading(false);
+          return;
+        }
+        
+        updateData = {
+          cashInBox: currentCash - amount,
+          cashExits: (currentReport.cashExits || 0) + amount,
+          // NO sumar a expenses para evitar duplicación - cashExits ya lo cuenta
+          movements: [
+            ...(currentReport.movements || []),
+            {
+              type: 'salida',
+              amount: amount,
+              reason: moneyReason,
+              timestamp: Timestamp.now(),
+              user: user?.email || 'unknown'
+            }
+          ]
+        };
+      }
+
+      // Actualizar el reporte de caja
+      await updateDoc(reportRef, updateData);
+
+      // Registrar en el historial de ventas como una transacción especial
+      const saleData = {
+        id: `money-${moneyModalType}-${Date.now()}`,
+        type: moneyModalType,
+        amount: moneyModalType === 'entrada' ? amount : -amount,
+        reason: moneyReason,
+        timestamp: Timestamp.now(),
+        date: new Date().toISOString().split('T')[0],
+        user: user?.email || 'unknown',
+        shiftId: cashRegisterStatus.reportId,
+        isMoneyMovement: true
+      };
+
+      // Guardar en colección de ventas para que aparezca en el historial
+      await addDoc(collection(db, 'sales'), saleData);
+
+      toast({
+        title: `${moneyModalType === 'entrada' ? 'Entrada' : 'Salida'} registrada`,
+        description: `Se ha registrado la ${moneyModalType} de $${amount.toLocaleString()} - ${moneyReason}`
+      });
+
+      // Cerrar modal y limpiar campos
+      setShowMoneyModal(false);
+      setMoneyAmount('');
+      setMoneyReason('');
+
+      // Recargar datos para mostrar cambios
+      checkCashRegisterStatus();
+      fetchAllSalesHistory(); // Recargar historial para mostrar el movimiento
+      
+      // Actualizar el dinero actual en el estado local
+      const updatedCash = await getCurrentCashInBox();
+      setCurrentCashInBox(updatedCash);
+
+    } catch (error) {
+      console.error('Error procesando movimiento de dinero:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo procesar el movimiento de dinero"
+      });
+    } finally {
+      setMoneyLoading(false);
     }
   };
 
@@ -3920,6 +4124,71 @@ const POSSalesSystem: React.FC = () => {
             salesData = [];
           }
         }
+      }
+
+      // Cargar movimientos de dinero (entradas/salidas) del turno actual
+      try {
+        if (connectionStatus.isOnline && cashRegisterStatus.reportId) {
+          console.log('💰 Cargando movimientos de dinero del turno...');
+          
+          const moneyMovementsQuery = query(
+            collection(db, 'sales'),
+            where('isMoneyMovement', '==', true),
+            where('shiftId', '==', cashRegisterStatus.reportId)
+          );
+          
+          const moneySnapshot = await getDocs(moneyMovementsQuery);
+          
+          const moneyMovements = moneySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: data.id,
+              saleNumber: `${data.type.toUpperCase()}-${data.id.split('-')[2] || 'N/A'}`,
+              customer: { 
+                name: `${data.type === 'entrada' ? 'Entrada' : 'Salida'} de dinero`,
+                clientCode: data.type.toUpperCase()
+              },
+              items: [{
+                id: 'money-movement',
+                product: {
+                  id: 'money-movement',
+                  name: data.reason || 'Movimiento de dinero',
+                  price: Math.abs(data.amount),
+                  category: 'MOVIMIENTO'
+                },
+                name: data.reason || 'Movimiento de dinero',
+                price: Math.abs(data.amount),
+                quantity: 1,
+                discount: 0,
+                discountType: 'percentage' as const,
+                subtotal: Math.abs(data.amount),
+                category: 'MOVIMIENTO'
+              }],
+              subtotal: Math.abs(data.amount),
+              discounts: 0,
+              tax: 0,
+              total: data.amount, // Mantener signo para diferenciar entrada/salida
+              totalProfit: 0,
+              paymentMethod: 'cash' as const,
+              paymentDetails: { reason: data.reason },
+              status: 'completed' as const,
+              timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+              cashier: data.user || user?.email || 'admin@pos.local',
+              notes: `${data.type === 'entrada' ? '💰 ENTRADA' : '💸 SALIDA'}: ${data.reason}`,
+              mode: 'money_movement' as any,
+              reportId: cashRegisterStatus.reportId,
+              isMoneyMovement: true,
+              movementType: data.type
+            };
+          }) as any[];
+
+          console.log(`💰 ${moneyMovements.length} movimientos de dinero encontrados`);
+          
+          // Agregar movimientos de dinero al array de ventas
+          salesData = [...salesData, ...moneyMovements];
+        }
+      } catch (error) {
+        console.error('❌ Error cargando movimientos de dinero:', error);
       }
 
       // Ordenar por fecha más reciente
@@ -6184,8 +6453,9 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                         className="pl-14 h-10 text-sm bg-white border-2 focus:border-blue-500 rounded-lg shadow-sm"
                       />
                     </div>
+                    
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger className="w-44 h-10 text-sm bg-white border-2 rounded-lg shadow-sm relative">
+                      <SelectTrigger className="w-32 h-10 text-sm bg-white border-2 rounded-lg shadow-sm relative">
                         <SelectValue placeholder="Categoría" />
                       </SelectTrigger>
                       <SelectContent className="z-[10010] bg-white shadow-lg border">
@@ -6197,6 +6467,27 @@ ${totalPointsEarned > 0 && customer.clientCode ?
                         ))}
                       </SelectContent>
                     </Select>
+                    
+                    {/* Botones de entrada y salida de dinero */}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="h-10 px-4 bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all duration-200"
+                      onClick={handleMoneyEntry}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Entrada
+                    </Button>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="h-10 px-4 bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all duration-200"
+                      onClick={handleMoneyExit}
+                    >
+                      <Minus className="h-4 w-4 mr-2" />
+                      Salida
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -7105,11 +7396,16 @@ ${totalPointsEarned > 0 && customer.clientCode ?
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <h3 className="text-lg font-semibold">
-                  Ventas Encontradas: {getFilteredSalesHistory().length}
+                  Registros Encontrados: {getFilteredSalesHistory().length}
                 </h3>
-                <Badge variant="secondary" className="text-sm w-fit">
-                  Total: ${getFilteredSalesHistory().reduce((sum, sale) => sum + ((sale as any).total || (sale as any).resumen?.total || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
-                </Badge>
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="text-sm w-fit">
+                    Ventas: {getFilteredSalesHistory().filter(sale => !(sale as any).isMoneyMovement).length}
+                  </Badge>
+                  <Badge variant="secondary" className="text-sm w-fit">
+                    Total: ${getFilteredSalesHistory().filter(sale => !(sale as any).isMoneyMovement).reduce((sum, sale) => sum + ((sale as any).total || (sale as any).resumen?.total || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2})}
+                  </Badge>
+                </div>
               </div>
               
               {loadingSalesHistory ? (
@@ -7474,6 +7770,107 @@ ${totalPointsEarned > 0 && customer.clientCode ?
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para entrada/salida de dinero */}
+      <Dialog open={showMoneyModal} onOpenChange={setShowMoneyModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {moneyModalType === 'entrada' ? (
+                <>
+                  <Plus className="h-5 w-5 text-green-600" />
+                  Entrada de Dinero
+                </>
+              ) : (
+                <>
+                  <Minus className="h-5 w-5 text-red-600" />
+                  Salida de Dinero
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {moneyModalType === 'entrada' 
+                ? 'Registra una entrada de dinero adicional a la caja. Esta cantidad se sumará al dinero disponible.'
+                : `Registra una salida de dinero de la caja. Dinero disponible: $${currentCashInBox.toLocaleString()}`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="moneyAmount">Monto ($)</Label>
+              <Input
+                id="moneyAmount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
+                value={moneyAmount}
+                onChange={(e) => setMoneyAmount(e.target.value)}
+                className="text-lg"
+              />
+              {moneyModalType === 'salida' && moneyAmount && parseFloat(moneyAmount) > currentCashInBox && (
+                <p className="text-sm text-red-600 mt-1">
+                  ⚠️ El monto excede el dinero disponible en caja (${currentCashInBox.toLocaleString()})
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="moneyReason">Concepto</Label>
+              <Input
+                id="moneyReason"
+                placeholder="Describe el motivo de la transacción..."
+                value={moneyReason}
+                onChange={(e) => setMoneyReason(e.target.value)}
+                className="text-lg"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="sm:justify-start">
+            <div className="flex gap-2 w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowMoneyModal(false);
+                  setMoneyAmount('');
+                  setMoneyReason('');
+                }}
+                className="flex-1"
+                disabled={moneyLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={processMoneyMovement}
+                disabled={moneyLoading || !moneyAmount || !moneyReason.trim()}
+                className={`flex-1 ${
+                  moneyModalType === 'entrada' 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {moneyLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    {moneyModalType === 'entrada' ? (
+                      <Plus className="h-4 w-4 mr-2" />
+                    ) : (
+                      <Minus className="h-4 w-4 mr-2" />
+                    )}
+                    {moneyModalType === 'entrada' ? 'Agregar' : 'Retirar'}
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
