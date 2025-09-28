@@ -400,7 +400,55 @@ export const CashRegisterSystem: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
-  const [currentReport, setCurrentReport] = useState<DailyCashReport | null>(null);
+  // Reporte por defecto para evitar errores cuando no hay turno activo
+  const defaultReport: DailyCashReport = {
+    id: 'default',
+    date: new Date(),
+    openingBalance: 0,
+    closingBalance: 0,
+    totalSales: 0,
+    cashInBox: 0,
+    cashSales: 0,
+    cashPayments: 0,
+    cashEntries: 0,
+    cashExits: 0,
+    cashReturns: 0,
+    vaultDeposits: 0,
+    bankTransfers: 0,
+    totalProfit: 0,
+    grossProfit: 0,
+    netProfit: 0,
+    operationalCosts: 0,
+    creditCardSales: 0,
+    creditSales: 0,
+    voucherSales: 0,
+    salesReturns: 0,
+    digitalPayments: 0,
+    metrics: {
+      efficiency: 0,
+      cashFlow: 0,
+      profitability: 0,
+      customerSatisfaction: 0,
+      operationalRisk: 0,
+      salesVelocity: 0,
+      inventoryTurn: 0,
+      avgTransactionTime: 0
+    },
+    departmentSales: [],
+    cashOutflow: 0,
+    taxes: 0,
+    tips: 0,
+    bonuses: 0,
+    expenses: 0,
+    movements: [],
+    alerts: [],
+    sales: [],
+    createdBy: 'system',
+    status: 'open',
+    cashierNotes: ''
+  };
+
+  const [currentReport, setCurrentReport] = useState<DailyCashReport>(defaultReport);
   const [reports, setReports] = useState<DailyCashReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(true);
   const [isCreatingReport, setIsCreatingReport] = useState(false);
@@ -463,6 +511,14 @@ export const CashRegisterSystem: React.FC = () => {
   const [customDateTo, setCustomDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
+
+  // Validación de seguridad - asegurar que currentReport nunca sea null
+  useEffect(() => {
+    if (!currentReport) {
+      console.warn('⚠️ currentReport es null, restaurando defaultReport');
+      setCurrentReport(defaultReport);
+    }
+  }, [currentReport]);
 
   // Funciones de depuración
   useEffect(() => {
@@ -554,7 +610,7 @@ export const CashRegisterSystem: React.FC = () => {
       // Verificar si el reporte es del día actual
       const [year, month, day] = selectedDate.split('-').map(Number);
       const selectedDateObj = new Date(year, month - 1, day);
-      const reportDate = new Date(currentReport.date);
+      const reportDate = new Date(currentReport?.date || new Date());
       const isSameDay = reportDate.toDateString() === selectedDateObj.toDateString();
       
       console.log('📅 VERIFICACIÓN DE FECHA:', {
@@ -767,7 +823,7 @@ export const CashRegisterSystem: React.FC = () => {
             // Turno activo encontrado - mostrar datos del turno
             
             // Solo actualizar si cambió el reporte o si es la primera carga
-            if (!currentReport || currentReport.id !== todayReport.id) {
+            if (currentReport.id === 'default' || currentReport.id !== todayReport.id) {
 
               
               // 🚨 No sobrescribir si acabamos de crear un reporte limpio
@@ -793,9 +849,9 @@ export const CashRegisterSystem: React.FC = () => {
               totalReports: reportsData.length,
               reportIds: reportsData.map(r => ({ id: r.id, status: r.status }))
             });
-            // Si no hay reporte del día, limpiar currentReport
-            if (currentReport) {
-              setCurrentReport(null);
+            // Si no hay reporte del día, usar reporte por defecto
+            if (currentReport.id !== 'default') {
+              setCurrentReport(defaultReport);
             }
           }
         }
@@ -816,7 +872,7 @@ export const CashRegisterSystem: React.FC = () => {
           async (ventasSnapshot) => {
           console.log('🔄 Detectados cambios en ventas...');
           console.log('🏪 currentReport completo:', currentReport);
-          console.log('🆔 currentReport.id:', currentReport?.id);
+          console.log('🆔 currentReport.id:', currentReport.id);
           console.log('📊 Total de ventas en Firebase:', ventasSnapshot.docs.length);
 
           // Filtrar ventas de hoy - CORREGIDO: usar fecha local directamente
@@ -860,7 +916,7 @@ export const CashRegisterSystem: React.FC = () => {
               // Debug: mostrar fechas para entender el filtrado
               console.log(`🔍 Venta ${sale.numeroVenta || sale.id}:`);
               console.log(`   📅 Fecha=${saleDate}, FiltroFecha=${selectedDate}, FechaMatch=${dateMatches}`);
-              console.log(`   🏪 ReportId=${sale.reportId}, TurnoActual=${currentReport?.id}, ReportMatch=${reportIdMatches}`);
+              console.log(`   🏪 ReportId=${sale.reportId}, TurnoActual=${currentReport.id}, ReportMatch=${reportIdMatches}`);
               console.log(`   ✅ Match final=${matches}`);
 
               return matches;
@@ -895,7 +951,7 @@ export const CashRegisterSystem: React.FC = () => {
         unsubscribeVentas();
       };
     }
-  }, [selectedDate, liveMode, currentReport?.movements.length]);
+  }, [selectedDate, liveMode, currentReport?.movements?.length]);
 
   // 🚀 NUEVA FUNCIÓN: Calcular balance desde las ventas del turno
   const updateBalanceFromShiftSales = (report: DailyCashReport) => {
@@ -1060,7 +1116,7 @@ export const CashRegisterSystem: React.FC = () => {
         await syncWithInternalDB(report.id);
       } else {
         console.log('❌ No se encontrado reporte para hoy');
-        setCurrentReport(null);
+        setCurrentReport(defaultReport);
       }
     } catch (error) {
       console.error("❌ Error loading today's report:", error);
@@ -2082,7 +2138,7 @@ export const CashRegisterSystem: React.FC = () => {
       salesProgress, // Agregar progreso de ventas
       dailySalesGoal
     };
-  }, [currentReport, currentReport?.sales?.length]);
+  }, [currentReport, currentReport.sales?.length]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
@@ -2127,12 +2183,12 @@ export const CashRegisterSystem: React.FC = () => {
             <div className="text-xs text-slate-500">{currentTime.toLocaleDateString('es-ES')}</div>
           </div>
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${currentReport?.status === 'open' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-xs text-slate-500">{currentReport?.status === 'open' ? 'Abierta' : 'Cerrada'}</span>
+            <div className={`w-3 h-3 rounded-full ${currentReport.status === 'open' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-xs text-slate-500">{currentReport.status === 'open' ? 'Abierta' : 'Cerrada'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${(currentReport?.sales?.length || 0) > 0 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
-            <span className="text-xs text-slate-500">POS ({currentReport?.sales?.length || 0})</span>
+            <div className={`w-3 h-3 rounded-full ${(currentReport.sales?.length || 0) > 0 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
+            <span className="text-xs text-slate-500">POS ({currentReport.sales?.length || 0})</span>
           </div>
         </div>
       </div>
@@ -2265,13 +2321,14 @@ export const CashRegisterSystem: React.FC = () => {
           console.log('🏁 RENDER CHECK:', {
             hasCurrentReport: !!currentReport,
             hasDayStats: !!dayStats,
-            currentReportId: currentReport?.id,
-            totalSales: currentReport?.totalSales,
+            currentReportId: currentReport.id,
+            totalSales: currentReport.totalSales,
             willRender: !!(currentReport && dayStats)
           });
           return null;
         })()}
-        {currentReport && (
+        {/* Dashboard siempre visible - condición currentReport removida */}
+        {(
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
               <AnimatedStat
@@ -2329,7 +2386,7 @@ export const CashRegisterSystem: React.FC = () => {
               <AnimatedStat
                 icon={<Zap />}
                 label="Transacciones POS"
-                value={currentReport?.sales?.length || 0}
+                value={currentReport.sales?.length || 0}
                 change={22.1}
                 color="text-pink-600"
                 gradient="from-pink-500 to-rose-600"
@@ -2415,8 +2472,8 @@ export const CashRegisterSystem: React.FC = () => {
           </>
         )}
 
-        {/* Panel principal con tabs mejoradas */}
-        {currentReport && (
+        {/* Panel principal con tabs mejoradas - condición currentReport removida */}
+        {(
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 overflow-hidden">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="bg-gradient-to-r from-slate-100 to-blue-100 p-1">
@@ -2939,7 +2996,7 @@ export const CashRegisterSystem: React.FC = () => {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {currentReport?.movements && currentReport.movements.length > 0 ? (
+                      {currentReport.movements && currentReport.movements.length > 0 ? (
                         <div className="space-y-3">
                           {currentReport.movements
                             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -3006,10 +3063,10 @@ export const CashRegisterSystem: React.FC = () => {
                         </CardTitle>
                         <div className="flex space-x-2">
                           <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                            {currentReport?.sales?.length || 0} ventas
+                            {currentReport.sales?.length || 0} ventas
                           </Badge>
                           <Badge variant="outline" className="bg-green-50 text-green-700">
-                            ${(currentReport?.totalSales || 0).toLocaleString('es-AR')}
+                            ${(currentReport.totalSales || 0).toLocaleString('es-AR')}
                           </Badge>
                         </div>
                       </div>
@@ -3076,7 +3133,7 @@ export const CashRegisterSystem: React.FC = () => {
                           <RefreshCw className="h-8 w-8 mx-auto text-gray-400 mb-4 animate-spin" />
                           <p className="text-gray-500">Cargando ventas...</p>
                         </div>
-                      ) : currentReport?.sales && currentReport.sales.length > 0 ? (
+                      ) : currentReport.sales && currentReport.sales.length > 0 ? (
                         <div className="space-y-3">
                           {currentReport.sales.map((sale, index) => (
                             <div key={sale.id || index} className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
@@ -3450,8 +3507,8 @@ export const CashRegisterSystem: React.FC = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Mensaje cuando no hay corte activo */}
-        {!currentReport && !isCreatingReport && (
+        {/* Mensaje cuando no hay corte activo - COMENTADO PARA ACCESO DIRECTO AL DASHBOARD */}
+        {/* {!currentReport && !isCreatingReport && (
           <div className="text-center py-16">
             <Card className="max-w-2xl mx-auto bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl">
               <CardContent className="py-16">
@@ -3481,7 +3538,7 @@ export const CashRegisterSystem: React.FC = () => {
               </CardContent>
             </Card>
           </div>
-        )}
+        )} */}
 
       {/* Modal para ver Ticket Completo */}
       <AlertDialog open={showTicketModal} onOpenChange={setShowTicketModal}>

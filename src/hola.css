@@ -1,0 +1,3324 @@
+/* Reset y variables */
+* {
+	margin: 0 !important;
+	padding: 0 !important;
+	box-sizing: border-box !important;
+}
+
+:root {
+}
+
+body {
+	margin: 0 !important;
+	font-family: 'Poppins', 'Arial', sans-serif !important;
+	background: #fafafa !important;
+	color: #333 !important;
+	line-height: 1.6 !important;
+	overflow-x: hidden !important;
+	-webkit-font-smoothing: antialiased !important;
+	-moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Patrón de fondo sutil */
+body::before {
+	content: '';
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-image: radial-gradient(circle at 25% 25%, rgba(183, 28, 28, 0.03) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(255, 204, 0, 0.03) 0%, transparent 50%);
+	pointer-events: none;
+	z-index: -1;
+}
+
+/* Encabezado */
+.header {
+	display: flex !important;
+	justify-content: space-between !important;
+	align-items: center !important;
+	background: linear-gradient(135deg, #b71c1c, #d32f2f) !important;
+	color: white !important;
+	padding: 1rem 2rem !important;
+	position: relative !important;
+	top: auto !important;
+	width: 100% !important;
+	z-index: 100 !important;
+	box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+	border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+	margin-bottom: 0 !important;
+}
+
+.header.scrolled {
+	padding: .8rem 2rem !important;
+	background: rgba(183, 28, 28, 0.95) !important;
+}
+
+.header .logo {
+	font-weight: 800 !important;
+	font-size: 1.8rem !important;
+	letter-spacing: 1px !important;
+	text-shadow: 2px 2px 4px rgba(0,0,0,0.3) !important;
+	background: linear-gradient(45deg, white, #ffebee) !important;
+	-webkit-background-clip: text !important;
+	background-clip: text !important;
+	color: white !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.header .logo:hover {
+	transform: scale(1.05) !important;
+}
+
+.header nav {
+	display: flex !important;
+	align-items: center !important;
+	gap: 2rem !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.header nav a {
+	color: white !important;
+	text-decoration: none !important;
+	font-weight: 500 !important;
+	font-size: 1rem !important;
+	padding: .5rem 1rem !important;
+	border-radius: 20px !important;
+	border: 1px solid transparent !important;
+	transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.header nav a:hover {
+	background: rgba(255,255,255,0.1) !important;
+	transform: translateY(-2px) !important;
+	border-color: rgba(255,255,255,0.2) !important;
+	box-shadow: 0 8px 25px rgba(255,255,255,0.1) !important;
+	color: white !important;
+}
+
+.header nav a::after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	width: 0;
+	height: 2px;
+	background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
+	transition: var(--transition);
+	transform: translateX(-50%);
+	border-radius: 1px;
+}
+
+.header nav a:hover::after {
+	width: 80%;
+}
+
+/* Hamburger Menu - Mejorado para WordPress */
+.nav-toggle-checkbox {
+	display: none !important;
+	position: absolute !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+}
+
+.nav-toggle-label {
+	display: none !important;
+	flex-direction: column !important;
+	cursor: pointer !important;
+	gap: 5px !important;
+	padding: 0.8rem !important;
+	border-radius: 10px !important;
+	transition: all .3s ease !important;
+	background: rgba(255,255,255,0.15) !important;
+	border: 2px solid rgba(255,255,255,0.3) !important;
+	position: relative !important;
+	z-index: 1001 !important;
+	width: 45px !important;
+	height: 45px !important;
+	justify-content: center !important;
+	align-items: center !important;
+}
+
+.nav-toggle-label:hover {
+	background: rgba(255,255,255,0.2) !important;
+	transform: translateY(-50%) scale(1.05) !important;
+}
+
+.nav-toggle-label span {
+	width: 25px !important;
+	height: 3px !important;
+	background: white !important;
+	transition: all .3s ease !important;
+	border-radius: 2px !important;
+	transform-origin: center !important;
+	display: block !important;
+	position: relative !important;
+}
+
+.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(1) {
+	transform: rotate(45deg) translate(5px, 5px) !important;
+}
+
+.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(2) {
+	opacity: 0 !important;
+}
+
+.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(3) {
+	transform: rotate(-45deg) translate(7px, -6px) !important;
+}
+
+/* Estilos del menú de navegación */
+.header nav {
+	display: flex !important;
+	align-items: center !important;
+	gap: 1.5rem !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	position: relative !important;
+	flex-wrap: wrap !important;
+}
+
+.header nav a {
+	color: white !important;
+	text-decoration: none !important;
+	font-weight: 500 !important;
+	font-size: 0.95rem !important;
+	padding: 0.6rem 1.2rem !important;
+	border-radius: 25px !important;
+	border: 1px solid transparent !important;
+	transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+	display: inline-block !important;
+	white-space: nowrap !important;
+	margin: 0.2rem 0.3rem !important;
+	min-width: auto !important;
+	text-align: center !important;
+}
+
+.header nav a:hover {
+	background: rgba(255,255,255,0.1) !important;
+	transform: translateY(-2px) !important;
+	border-color: rgba(255,255,255,0.2) !important;
+	box-shadow: 0 8px 25px rgba(255,255,255,0.1) !important;
+	color: white !important;
+}
+
+/* Hero */
+.hero {
+	background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url('https://g9ryyfyjtd-ocqtf.wordpress.com/wp-content/uploads/2025/09/whatsapp-image-2025-09-27-at-8.24.26-pm-1.jpeg?w=1024') center/cover no-repeat !important;
+	color: white !important;
+	text-align: center !important;
+	padding: 5rem 2rem 4rem !important;
+	min-height: 70vh !important;
+	display: flex !important;
+	flex-direction: column !important;
+	justify-content: center !important;
+	align-items: center !important;
+	position: relative !important;
+	overflow: hidden !important;
+	margin-top: 0 !important;
+}
+
+.hero::before {
+	content: '' !important;
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 0 !important;
+	background: linear-gradient(45deg, rgba(183,28,28,0.2), rgba(211,47,47,0.2), rgba(255,107,53,0.1)) !important;
+}
+
+.hero h1 {
+	font-size: 3.5rem !important;
+	margin-bottom: 1.5rem !important;
+	font-weight: 800 !important;
+	text-shadow: 3px 3px 6px rgba(0,0,0,0.7) !important;
+	z-index: 2 !important;
+	position: relative !important;
+	background: linear-gradient(45deg, white, #ffebee) !important;
+	-webkit-background-clip: text !important;
+	background-clip: text !important;
+	line-height: 1.1 !important;
+	color: white !important;
+}
+
+.hero p {
+	font-size: 1.3rem !important;
+	margin-bottom: 2rem !important;
+	max-width: 600px !important;
+	text-shadow: 2px 2px 4px rgba(0,0,0,0.5) !important;
+	z-index: 2 !important;
+	position: relative !important;
+	font-weight: 300 !important;
+	opacity: .95 !important;
+	color: white !important;
+}
+
+.hero .btn {
+	background: linear-gradient(135deg, #ffcc00, #ff6b35) !important;
+	color: #000 !important;
+	padding: 1rem 2rem !important;
+	border-radius: 30px !important;
+	text-decoration: none !important;
+	font-weight: 700 !important;
+	font-size: 1.1rem !important;
+	box-shadow: 0 8px 25px rgba(255,204,0,0.3) !important;
+	z-index: 2 !important;
+	position: relative !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+	text-transform: uppercase !important;
+	letter-spacing: 1px !important;
+	display: inline-block !important;
+}
+
+.hero .btn:hover {
+	background: linear-gradient(135deg, #ff6b35, #ffcc00) !important;
+	transform: translateY(-3px) scale(1.05) !important;
+	box-shadow: 0 12px 35px rgba(255,204,0,0.4) !important;
+	border-color: rgba(255,255,255,0.4) !important;
+	color: #000 !important;
+}
+
+.hero .btn::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+	transition: var(--transition);
+}
+
+.hero .btn:hover::before {
+	left: 100%;
+}
+
+/* Productos */
+.productos {
+	padding: 5rem 2rem;
+	text-align: center;
+	background: linear-gradient(135deg, #ffffff, #f8f9fa);
+	position: relative;
+}
+
+.productos::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-image: radial-gradient(circle at 20% 80%, rgba(183, 28, 28, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 204, 0, 0.03) 0%, transparent 50%);
+	pointer-events: none;
+}
+
+.productos h2 {
+	margin-bottom: 3rem;
+	font-size: 2.5rem;
+	color: var(--primary-color);
+	font-weight: 700;
+	position: relative;
+	z-index: 1;
+}
+
+.productos h2::after {
+	content: '';
+	position: absolute;
+	bottom: -10px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 80px;
+	height: 4px;
+	background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+	border-radius: 2px;
+}
+
+.productos .grid {
+	display: grid !important;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+	gap: 2rem !important;
+	max-width: 1200px !important;
+	margin: 0 auto !important;
+	position: relative !important;
+	z-index: 1 !important;
+}
+
+.card {
+	background: white !important;
+	border-radius: 15px !important;
+	box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
+	padding: 0 !important;
+	transition: transform .3s ease, box-shadow .3s ease !important;
+	overflow: hidden !important;
+	position: relative !important;
+	border: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+.card:hover {
+	transform: translateY(-10px) scale(1.02) !important;
+	box-shadow: 0 20px 40px rgba(0,0,0,0.15) !important;
+}
+
+.card img {
+	width: 100% !important;
+	height: 250px !important;
+	object-fit: cover !important;
+	transition: transform .3s ease !important;
+	position: relative !important;
+	z-index: 0 !important;
+}
+
+.card:hover img {
+	transform: scale(1.1) !important;
+}
+
+.card-content {
+	padding: 1.5rem !important;
+	position: relative !important;
+	z-index: 2 !important;
+}
+
+.card h3 {
+	margin: 0 0 .5rem !important;
+	font-size: 1.4rem !important;
+	font-weight: 700 !important;
+	color: #333 !important;
+	transition: color .3s ease !important;
+	line-height: 1.3 !important;
+}
+
+.card:hover h3 {
+	color: #b71c1c !important;
+}
+
+.card p {
+	color: #666 !important;
+	margin-bottom: 1rem !important;
+	font-size: .95rem !important;
+	line-height: 1.5 !important;
+}
+
+.card .precio {
+	display: inline-block !important;
+	background: linear-gradient(135deg, #b71c1c, #ff6b35) !important;
+	color: white !important;
+	padding: .4rem .8rem !important;
+	border-radius: 20px !important;
+	font-weight: 700 !important;
+	font-size: .9rem !important;
+	box-shadow: 0 4px 15px rgba(183,28,28,0.3) !important;
+	transition: all .3s ease !important;
+	position: relative !important;
+	overflow: hidden !important;
+	margin-bottom: .8rem !important;
+	line-height: 1.2 !important;
+	box-sizing: border-box !important;
+}
+
+/* ELIMINAR COMPLETAMENTE CUALQUIER ÍCONO/EMOJI DE WHATSAPP */
+.whatsapp-btn-card,
+a[href*="wa.me"],
+a[href*="whatsapp"],
+.card a[href*="wa.me"],
+.card a[href*="whatsapp"],
+a.whatsapp-btn-card,
+.card .whatsapp-btn-card {
+	display: inline-block !important;
+	background: linear-gradient(135deg, #25d366, #128c7e) !important;
+	color: white !important;
+	padding: .6rem 1.2rem !important;
+	border-radius: 25px !important;
+	text-decoration: none !important;
+	font-weight: 600 !important;
+	font-size: .9rem !important;
+	transition: all .3s ease !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+	text-transform: uppercase !important;
+	letter-spacing: .5px !important;
+	cursor: pointer !important;
+	line-height: 1.2 !important;
+	min-width: auto !important;
+	max-width: 200px !important;
+	white-space: nowrap !important;
+	overflow: hidden !important;
+	text-overflow: ellipsis !important;
+	box-sizing: border-box !important;
+	position: relative !important;
+}
+
+/* QUITAR TODOS LOS PSEUDO-ELEMENTOS QUE PUEDAN TENER ÍCONOS */
+.whatsapp-btn-card::before,
+.whatsapp-btn-card::after,
+a[href*="wa.me"]::before,
+a[href*="wa.me"]::after,
+a[href*="whatsapp"]::before,
+a[href*="whatsapp"]::after,
+.card a[href*="wa.me"]::before,
+.card a[href*="wa.me"]::after,
+.card a[href*="whatsapp"]::before,
+.card a[href*="whatsapp"]::after,
+a.whatsapp-btn-card::before,
+a.whatsapp-btn-card::after,
+.card .whatsapp-btn-card::before,
+.card .whatsapp-btn-card::after {
+	display: none !important;
+	content: none !important;
+	background: none !important;
+	background-image: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	font-size: 0 !important;
+	line-height: 0 !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+}
+
+/* PREVENIR ÍCONOS DE WORDPRESS EN TODOS LOS ENLACES */
+a[href*="wa.me"],
+a[href*="whatsapp"] {
+	text-decoration: none !important;
+	background-image: none !important;
+	background-repeat: no-repeat !important;
+	background-position: center center !important;
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+	font-family: inherit !important;
+}
+
+/* REGLAS ESPECÍFICAS PARA WORDPRESS */
+a[href*="wa.me"].whatsapp-btn-card,
+a[href*="whatsapp"].whatsapp-btn-card,
+.whatsapp-btn-card[href*="wa.me"],
+.whatsapp-btn-card[href*="whatsapp"] {
+	font-size: .9rem !important;
+	padding: .6rem 1.2rem !important;
+	border-radius: 25px !important;
+	text-decoration: none !important;
+	display: inline-block !important;
+	box-sizing: border-box !important;
+	max-width: 100% !important;
+	background: linear-gradient(135deg, #25d366, #128c7e) !important;
+	color: white !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+}
+
+/* FORZAR QUE NO HAYA ÍCONOS EN NINGÚN CASO */
+* .whatsapp-btn-card,
+* a[href*="wa.me"],
+* a[href*="whatsapp"] {
+	background-image: none !important;
+	content: none !important;
+}
+
+.whatsapp-btn-card:hover,
+a[href*="wa.me"]:hover,
+a[href*="whatsapp"]:hover {
+	background: linear-gradient(135deg, #128c7e, #25d366) !important;
+	transform: translateY(-2px) !important;
+	box-shadow: 0 6px 15px rgba(37,211,102,0.3) !important;
+	color: white !important;
+	text-decoration: none !important;
+}
+
+/* Texto (Misión, Visión, Valores) */
+.texto {
+	padding: 5rem 2rem !important;
+	background: linear-gradient(135deg, #ffffff, #f8f9fa) !important;
+	max-width: 1200px !important;
+	margin: 0 auto !important;
+	text-align: center !important;
+	position: relative !important;
+}
+
+.section-header {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	gap: 1rem !important;
+	margin-bottom: 2rem !important;
+}
+
+.section-icon {
+	width: 3rem !important;
+	height: 3rem !important;
+	color: var(--primary-color) !important;
+	flex-shrink: 0 !important;
+}
+
+.texto h2 {
+	color: #b71c1c !important;
+	margin-bottom: 0 !important;
+	font-size: 2.5rem !important;
+	font-weight: 700 !important;
+	position: relative !important;
+	z-index: 1 !important;
+	background: linear-gradient(45deg, #b71c1c, #ff6b35) !important;
+	-webkit-background-clip: text !important;
+	background-clip: text !important;
+}
+
+.texto p {
+	text-align: center !important;
+	line-height: 1.8 !important;
+	font-size: 1.2rem !important;
+	color: #555 !important;
+	position: relative !important;
+	z-index: 1 !important;
+	max-width: 800px !important;
+	margin: 0 auto !important;
+}
+
+/* Valores mejorados */
+.valores-grid {
+	display: grid !important;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+	gap: 2rem !important;
+	margin-top: 3rem !important;
+}
+
+.valor-card {
+	background: white !important;
+	border-radius: 20px !important;
+	padding: 2rem !important;
+	box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
+	border: 2px solid transparent !important;
+	transition: all .3s ease !important;
+	text-align: center !important;
+	position: relative !important;
+	overflow: hidden !important;
+}
+
+.valor-card::before {
+	content: '' !important;
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	height: 4px !important;
+	background: linear-gradient(90deg, var(--primary-color), var(--accent-color)) !important;
+}
+
+.valor-card:hover {
+	transform: translateY(-10px) !important;
+	box-shadow: 0 20px 40px rgba(0,0,0,0.15) !important;
+	border-color: var(--primary-color) !important;
+}
+
+.valor-icon {
+	width: 4rem !important;
+	height: 4rem !important;
+	color: var(--primary-color) !important;
+	margin: 0 auto 1rem !important;
+	display: block !important;
+}
+
+.valor-card h3 {
+	color: #b71c1c !important;
+	font-size: 1.3rem !important;
+	font-weight: 600 !important;
+	margin-bottom: 1rem !important;
+	transition: color .3s ease !important;
+}
+
+.valor-card:hover h3 {
+	color: #ff6b35 !important;
+}
+
+.valor-card p {
+	color: #666 !important;
+	font-size: 1rem !important;
+	line-height: 1.6 !important;
+	margin: 0 !important;
+}
+
+/* Ubicación */
+.ubicacion {
+	padding: 5rem 2rem !important;
+	background: linear-gradient(135deg, #ffffff, #f8f9fa) !important;
+	text-align: center !important;
+	position: relative !important;
+}
+
+.ubicacion::before {
+	content: '' !important;
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 0 !important;
+	background-image: radial-gradient(circle at 30% 70%, rgba(183, 28, 28, 0.03) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(255, 204, 0, 0.03) 0%, transparent 50%) !important;
+	pointer-events: none !important;
+}
+
+.ubicacion h2 {
+	margin-bottom: 1rem !important;
+	font-size: 2.5rem !important;
+	color: var(--primary-color) !important;
+	font-weight: 700 !important;
+	position: relative !important;
+	z-index: 1 !important;
+}
+
+.ubicacion h2::after {
+	content: '' !important;
+	position: absolute !important;
+	bottom: -10px !important;
+	left: 50% !important;
+	transform: translateX(-50%) !important;
+	width: 80px !important;
+	height: 4px !important;
+	background: linear-gradient(90deg, var(--primary-color), var(--accent-color)) !important;
+	border-radius: 2px !important;
+}
+
+.ubicacion p {
+	margin-bottom: 2rem !important;
+	font-size: 1.2rem !important;
+	color: #666 !important;
+	position: relative !important;
+	z-index: 1 !important;
+	max-width: 600px !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+}
+
+.ubicacion iframe {
+	width: 100% !important;
+	max-width: 800px !important;
+	height: 400px !important;
+	border: 0 !important;
+	border-radius: 15px !important;
+	box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
+	position: relative !important;
+	z-index: 1 !important;
+	margin: 0 auto !important;
+	display: block !important;
+}
+
+/* Responsive ubicación */
+@media (max-width: 768px) {
+	.ubicacion {
+		padding: 3rem 1rem !important;
+	}
+	
+	.ubicacion h2 {
+		font-size: 2rem !important;
+	}
+	
+	.ubicacion p {
+		font-size: 1rem !important;
+	}
+	
+	.ubicacion iframe {
+		height: 300px !important;
+		border-radius: 10px !important;
+	}
+}
+
+@media (max-width: 480px) {
+	.ubicacion h2 {
+		font-size: 1.8rem !important;
+	}
+	
+	.ubicacion p {
+		font-size: .95rem !important;
+	}
+	
+	.ubicacion iframe {
+		height: 250px !important;
+	}
+}
+
+/* Responsive para secciones */
+@media (max-width: 768px) {
+	.texto {
+		padding: 3rem 1rem !important;
+	}
+	
+	.section-header {
+		flex-direction: column !important;
+		gap: .5rem !important;
+	}
+	
+	.section-icon {
+		width: 2.5rem !important;
+		height: 2.5rem !important;
+	}
+	
+	.texto h2 {
+		font-size: 2rem !important;
+	}
+	
+	.texto p {
+		font-size: 1rem !important;
+	}
+	
+	.valores-grid {
+		grid-template-columns: 1fr !important;
+		gap: 1.5rem !important;
+	}
+	
+	.valor-card {
+		padding: 1.5rem !important;
+	}
+	
+	.valor-icon {
+		width: 3rem !important;
+		height: 3rem !important;
+	}
+	
+	.valor-card h3 {
+		font-size: 1.1rem !important;
+	}
+}
+
+/* Animaciones */
+@keyframes fadeInUp {
+	from {
+		opacity: 0;
+		transform: translateY(30px);
+	}
+	
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes gradientShift {
+	0%, 100% {
+		background-position: 0 50%;
+	}
+	
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
+@keyframes float {
+	0%, 100% {
+		transform: translate(0, 0) rotate(0deg);
+	}
+	
+	33% {
+		transform: translate(30px, -30px) rotate(120deg);
+	}
+	
+	66% {
+		transform: translate(-20px, 20px) rotate(240deg);
+	}
+}
+
+@keyframes pulse {
+	0%, 100% {
+		opacity: .3;
+	}
+	
+	50% {
+		opacity: .6;
+	}
+}
+
+@keyframes slideInLeft {
+	from {
+		opacity: 0;
+		transform: translateX(-50px);
+	}
+	
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes slideInRight {
+	from {
+		opacity: 0;
+		transform: translateX(50px);
+	}
+	
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+/* Responsive - Mejorado para WordPress */
+@media (max-width: 768px) {
+	.header {
+		padding: 1rem !important;
+		position: relative !important;
+		display: flex !important;
+		justify-content: space-between !important;
+		align-items: center !important;
+		width: 100% !important;
+	}
+	
+	.header .logo {
+		font-size: 1.4rem !important;
+		flex: 1 !important;
+		text-align: left !important;
+	}
+	
+	.header nav {
+		flex-direction: column !important;
+		gap: 0.8rem !important;
+		position: absolute !important;
+		top: 100% !important;
+		left: 0 !important;
+		width: 100% !important;
+		background: rgba(183, 28, 28, 0.98) !important;
+		box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
+		padding: 1.5rem !important;
+		border-radius: 0 0 20px 20px !important;
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+		visibility: hidden !important;
+		transition: all .4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+		z-index: 1000 !important;
+		border: 1px solid rgba(255,255,255,0.2) !important;
+		border-top: none !important;
+		margin-top: 0 !important;
+		backdrop-filter: blur(10px) !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ nav {
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	.nav-toggle-label {
+		display: flex !important;
+		position: relative !important;
+		z-index: 1001 !important;
+		order: 3 !important;
+	}
+	
+	.header nav a {
+		padding: 1rem 1.5rem !important;
+		font-size: 1.1rem !important;
+		border-radius: 15px !important;
+		text-align: center !important;
+		margin: 0.3rem 0 !important;
+		border: 2px solid rgba(255,255,255,0.2) !important;
+		background: rgba(255,255,255,0.1) !important;
+		font-weight: 600 !important;
+		letter-spacing: 0.5px !important;
+		display: block !important;
+		width: 100% !important;
+		box-sizing: border-box !important;
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.15) !important;
+		transform: translateY(-1px) !important;
+		border-color: rgba(255,255,255,0.3) !important;
+	}
+	
+	.hero {
+		padding: 6rem 1rem 4rem !important;
+		min-height: 80vh !important;
+	}
+	
+	.hero h1 {
+		font-size: 2.2rem !important;
+		line-height: 1.2 !important;
+	}
+	
+	.hero p {
+		font-size: 1rem !important;
+		max-width: 90% !important;
+	}
+	
+	.hero .btn {
+		padding: 1rem 2rem !important;
+		font-size: 1rem !important;
+	}
+	
+	.productos {
+		padding: 3rem 1rem !important;
+	}
+	
+	.productos h2 {
+		font-size: 2rem !important;
+		margin-bottom: 2rem !important;
+	}
+	
+	.productos .grid {
+		grid-template-columns: 1fr !important;
+		gap: 1.5rem !important;
+	}
+	
+	.card {
+		margin: 0 auto !important;
+		max-width: 100% !important;
+	}
+	
+	.card img {
+		height: 200px !important;
+	}
+	
+	.card-content {
+		padding: 1rem !important;
+	}
+	
+	.card h3 {
+		font-size: 1.2rem !important;
+	}
+	
+	.card p {
+		font-size: .9rem !important;
+	}
+	
+	.card .precio {
+		font-size: .9rem !important;
+		padding: .4rem .8rem !important;
+	}
+	
+	.whatsapp-btn-card {
+		font-size: .8rem !important;
+		padding: .5rem 1rem !important;
+	}
+	
+	.texto {
+		padding: 3rem 1rem !important;
+	}
+	
+	.texto h2 {
+		font-size: 1.8rem !important;
+	}
+	
+	.texto p {
+		font-size: 1rem !important;
+	}
+	
+	.texto ul li {
+		padding: .8rem !important;
+		font-size: .95rem !important;
+	}
+	
+	.ubicacion {
+		padding: 3rem 1rem !important;
+	}
+	
+	.ubicacion h2 {
+		font-size: 2rem !important;
+	}
+	
+	.ubicacion iframe {
+		height: 300px !important;
+	}
+	
+	.footer {
+		padding: 2rem 1rem !important;
+	}
+	
+	.footer-logo {
+		max-width: 100px !important;
+	}
+}
+
+@media (max-width: 480px) {
+	.header .logo {
+		font-size: 1.2rem !important;
+	}
+	
+	.header nav a {
+		padding: .6rem .8rem !important;
+		font-size: .9rem !important;
+	}
+	
+	.hero h1 {
+		font-size: 1.8rem !important;
+	}
+	
+	.hero p {
+		font-size: .9rem !important;
+	}
+	
+	.hero .btn {
+		padding: .8rem 1.5rem !important;
+		font-size: .9rem !important;
+	}
+	
+	.productos h2 {
+		font-size: 1.8rem !important;
+	}
+	
+	.productos .grid {
+		gap: 1rem !important;
+	}
+	
+	.card img {
+		height: 180px !important;
+	}
+	
+	.card-content {
+		padding: .8rem !important;
+	}
+	
+	.card h3 {
+		font-size: 1.1rem !important;
+	}
+	
+	.card .precio {
+		font-size: .8rem !important;
+		padding: .3rem .6rem !important;
+	}
+	
+	.whatsapp-btn-card {
+		font-size: .75rem !important;
+		padding: .4rem .8rem !important;
+		max-width: 150px !important;
+	}
+	
+	.texto h2 {
+		font-size: 1.6rem !important;
+	}
+	
+	.texto p, .texto ul li {
+		font-size: .9rem !important;
+	}
+	
+	.ubicacion h2 {
+		font-size: 1.8rem !important;
+	}
+	
+	.ubicacion p {
+		font-size: .95rem !important;
+	}
+	
+	.ubicacion iframe {
+		height: 200px !important;
+	}
+	
+	.footer p {
+		font-size: .9rem !important;
+	}
+}
+
+/* Estilos adicionales para menú hamburguesa en WordPress */
+@media (min-width: 769px) {
+	.nav-toggle-label {
+		display: none !important;
+	}
+	
+	.header nav {
+		display: flex !important;
+		position: static !important;
+		flex-direction: row !important;
+		background: transparent !important;
+		box-shadow: none !important;
+		padding: 0 !important;
+		transform: none !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+		border: none !important;
+	}
+	
+	.header nav a {
+		background: transparent !important;
+		border: 1px solid transparent !important;
+		padding: .5rem 1rem !important;
+		margin: 0 !important;
+	}
+}
+
+/* Estilos ultra-agresivos para WordPress */
+@media (max-width: 768px) {
+	.header {
+		position: relative !important;
+		z-index: 999 !important;
+	}
+	
+	.nav-toggle-checkbox {
+		position: absolute !important;
+		left: -9999px !important;
+		opacity: 0 !important;
+	}
+	
+	.nav-toggle-label {
+		display: block !important;
+		cursor: pointer !important;
+		position: absolute !important;
+		top: 50% !important;
+		right: 1rem !important;
+		transform: translateY(-50%) !important;
+		z-index: 1002 !important;
+		width: auto !important;
+		height: auto !important;
+	}
+	
+	.header nav {
+		position: absolute !important;
+		top: 100% !important;
+		left: 0 !important;
+		right: 0 !important;
+		width: 100% !important;
+		background: rgba(183, 28, 28, 0.98) !important;
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+		visibility: hidden !important;
+		transition: all .4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+		z-index: 1001 !important;
+		border-radius: 0 0 15px 15px !important;
+		box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ nav {
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	.header nav a {
+		display: block !important;
+		padding: 1rem !important;
+		text-align: center !important;
+		border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+		background: rgba(255,255,255,0.05) !important;
+		margin: 0 !important;
+		border-radius: 0 !important;
+	}
+	
+	.header nav a:last-child {
+		border-bottom: none !important;
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.15) !important;
+		transform: none !important;
+	}
+}
+
+/* Estilos adicionales para prevenir íconos de WordPress */
+a[href*="wa.me"],
+a[href*="whatsapp"],
+.whatsapp-btn-card,
+.card a[href*="wa.me"],
+.card a[href*="whatsapp"] {
+	text-decoration: none !important;
+	background-image: none !important;
+	background-repeat: no-repeat !important;
+	background-position: none !important;
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+
+a[href*="wa.me"]:before,
+a[href*="whatsapp"]:before,
+.whatsapp-btn-card:before,
+.card a[href*="wa.me"]:before,
+.card a[href*="whatsapp"]:before {
+	display: none !important;
+	content: none !important;
+	background: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+a[href*="wa.me"]:after,
+a[href*="whatsapp"]:after,
+.whatsapp-btn-card:after,
+.card a[href*="wa.me"]:after,
+.card a[href*="whatsapp"]:after {
+	display: none !important;
+	content: none !important;
+	background: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+/* Forzar que los botones mantengan su estilo */
+.whatsapp-btn-card,
+a.whatsapp-btn-card,
+.card .whatsapp-btn-card,
+.card a.whatsapp-btn-card {
+	background: linear-gradient(135deg, #25d366, #128c7e) !important;
+	color: white !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+	border-radius: 25px !important;
+	font-weight: 600 !important;
+	text-transform: uppercase !important;
+	letter-spacing: .5px !important;
+	transition: all .3s ease !important;
+	display: inline-block !important;
+	text-align: center !important;
+	vertical-align: middle !important;
+	box-sizing: border-box !important;
+}
+
+/* REGLAS ULTRA-ESPECÍFICAS PARA ELIMINAR ÍCONOS */
+a[href*="wa.me"] *,
+a[href*="whatsapp"] *,
+.whatsapp-btn-card *,
+.card a[href*="wa.me"] *,
+.card a[href*="whatsapp"] * {
+	background-image: none !important;
+	content: none !important;
+	display: inline !important;
+}
+
+a[href*="wa.me"]::before,
+a[href*="wa.me"]::after,
+a[href*="whatsapp"]::before,
+a[href*="whatsapp"]::after,
+.whatsapp-btn-card::before,
+.whatsapp-btn-card::after {
+	content: "" !important;
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	background: transparent !important;
+	font-size: 0 !important;
+}
+
+/* REGLA FINAL PARA ASEGURAR QUE NO HAYAN ÍCONOS */
+.whatsapp-btn-card,
+a[href*="wa.me"],
+a[href*="whatsapp"] {
+	font-family: 'Poppins', 'Arial', sans-serif !important;
+	font-size: .9rem !important;
+	font-weight: 600 !important;
+	text-decoration: none !important;
+	color: white !important;
+	background: linear-gradient(135deg, #25d366, #128c7e) !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+	border-radius: 25px !important;
+	padding: .6rem 1.2rem !important;
+	display: inline-block !important;
+	text-align: center !important;
+	vertical-align: middle !important;
+	box-sizing: border-box !important;
+}
+
+/* Tablet */
+@media (min-width: 769px) and (max-width: 1024px) {
+	.productos .grid {
+		grid-template-columns: repeat(2, 1fr);
+		gap: 2rem;
+	}
+	
+	.hero h1 {
+		font-size: 3rem;
+	}
+	
+	.hero p {
+		font-size: 1.2rem;
+	}
+	
+	.texto {
+		max-width: 800px;
+	}
+}
+
+/* Large screens */
+@media (min-width: 1200px) {
+	.productos .grid {
+		grid-template-columns: repeat(3, 1fr);
+		gap: 2.5rem;
+	}
+	
+	.hero h1 {
+		font-size: 4rem;
+	}
+	
+	.hero p {
+		font-size: 1.4rem;
+	}
+	
+	.texto {
+		max-width: 1000px;
+	}
+}
+
+/* Scroll suave */
+html {
+	scroll-behavior: smooth;
+}
+
+/* Loading animation */
+.loading {
+	opacity: 0;
+	animation: fadeInUp .6s cubic-bezier(0.4, 0, 0.2, 1) .2s forwards;
+}
+
+/* Accessibility */
+.header nav a:focus,
+.hero .btn:focus,
+.nav-toggle-label:focus {
+	outline: 2px solid var(--secondary-color);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	  ::before,
+	  ::after {
+		animation-duration: .01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: .01ms !important;
+	}
+}
+
+/* Print styles */
+@media print {
+	.header,
+	  .footer {
+		display: none;
+	}
+	
+	.hero {
+		background: none !important;
+		color: black !important;
+	}
+}
+
+/* ÚLTIMA REGLA PARA ELIMINAR ÍCONOS/EMOJIS DE WHATSAPP */
+.whatsapp-btn-card,
+a[href*="wa.me"],
+a[href*="whatsapp"],
+.card .whatsapp-btn-card,
+.card a[href*="wa.me"],
+.card a[href*="whatsapp"] {
+	background-image: none !important;
+	content: attr(data-text) !important;
+	font-family: 'Poppins', 'Arial', sans-serif !important;
+	font-size: .9rem !important;
+	font-weight: 600 !important;
+	text-decoration: none !important;
+	color: white !important;
+	background: linear-gradient(135deg, #25d366, #128c7e) !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+	border-radius: 25px !important;
+	padding: .6rem 1.2rem !important;
+	display: inline-block !important;
+	text-align: center !important;
+	vertical-align: middle !important;
+	box-sizing: border-box !important;
+}
+
+/* FORZAR QUE NO HAYA NINGÚN ÍCONO NI EMOJI */
+.whatsapp-btn-card::before,
+.whatsapp-btn-card::after,
+a[href*="wa.me"]::before,
+a[href*="wa.me"]::after,
+a[href*="whatsapp"]::before,
+a[href*="whatsapp"]::after,
+.card .whatsapp-btn-card::before,
+.card .whatsapp-btn-card::after,
+.card a[href*="wa.me"]::before,
+.card a[href*="wa.me"]::after,
+.card a[href*="whatsapp"]::before,
+.card a[href*="whatsapp"]::after {
+	content: "" !important;
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	background: transparent !important;
+	background-image: none !important;
+	font-size: 0 !important;
+	line-height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+}
+
+/* REGLA FINAL ULTRA-AGRESIVA PARA WORDPRESS */
+.header nav a,
+.header nav a:link,
+.header nav a:visited,
+.header nav a:hover,
+.header nav a:active,
+.header nav a:focus {
+	padding: .75rem 1.5rem !important;
+	margin: 0 .5rem !important;
+	letter-spacing: .5px !important;
+	font-weight: 500 !important;
+	font-size: 1rem !important;
+	font-family: 'Poppins', 'Arial', sans-serif !important;
+	text-decoration: none !important;
+	color: white !important;
+	background: transparent !important;
+	border: 1px solid transparent !important;
+	border-radius: 20px !important;
+	display: inline-block !important;
+	white-space: nowrap !important;
+	min-width: 80px !important;
+	text-align: center !important;
+	vertical-align: middle !important;
+	box-sizing: border-box !important;
+	line-height: 1.4 !important;
+}
+
+/* FORZAR ESPACIADO EN TODOS LOS ENLACES DE NAVEGACIÓN */
+nav a,
+.header nav a,
+div.header nav a,
+.header div nav a {
+	letter-spacing: .5px !important;
+	word-spacing: 2px !important;
+	padding-left: 1.5rem !important;
+	padding-right: 1.5rem !important;
+	margin-left: .5rem !important;
+	margin-right: .5rem !important;
+}
+
+/* ESTILOS FINALES PARA MENÚ HAMBURGUESA EN WORDPRESS */
+@media screen and (max-width: 768px) {
+	.header {
+		position: relative !important;
+		z-index: 9999 !important;
+		display: flex !important;
+		justify-content: space-between !important;
+		align-items: center !important;
+		padding: 1rem !important;
+		width: 100% !important;
+		box-sizing: border-box !important;
+	}
+	
+	.header .logo {
+		font-size: 1.4rem !important;
+		font-weight: 800 !important;
+		flex: 1 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+	
+	.nav-toggle-checkbox {
+		display: none !important;
+		visibility: hidden !important;
+		opacity: 0 !important;
+		position: absolute !important;
+		left: -9999px !important;
+	}
+	
+	.nav-toggle-label {
+		display: flex !important;
+		flex-direction: column !important;
+		gap: 4px !important;
+		cursor: pointer !important;
+		padding: .5rem !important;
+		border-radius: 20px !important;
+		background: rgba(255,255,255,0.1) !important;
+		border: 1px solid rgba(255,255,255,0.2) !important;
+		transition: all .3s ease !important;
+		position: relative !important;
+		z-index: 1002 !important;
+		width: auto !important;
+		height: auto !important;
+		margin: 0 !important;
+	}
+	
+	.nav-toggle-label:hover {
+		background: rgba(255,255,255,0.2) !important;
+		transform: scale(1.05) !important;
+	}
+	
+	.nav-toggle-label span {
+		display: block !important;
+		width: 25px !important;
+		height: 3px !important;
+		background: white !important;
+		border-radius: 2px !important;
+		transition: all .3s ease !important;
+		transform-origin: center !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(1) {
+		transform: rotate(45deg) translate(5px, 5px) !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(2) {
+		opacity: 0 !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(3) {
+		transform: rotate(-45deg) translate(7px, -6px) !important;
+	}
+	
+	.header nav {
+		position: absolute !important;
+		top: 100% !important;
+		left: 0 !important;
+		right: 0 !important;
+		width: 100% !important;
+		background: rgba(183, 28, 28, 0.98) !important;
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+		visibility: hidden !important;
+		transition: all .4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+		z-index: 1001 !important;
+		border-radius: 0 0 15px 15px !important;
+		box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+		padding: 1rem 0 !important;
+		margin: 0 !important;
+		display: flex !important;
+		flex-direction: column !important;
+		gap: 0 !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ nav {
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	.header nav a {
+		display: block !important;
+		color: white !important;
+		text-decoration: none !important;
+		padding: 1rem 2rem !important;
+		border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+		background: rgba(255,255,255,0.05) !important;
+		transition: all .3s ease !important;
+		font-weight: 500 !important;
+		text-align: center !important;
+		margin: 0 !important;
+		border-radius: 0 !important;
+	}
+	
+	.header nav a:last-child {
+		border-bottom: none !important;
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.15) !important;
+		transform: translateY(-1px) !important;
+		color: white !important;
+	}
+}
+
+/* ESTILOS DE EMERGENCIA PARA WORDPRESS */
+.header {
+	position: relative !important;
+	z-index: 9999 !important;
+}
+
+@media only screen and (max-width: 768px) {
+	.header nav {
+		display: none !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ nav {
+		display: flex !important;
+		flex-direction: column !important;
+	}
+	
+	.nav-toggle-label {
+		display: flex !important;
+	}
+}
+
+@media only screen and (min-width: 769px) {
+	.nav-toggle-label {
+		display: none !important;
+	}
+	
+	.header nav {
+		display: flex !important;
+		flex-direction: row !important;
+	}
+}
+
+/* PREVENIR INTERFERENCIA DE WORDPRESS */
+@media screen and (min-width: 769px) {
+	.nav-toggle-label {
+		display: none !important;
+	}
+	
+	.header nav {
+		display: flex !important;
+		flex-direction: row !important;
+		position: static !important;
+		background: transparent !important;
+		box-shadow: none !important;
+		transform: none !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+		padding: 0 !important;
+		margin: 0 !important;
+		gap: 2rem !important;
+		border-radius: 0 !important;
+		z-index: auto !important;
+	}
+	
+	.header nav a {
+		background: transparent !important;
+		border: 1px solid transparent !important;
+		padding: .5rem 1rem !important;
+		border-radius: 20px !important;
+		border-bottom: none !important;
+		margin: 0 !important;
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.1) !important;
+		border-color: rgba(255,255,255,0.2) !important;
+		transform: translateY(-2px) !important;
+	}
+}
+
+/* PREVENIR INTERFERENCIA DE WORDPRESS */
+@media screen and (min-width: 769px) {
+	.nav-toggle-label {
+		display: none !important;
+	}
+	
+	.header nav {
+		display: flex !important;
+		flex-direction: row !important;
+		position: static !important;
+		background: transparent !important;
+		box-shadow: none !important;
+		transform: none !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+		padding: 0 !important;
+		margin: 0 !important;
+		gap: 2rem !important;
+		border-radius: 0 !important;
+		z-index: auto !important;
+	}
+	
+	.header nav a {
+		background: transparent !important;
+		border: 1px solid transparent !important;
+		padding: .5rem 1rem !important;
+		border-radius: 20px !important;
+		border-bottom: none !important;
+		margin: 0 !important;
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.1) !important;
+		border-color: rgba(255,255,255,0.2) !important;
+		transform: translateY(-2px) !important;
+	}
+}
+
+/* REGLA ESPECÍFICA PARA WORDPRESS CON IDs */
+#nav-toggle:checked ~ #nav-menu {
+	transform: translateY(0) !important;
+	opacity: 1 !important;
+	visibility: visible !important;
+}
+
+/* Footer */
+.footer {
+	background: linear-gradient(135deg, #b71c1c, #d32f2f) !important;
+	color: white !important;
+	padding: 4rem 2rem 2rem !important;
+	margin-top: 0 !important;
+	position: relative !important;
+	overflow: hidden !important;
+}
+
+.footer::before {
+	content: '' !important;
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 0 !important;
+	background: linear-gradient(45deg, rgba(255,204,0,0.1), rgba(255,107,53,0.1)) !important;
+}
+
+.footer-content {
+	display: grid !important;
+	grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+	gap: 2rem !important;
+	max-width: 1200px !important;
+	margin: 0 auto !important;
+	position: relative !important;
+	z-index: 1 !important;
+}
+
+.footer-section {
+	padding: 0 !important;
+}
+
+.footer-section h3 {
+	color: #ffcc00 !important;
+	font-size: 1.3rem !important;
+	font-weight: 700 !important;
+	margin-bottom: 1rem !important;
+	position: relative !important;
+}
+
+.footer-section h3::after {
+	content: '' !important;
+	position: absolute !important;
+	bottom: -5px !important;
+	left: 0 !important;
+	width: 50px !important;
+	height: 3px !important;
+	background: linear-gradient(90deg, #ffcc00, #ff6b35) !important;
+	border-radius: 2px !important;
+}
+
+.footer-logo {
+	max-width: 150px !important;
+	height: auto !important;
+	margin-bottom: 1rem !important;
+	display: block !important;
+}
+
+.footer p {
+	margin: .5rem 0 !important;
+	line-height: 1.6 !important;
+	color: rgba(255,255,255,0.9) !important;
+}
+
+.footer p strong {
+	color: #ffcc00 !important;
+	font-weight: 600 !important;
+}
+
+.social-links {
+	display: flex !important;
+	gap: 1rem !important;
+	flex-wrap: wrap !important;
+	margin-top: 1rem !important;
+}
+
+.social-link {
+	display: inline-block !important;
+	padding: .8rem 1.2rem !important;
+	background: rgba(255,255,255,0.1) !important;
+	color: white !important;
+	text-decoration: none !important;
+	border-radius: 25px !important;
+	font-weight: 600 !important;
+	font-size: .9rem !important;
+	transition: all .3s ease !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+	text-transform: uppercase !important;
+	letter-spacing: .5px !important;
+}
+
+.social-link:hover {
+	background: rgba(255,255,255,0.2) !important;
+	transform: translateY(-2px) !important;
+	box-shadow: 0 6px 15px rgba(255,255,255,0.2) !important;
+	border-color: rgba(255,255,255,0.4) !important;
+}
+
+.social-link.whatsapp:hover {
+	background: linear-gradient(135deg, #25d366, #128c7e) !important;
+	border-color: #25d366 !important;
+}
+
+.social-link.facebook:hover {
+	background: linear-gradient(135deg, #1877f2, #42a5f5) !important;
+	border-color: #1877f2 !important;
+}
+
+.social-link.instagram:hover {
+	background: linear-gradient(135deg, #e4405f, #f56040, #ffdc80) !important;
+	border-color: #e4405f !important;
+}
+
+.social-link.tiktok:hover {
+	background: linear-gradient(135deg, #000000, #ff0050) !important;
+	border-color: #ff0050 !important;
+}
+
+/* Responsive footer */
+@media (max-width: 768px) {
+	.footer {
+		padding: 3rem 1rem 2rem !important;
+	}
+	
+	.footer-content {
+		grid-template-columns: 1fr !important;
+		gap: 2rem !important;
+	}
+	
+	.footer-section {
+		text-align: center !important;
+	}
+	
+	.social-links {
+		justify-content: center !important;
+	}
+	
+	.footer-logo {
+		max-width: 120px !important;
+	}
+}
+
+@media (max-width: 480px) {
+	.footer {
+		padding: 2rem 1rem 1.5rem !important;
+	}
+	
+	.footer-section h3 {
+		font-size: 1.1rem !important;
+	}
+	
+	.social-link {
+		padding: .6rem 1rem !important;
+		font-size: .8rem !important;
+	}
+	
+	.footer p {
+		font-size: .9rem !important;
+	}
+}
+
+/* Nuevos estilos para los botones del héroe */
+.hero-buttons {
+	display: flex !important;
+	gap: 1rem !important;
+	justify-content: center !important;
+	flex-wrap: wrap !important;
+}
+
+.btn-secondary {
+	background: rgba(255,255,255,0.1) !important;
+	color: white !important;
+	padding: 1rem 2rem !important;
+	border-radius: 30px !important;
+	text-decoration: none !important;
+	font-weight: 700 !important;
+	font-size: 1.1rem !important;
+	box-shadow: 0 8px 25px rgba(255,255,255,0.1) !important;
+	border: 2px solid rgba(255,255,255,0.3) !important;
+	text-transform: uppercase !important;
+	letter-spacing: 1px !important;
+	display: inline-block !important;
+	transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn-secondary:hover {
+	background: rgba(255,255,255,0.2) !important;
+	transform: translateY(-3px) scale(1.05) !important;
+	box-shadow: 0 12px 35px rgba(255,255,255,0.2) !important;
+	border-color: rgba(255,255,255,0.5) !important;
+	color: white !important;
+}
+
+/* Responsive para botones del hero */
+@media (max-width: 768px) {
+	.hero-buttons {
+		flex-direction: column !important;
+		align-items: center !important;
+	}
+	
+	.btn, .btn-secondary {
+		width: 100% !important;
+		max-width: 300px !important;
+		text-align: center !important;
+	}
+}
+
+/* Contacto */
+.contacto {
+	padding: 5rem 2rem !important;
+	background: #ffffff !important;
+	text-align: center !important;
+	position: relative !important;
+	overflow: hidden !important;
+}
+
+.contacto h2 {
+	margin-bottom: 3rem !important;
+	font-size: 2.5rem !important;
+	color: var(--primary-color) !important;
+	font-weight: 700 !important;
+	position: relative !important;
+	z-index: 1 !important;
+	background: linear-gradient(45deg, #b71c1c, #ff6b35) !important;
+	-webkit-background-clip: text !important;
+	background-clip: text !important;
+}
+
+.contacto h2::after {
+	content: '' !important;
+	position: absolute !important;
+	bottom: -10px !important;
+	left: 50% !important;
+	transform: translateX(-50%) !important;
+	width: 80px !important;
+	height: 4px !important;
+	background: linear-gradient(90deg, var(--primary-color), var(--accent-color)) !important;
+	border-radius: 2px !important;
+}
+
+/* Estilos limpios para el formulario de contacto de Jetpack */
+.wp-block-jetpack-contact-form {
+	max-width: 700px !important;
+	margin: 0 auto !important;
+	background: #ffffff !important;
+	border-radius: 20px !important;
+	box-shadow: 0 10px 40px rgba(0,0,0,0.1) !important;
+	padding: 3rem !important;
+	position: relative !important;
+	z-index: 1 !important;
+	border: 2px solid #e8e8e8 !important;
+	transition: all .3s ease !important;
+}
+
+.wp-block-jetpack-contact-form:hover {
+	box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+	border-color: rgba(183,28,28,0.2) !important;
+}
+
+.wp-block-jetpack-contact-form div {
+	margin-bottom: 2rem !important;
+}
+
+.wp-block-jetpack-contact-form label {
+	display: block !important;
+	margin-bottom: .8rem !important;
+	font-weight: 600 !important;
+	color: #333 !important;
+	font-size: 1.1rem !important;
+	letter-spacing: .5px !important;
+}
+
+.wp-block-jetpack-contact-form input[type="text"],
+.wp-block-jetpack-contact-form input[type="email"],
+.wp-block-jetpack-contact-form textarea {
+	width: 100% !important;
+	padding: 1rem 1.2rem !important;
+	border: 2px solid #ddd !important;
+	border-radius: 10px !important;
+	font-size: 1rem !important;
+	font-family: 'Poppins', sans-serif !important;
+	transition: all .3s ease !important;
+	box-sizing: border-box !important;
+	background: #fafafa !important;
+	color: #333 !important;
+}
+
+.wp-block-jetpack-contact-form input[type="text"]:focus,
+.wp-block-jetpack-contact-form input[type="email"]:focus,
+.wp-block-jetpack-contact-form textarea:focus {
+	border-color: #b71c1c !important;
+	box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.1) !important;
+	background: #ffffff !important;
+	outline: none !important;
+}
+
+.wp-block-jetpack-contact-form textarea {
+	min-height: 120px !important;
+	resize: vertical !important;
+	line-height: 1.5 !important;
+}
+
+/* Botón limpio y visible */
+.wp-block-jetpack-contact-form button,
+.wp-block-jetpack-contact-form .wp-block-jetpack-button,
+.wp-block-jetpack-contact-form input[type="submit"],
+.wp-block-jetpack-contact-form .jetpack-button,
+.wp-block-jetpack-contact-form button[type="submit"] {
+	background: linear-gradient(135deg, #b71c1c, #ff6b35) !important;
+	color: white !important;
+	border: none !important;
+	border-radius: 25px !important;
+	padding: 1rem 2.5rem !important;
+	font-size: 1.1rem !important;
+	font-weight: 600 !important;
+	font-family: 'Poppins', sans-serif !important;
+	text-transform: uppercase !important;
+	letter-spacing: .5px !important;
+	cursor: pointer !important;
+	transition: all .3s ease !important;
+	box-shadow: 0 4px 15px rgba(183, 28, 28, 0.3) !important;
+	min-width: 180px !important;
+	margin: 1rem auto 0 !important;
+	display: block !important;
+	position: relative !important;
+	text-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+}
+
+.wp-block-jetpack-contact-form button:hover,
+.wp-block-jetpack-contact-form .wp-block-jetpack-button:hover,
+.wp-block-jetpack-contact-form input[type="submit"]:hover,
+.wp-block-jetpack-contact-form .jetpack-button:hover,
+.wp-block-jetpack-contact-form button[type="submit"]:hover {
+	background: linear-gradient(135deg, #ff6b35, #b71c1c) !important;
+	transform: translateY(-2px) !important;
+	box-shadow: 0 8px 25px rgba(183, 28, 28, 0.4) !important;
+}
+
+.wp-block-jetpack-contact-form button:active,
+.wp-block-jetpack-contact-form .wp-block-jetpack-button:active,
+.wp-block-jetpack-contact-form input[type="submit"]:active,
+.wp-block-jetpack-contact-form .jetpack-button:active,
+.wp-block-jetpack-contact-form button[type="submit"]:active {
+	transform: translateY(0) !important;
+	box-shadow: 0 2px 8px rgba(183, 28, 28, 0.3) !important;
+}
+
+/* Responsive para contacto mejorado */
+@media (max-width: 768px) {
+	.contacto {
+		padding: 3rem 1rem !important;
+	}
+	
+	.contacto h2 {
+		font-size: 2rem !important;
+		margin-bottom: 2rem !important;
+	}
+	
+	.wp-block-jetpack-contact-form {
+		padding: 2rem 1.5rem !important;
+		margin: 0 .5rem !important;
+		border-radius: 20px !important;
+	}
+	
+	.wp-block-jetpack-contact-form div {
+		margin-bottom: 1.5rem !important;
+	}
+	
+	.wp-block-jetpack-contact-form input[type="text"],
+	  .wp-block-jetpack-contact-form input[type="email"],
+	  .wp-block-jetpack-contact-form textarea {
+		padding: 1rem !important;
+		font-size: 1rem !important;
+		border-radius: 12px !important;
+	}
+	
+	.wp-block-jetpack-contact-form button,
+	  .wp-block-jetpack-contact-form .wp-block-jetpack-button,
+	  .wp-block-jetpack-contact-form input[type="submit"],
+	  .wp-block-jetpack-contact-form .jetpack-button,
+	  .wp-block-jetpack-contact-form button[type="submit"] {
+		padding: 1rem 2rem !important;
+		font-size: 1.1rem !important;
+		min-width: 180px !important;
+	}
+}
+
+@media (max-width: 480px) {
+	.contacto h2 {
+		font-size: 1.8rem !important;
+	}
+	
+	.wp-block-jetpack-contact-form {
+		padding: 1.5rem 1rem !important;
+		border-radius: 15px !important;
+	}
+	
+	.wp-block-jetpack-contact-form label {
+		font-size: 1rem !important;
+	}
+	
+	.wp-block-jetpack-contact-form input[type="text"],
+	  .wp-block-jetpack-contact-form input[type="email"],
+	  .wp-block-jetpack-contact-form textarea {
+		padding: .9rem !important;
+		font-size: .95rem !important;
+	}
+	
+	.wp-block-jetpack-contact-form button,
+	  .wp-block-jetpack-contact-form .wp-block-jetpack-button,
+	  .wp-block-jetpack-contact-form input[type="submit"],
+	  .wp-block-jetpack-contact-form .jetpack-button,
+	  .wp-block-jetpack-contact-form button[type="submit"] {
+		padding: .9rem 1.5rem !important;
+		font-size: 1rem !important;
+		min-width: 160px !important;
+	}
+}
+
+/* Estilos específicos para laptop/desktop */
+@media (min-width: 769px) {
+	.wp-block-jetpack-contact-form {
+		max-width: 800px !important;
+		padding: 3.5rem !important;
+	}
+	
+	.wp-block-jetpack-contact-form input[type="text"],
+	  .wp-block-jetpack-contact-form input[type="email"],
+	  .wp-block-jetpack-contact-form textarea {
+		font-size: 1.1rem !important;
+		padding: 1.4rem 1.7rem !important;
+	}
+	
+	.wp-block-jetpack-contact-form button,
+	  .wp-block-jetpack-contact-form .wp-block-jetpack-button,
+	  .wp-block-jetpack-contact-form input[type="submit"],
+	  .wp-block-jetpack-contact-form .jetpack-button,
+	  .wp-block-jetpack-contact-form button[type="submit"] {
+		font-size: 1.3rem !important;
+		padding: 1.4rem 3.5rem !important;
+		min-width: 220px !important;
+	}
+}
+
+/* ESTILOS ULTRA-AGRESIVOS PARA HEADER EN WORDPRESS - SOLUCIÓN FINAL */
+/* Header base - Forzar estructura */
+.header {
+	position: relative !important;
+	z-index: 9999 !important;
+	display: flex !important;
+	justify-content: space-between !important;
+	align-items: center !important;
+	background: linear-gradient(135deg, #b71c1c, #d32f2f) !important;
+	color: white !important;
+	padding: 1.5rem 2rem !important;
+/* Más padding vertical */
+	width: 100% !important;
+	box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+	border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+	margin-bottom: 0 !important;
+	top: auto !important;
+	left: auto !important;
+	right: auto !important;
+	bottom: auto !important;
+	transform: none !important;
+	box-sizing: border-box !important;
+	min-height: 70px !important;
+/* Altura mínima */
+}
+
+.header.scrolled {
+	padding: .8rem 2rem !important;
+	background: rgba(183, 28, 28, 0.95) !important;
+}
+
+/* Logo - Forzar apariencia */
+.header .logo {
+	font-weight: 800 !important;
+	font-size: 1.8rem !important;
+	letter-spacing: 1px !important;
+	text-shadow: 2px 2px 4px rgba(0,0,0,0.3) !important;
+	background: linear-gradient(45deg, white, #ffebee) !important;
+	-webkit-background-clip: text !important;
+	background-clip: text !important;
+	color: white !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	flex: 1 !important;
+	text-decoration: none !important;
+	display: block !important;
+	white-space: nowrap !important;
+}
+
+.header .logo:hover {
+	transform: scale(1.05) !important;
+}
+
+/* Navegación desktop */
+.header nav {
+	display: flex !important;
+	align-items: center !important;
+	gap: 2rem !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	position: static !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	transform: none !important;
+	opacity: 1 !important;
+	visibility: visible !important;
+	border-radius: 0 !important;
+	z-index: auto !important;
+}
+
+.header nav a {
+	color: white !important;
+	text-decoration: none !important;
+	font-weight: 500 !important;
+	font-size: 1rem !important;
+	padding: .5rem 1rem !important;
+	border-radius: 20px !important;
+	border: 1px solid transparent !important;
+	transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+	display: block !important;
+	white-space: nowrap !important;
+	background: transparent !important;
+	margin: 0 .5rem !important;
+/* Espacio horizontal entre enlaces */
+}
+
+.header nav a:hover {
+	background: rgba(255,255,255,0.1) !important;
+	transform: translateY(-2px) !important;
+	border-color: rgba(255,255,255,0.2) !important;
+	box-shadow: 0 8px 25px rgba(255,255,255,0.1) !important;
+	color: white !important;
+}
+
+/* Checkbox oculto para menú hamburguesa */
+.nav-toggle-checkbox {
+	display: none !important;
+	position: absolute !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+	visibility: hidden !important;
+	left: -9999px !important;
+}
+
+/* Botón hamburguesa */
+.nav-toggle-label {
+	display: none !important;
+	flex-direction: column !important;
+	cursor: pointer !important;
+	gap: 4px !important;
+	padding: .5rem !important;
+	border-radius: 20px !important;
+	transition: all .3s ease !important;
+	background: rgba(255,255,255,0.1) !important;
+	border: 1px solid rgba(255,255,255,0.2) !important;
+	position: relative !important;
+	z-index: 1002 !important;
+	width: auto !important;
+	height: auto !important;
+	margin: 0 !important;
+}
+
+.nav-toggle-label:hover {
+	background: rgba(255,255,255,0.2) !important;
+	transform: scale(1.05) !important;
+}
+
+.nav-toggle-label span {
+	width: 25px !important;
+	height: 3px !important;
+	background: white !important;
+	transition: all .3s ease !important;
+	border-radius: 2px !important;
+	transform-origin: center !important;
+	display: block !important;
+	position: relative !important;
+}
+
+/* Animación del botón hamburguesa */
+.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(1) {
+	transform: rotate(45deg) translate(5px, 5px) !important;
+}
+
+.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(2) {
+	opacity: 0 !important;
+}
+
+.nav-toggle-checkbox:checked ~ .nav-toggle-label span:nth-child(3) {
+	transform: rotate(-45deg) translate(7px, -6px) !important;
+}
+
+/* RESPONSIVE ULTRA-AGRESIVO PARA WORDPRESS */
+/* Móvil - Forzar menú hamburguesa */
+@media screen and (max-width: 768px) {
+	.header {
+		position: relative !important;
+		z-index: 9999 !important;
+		display: flex !important;
+		justify-content: space-between !important;
+		align-items: center !important;
+		padding: 1.5rem !important;
+	/* Más padding vertical y horizontal */
+		width: 100% !important;
+		box-sizing: border-box !important;
+		background: linear-gradient(135deg, #b71c1c, #d32f2f) !important;
+		box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+		min-height: 70px !important;
+	/* Altura mínima para más espacio */
+	}
+	
+	.header .logo {
+		font-size: 1.4rem !important;
+		font-weight: 800 !important;
+		flex: 1 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		text-align: left !important;
+		white-space: nowrap !important;
+		overflow: hidden !important;
+		text-overflow: ellipsis !important;
+		max-width: calc(100% - 80px) !important;
+	/* Más espacio para el botón */
+	}
+	
+	/* Ocultar navegación desktop */
+	.header nav {
+		display: none !important;
+		position: absolute !important;
+		top: 100% !important;
+		left: 0 !important;
+		right: 0 !important;
+		width: 100% !important;
+		background: rgba(183, 28, 28, 0.98) !important;
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+		visibility: hidden !important;
+		transition: all .4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+		z-index: 1001 !important;
+		border-radius: 0 0 15px 15px !important;
+		box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+		padding: 1rem 0 !important;
+		margin: 0 !important;
+		flex-direction: column !important;
+		gap: 0 !important;
+	}
+	
+	/* Mostrar botón hamburguesa */
+	.nav-toggle-label {
+		display: flex !important;
+		position: relative !important;
+		z-index: 1002 !important;
+		order: 3 !important;
+		margin: 0 0 0 1rem !important;
+	/* Margen izquierdo para separación */
+		flex-shrink: 0 !important;
+	/* No se encoja */
+	}
+	
+	/* Mostrar menú cuando checkbox está checked */
+	.nav-toggle-checkbox:checked ~ nav {
+		display: flex !important;
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	.header nav a {
+		display: block !important;
+		color: white !important;
+		text-decoration: none !important;
+		padding: 1rem 2rem !important;
+	/* Más padding para móvil */
+		border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+		background: rgba(255,255,255,0.05) !important;
+		transition: all .3s ease !important;
+		font-weight: 500 !important;
+		text-align: center !important;
+		margin: 0 !important;
+		border-radius: 0 !important;
+		font-size: 1rem !important;
+	}
+	
+	.header nav a:last-child {
+		border-bottom: none !important;
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.15) !important;
+		transform: translateY(-1px) !important;
+		color: white !important;
+		border-color: rgba(255,255,255,0.3) !important;
+	}
+}
+
+/* Desktop - Forzar navegación horizontal */
+@media screen and (min-width: 769px) {
+	.nav-toggle-label {
+		display: none !important;
+	}
+	
+	.header nav {
+		display: flex !important;
+		flex-direction: row !important;
+		position: static !important;
+		background: transparent !important;
+		box-shadow: none !important;
+		transform: none !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+		padding: 0 !important;
+		margin: 0 !important;
+		gap: 2rem !important;
+		border-radius: 0 !important;
+		z-index: auto !important;
+		width: auto !important;
+		height: auto !important;
+	}
+	
+	.header nav a {
+		background: transparent !important;
+		border: 1px solid transparent !important;
+		padding: .75rem 1.5rem !important;
+	/* Más padding para mejor separación */
+		border-radius: 20px !important;
+		border-bottom: none !important;
+		margin: 0 .5rem !important;
+	/* Agregar margen horizontal */
+		display: block !important;
+		font-size: 1rem !important;
+		letter-spacing: .5px !important;
+	/* Espaciado entre letras */
+		font-weight: 500 !important;
+		white-space: nowrap !important;
+		min-width: 80px !important;
+	/* Ancho mínimo */
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.1) !important;
+		border-color: rgba(255,255,255,0.2) !important;
+		transform: translateY(-2px) !important;
+		box-shadow: 0 8px 25px rgba(255,255,255,0.1) !important;
+	}
+}
+
+/* ESTILOS DE EMERGENCIA PARA WORDPRESS - SELECTORES ULTRA-ESPECÍFICOS */
+@media only screen and (max-width: 768px) {
+	.header {
+		position: relative !important;
+		z-index: 9999 !important;
+		display: flex !important;
+		justify-content: space-between !important;
+		align-items: center !important;
+		padding: 1.5rem !important;
+	/* Más padding */
+		width: 100% !important;
+		background: linear-gradient(135deg, #b71c1c, #d32f2f) !important;
+		box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+		border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+		min-height: 70px !important;
+	/* Altura mínima */
+	}
+	
+	.header .logo {
+		font-size: 1.4rem !important;
+		font-weight: 800 !important;
+		flex: 1 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		color: white !important;
+		text-decoration: none !important;
+		max-width: calc(100% - 80px) !important;
+	/* Espacio para el botón */
+	}
+	
+	.nav-toggle-label {
+		display: flex !important;
+		cursor: pointer !important;
+		padding: .5rem !important;
+		background: rgba(255,255,255,0.1) !important;
+		border: 1px solid rgba(255,255,255,0.2) !important;
+		border-radius: 20px !important;
+		position: relative !important;
+		z-index: 1002 !important;
+		margin: 0 0 0 1rem !important;
+	/* Margen izquierdo */
+		flex-shrink: 0 !important;
+	/* No se encoja */
+	}
+	
+	.header nav {
+		display: none !important;
+		position: absolute !important;
+		top: 100% !important;
+		left: 0 !important;
+		right: 0 !important;
+		width: 100% !important;
+		background: rgba(183, 28, 28, 0.98) !important;
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+		visibility: hidden !important;
+		transition: all .4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+		z-index: 1001 !important;
+		border-radius: 0 0 15px 15px !important;
+		box-shadow: 0 8px 25px rgba(0,0,0,0.3) !important;
+		padding: 1rem 0 !important;
+	}
+	
+	.nav-toggle-checkbox:checked ~ nav {
+		display: flex !important;
+		flex-direction: column !important;
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	.header nav a {
+		display: block !important;
+		padding: 1rem 2rem !important;
+		color: white !important;
+		text-decoration: none !important;
+		text-align: center !important;
+		border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+		background: rgba(255,255,255,0.05) !important;
+		transition: all .3s ease !important;
+	}
+	
+	.header nav a:last-child {
+		border-bottom: none !important;
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.15) !important;
+		color: white !important;
+	}
+}
+
+@media only screen and (min-width: 769px) {
+	.nav-toggle-label {
+		display: none !important;
+	}
+	
+	.header nav {
+		display: flex !important;
+		flex-direction: row !important;
+		position: static !important;
+		background: transparent !important;
+		transform: none !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	.header nav a {
+		background: transparent !important;
+		border: 1px solid transparent !important;
+		padding: .75rem 1.5rem !important;
+	/* Más padding para mejor separación */
+		border-radius: 20px !important;
+		margin: 0 .5rem !important;
+	/* Agregar margen horizontal */
+		letter-spacing: .5px !important;
+	/* Espaciado entre letras */
+		font-weight: 500 !important;
+		white-space: nowrap !important;
+		min-width: 80px !important;
+	/* Ancho mínimo */
+	}
+	
+	.header nav a:hover {
+		background: rgba(255,255,255,0.1) !important;
+		border-color: rgba(255,255,255,0.2) !important;
+	}
+}
+
+/* REGLA FINAL ULTRA-AGRESIVA PARA WORDPRESS */
+.header nav a,
+.header nav a:link,
+.header nav a:visited,
+.header nav a:hover,
+.header nav a:active,
+.header nav a:focus,
+#nav-menu a,
+#nav-menu a:link,
+#nav-menu a:visited,
+#nav-menu a:hover,
+#nav-menu a:active,
+#nav-menu a:focus {
+	padding: .75rem 1.5rem !important;
+	margin: 0 .5rem !important;
+	letter-spacing: .5px !important;
+	font-weight: 500 !important;
+	font-size: 1rem !important;
+	font-family: 'Poppins', 'Arial', sans-serif !important;
+	text-decoration: none !important;
+	color: white !important;
+	background: transparent !important;
+	border: 1px solid transparent !important;
+	border-radius: 20px !important;
+	display: inline-block !important;
+	white-space: nowrap !important;
+	min-width: 80px !important;
+	text-align: center !important;
+	vertical-align: middle !important;
+	box-sizing: border-box !important;
+	line-height: 1.4 !important;
+}
+
+/* FORZAR ESPACIADO EN TODOS LOS ENLACES DE NAVEGACIÓN */
+nav a,
+.header nav a,
+div.header nav a,
+#nav-menu a,
+#nav-menu a:link,
+#nav-menu a:visited,
+#nav-menu a:hover,
+#nav-menu a:active,
+#nav-menu a:focus {
+	letter-spacing: .5px !important;
+	word-spacing: 2px !important;
+	padding-left: 1.5rem !important;
+	padding-right: 1.5rem !important;
+	margin-left: .5rem !important;
+	margin-right: .5rem !important;
+	font-size: 1rem !important;
+	font-weight: 500 !important;
+	min-width: 80px !important;
+	display: inline-block !important;
+	text-align: center !important;
+}
+
+
+
+/* ESTILOS ULTRA-AGRESIVOS CON SELECTORES DE WORDPRESS */
+.wp-block-navigation a,
+.wp-block-navigation-link a,
+.menu-item a,
+.menu-item-link,
+.nav-menu a {
+	letter-spacing: 1px !important;
+	padding: 1rem 2rem !important;
+	margin: 0 1rem !important;
+	font-size: 1.1rem !important;
+	font-weight: 600 !important;
+	min-width: 100px !important;
+	display: inline-block !important;
+}
+
+/* =================================================================
+   RESPONSIVE MEJORADO PARA CHE CARRETA - SOLUCIÓN FINAL
+   ================================================================= */
+
+/* Desktop Mejorado - Espaciado correcto entre enlaces */
+@media (min-width: 1025px) {
+	.header {
+		padding: 1.5rem 2.5rem !important;
+	}
+	
+	.header nav {
+		gap: 2rem !important;
+		flex-wrap: nowrap !important;
+	}
+	
+	.header nav a {
+		padding: 0.7rem 1.4rem !important;
+		margin: 0.2rem 0.4rem !important;
+		font-size: 1rem !important;
+		min-width: auto !important;
+		flex-shrink: 0 !important;
+	}
+	
+	.nav-toggle-label {
+		display: none !important;
+	}
+}
+
+/* Tablet Portrait (768px - 1024px) - Menú compacto */
+@media (min-width: 769px) and (max-width: 1024px) {
+	.header {
+		padding: 1.2rem 2rem !important;
+	}
+	
+	.header .logo {
+		font-size: 1.7rem !important;
+	}
+	
+	.header nav {
+		gap: 1rem !important;
+		flex-wrap: wrap !important;
+	}
+	
+	.header nav a {
+		font-size: 0.9rem !important;
+		padding: 0.5rem 1rem !important;
+		margin: 0.2rem 0.2rem !important;
+	}
+	
+	.nav-toggle-label {
+		display: none !important;
+	}
+}
+
+/* Mobile Large y Tablet Small (481px - 768px) - Menú hamburguesa */
+@media (min-width: 481px) and (max-width: 768px) {
+	.header {
+		padding: 1rem 1.5rem !important;
+	}
+	
+	.header .logo {
+		font-size: 1.5rem !important;
+	}
+	
+	.nav-toggle-label {
+		display: flex !important;
+	}
+	
+	.header nav {
+		gap: 0.8rem !important;
+	}
+}
+
+/* Mobile Small (320px - 480px) - Menú hamburguesa compacto */
+@media (max-width: 480px) {
+	.header {
+		padding: 0.8rem 1rem !important;
+	}
+	
+	.header .logo {
+		font-size: 1.3rem !important;
+	}
+	
+	.header nav {
+		padding: 1rem !important;
+		gap: 0.6rem !important;
+	}
+	
+	.header nav a {
+		padding: 0.8rem 1rem !important;
+		font-size: 1rem !important;
+		margin: 0.2rem 0 !important;
+	}
+	
+	.nav-toggle-label {
+		width: 40px !important;
+		height: 40px !important;
+		padding: 0.6rem !important;
+	}
+	
+	.nav-toggle-label span {
+		width: 24px !important;
+	}
+}
+
+/* =================================================================
+   SOLUCION ULTRA-AGRESIVA PARA WORDPRESS - CHE CARRETA
+   ================================================================= */
+
+/* Reset completo para WordPress - Forzar todos los estilos */
+body .header,
+html .header,
+div.header,
+header.header,
+.site-header .header,
+#masthead .header {
+	display: flex !important;
+	justify-content: space-between !important;
+	align-items: center !important;
+	background: linear-gradient(135deg, #b71c1c, #d32f2f) !important;
+	color: white !important;
+	padding: 1.5rem 2rem !important;
+	position: relative !important;
+	width: 100% !important;
+	z-index: 9999 !important;
+	box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+	border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+	margin: 0 !important;
+	min-height: 70px !important;
+	box-sizing: border-box !important;
+}
+
+/* Logo ultra-específico para WordPress */
+body .header .logo,
+html .header .logo,
+div.header .logo,
+header.header .logo,
+.site-header .header .logo,
+#masthead .header .logo {
+	font-weight: 800 !important;
+	font-size: 1.8rem !important;
+	letter-spacing: 1px !important;
+	text-shadow: 2px 2px 4px rgba(0,0,0,0.3) !important;
+	color: white !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	text-decoration: none !important;
+	background: none !important;
+	border: none !important;
+	flex-shrink: 0 !important;
+}
+
+/* Navegación ultra-específica para WordPress */
+body .header nav,
+html .header nav,
+div.header nav,
+header.header nav,
+.site-header .header nav,
+#masthead .header nav {
+	display: flex !important;
+	align-items: center !important;
+	gap: 1.5rem !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	position: relative !important;
+	flex-wrap: wrap !important;
+	list-style: none !important;
+	background: none !important;
+	border: none !important;
+	box-shadow: none !important;
+}
+
+/* Enlaces de navegación ultra-específicos para WordPress */
+body .header nav a,
+html .header nav a,
+div.header nav a,
+header.header nav a,
+.site-header .header nav a,
+#masthead .header nav a,
+body .header nav a:link,
+body .header nav a:visited,
+body .header nav a:hover,
+body .header nav a:active {
+	color: white !important;
+	text-decoration: none !important;
+	font-weight: 500 !important;
+	font-size: 0.95rem !important;
+	padding: 0.6rem 1.2rem !important;
+	border-radius: 25px !important;
+	border: 1px solid transparent !important;
+	transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+	display: inline-block !important;
+	white-space: nowrap !important;
+	margin: 0.2rem 0.3rem !important;
+	min-width: auto !important;
+	text-align: center !important;
+	background: none !important;
+	box-shadow: none !important;
+	outline: none !important;
+	font-family: inherit !important;
+}
+
+/* Hover ultra-específico para WordPress */
+body .header nav a:hover,
+html .header nav a:hover,
+div.header nav a:hover,
+header.header nav a:hover,
+.site-header .header nav a:hover,
+#masthead .header nav a:hover {
+	background: rgba(255,255,255,0.1) !important;
+	transform: translateY(-2px) !important;
+	border-color: rgba(255,255,255,0.2) !important;
+	box-shadow: 0 8px 25px rgba(255,255,255,0.1) !important;
+	color: white !important;
+	text-decoration: none !important;
+}
+
+/* Checkbox oculto ultra-específico para WordPress */
+body .nav-toggle-checkbox,
+html .nav-toggle-checkbox,
+div .nav-toggle-checkbox,
+header .nav-toggle-checkbox {
+	display: none !important;
+	position: absolute !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+	visibility: hidden !important;
+}
+
+/* Botón hamburguesa ultra-específico para WordPress */
+body .nav-toggle-label,
+html .nav-toggle-label,
+div .nav-toggle-label,
+header .nav-toggle-label {
+	display: none !important;
+	flex-direction: column !important;
+	cursor: pointer !important;
+	gap: 5px !important;
+	padding: 0.8rem !important;
+	border-radius: 10px !important;
+	transition: all .3s ease !important;
+	background: rgba(255,255,255,0.15) !important;
+	border: 2px solid rgba(255,255,255,0.3) !important;
+	position: relative !important;
+	z-index: 10001 !important;
+	width: 45px !important;
+	height: 45px !important;
+	justify-content: center !important;
+	align-items: center !important;
+	margin: 0 !important;
+	text-decoration: none !important;
+	box-shadow: none !important;
+}
+
+/* Líneas del hamburguesa ultra-específicas para WordPress */
+body .nav-toggle-label span,
+html .nav-toggle-label span,
+div .nav-toggle-label span,
+header .nav-toggle-label span {
+	width: 28px !important;
+	height: 3px !important;
+	background: white !important;
+	transition: all .3s ease !important;
+	border-radius: 3px !important;
+	transform-origin: center !important;
+	display: block !important;
+	position: relative !important;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+/* RESPONSIVE ULTRA-ESPECÍFICO PARA WORDPRESS */
+
+/* Desktop - WordPress Override */
+@media screen and (min-width: 1025px) {
+	body .header,
+	html .header,
+	div.header,
+	header.header {
+		padding: 1.5rem 2.5rem !important;
+		flex-direction: row !important;
+		flex-wrap: nowrap !important;
+	}
+	
+	body .header nav,
+	html .header nav,
+	div.header nav,
+	header.header nav {
+		position: static !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+		transform: none !important;
+		flex-direction: row !important;
+		gap: 2rem !important;
+		background: none !important;
+		box-shadow: none !important;
+		border: none !important;
+		padding: 0 !important;
+		width: auto !important;
+		height: auto !important;
+	}
+	
+	body .nav-toggle-label,
+	html .nav-toggle-label,
+	div .nav-toggle-label,
+	header .nav-toggle-label {
+		display: none !important;
+	}
+}
+
+/* Mobile - WordPress Override */
+@media screen and (max-width: 768px) {
+	body .header,
+	html .header,
+	div.header,
+	header.header {
+		flex-direction: row !important;
+		justify-content: space-between !important;
+		align-items: center !important;
+		padding: 1rem 1.5rem !important;
+		min-height: 60px !important;
+	}
+	
+	body .header .logo,
+	html .header .logo,
+	div.header .logo,
+	header.header .logo {
+		margin: 0 !important;
+		font-size: 1.6rem !important;
+		flex-shrink: 0 !important;
+	}
+	
+	body .nav-toggle-label,
+	html .nav-toggle-label,
+	div .nav-toggle-label,
+	header .nav-toggle-label {
+		display: flex !important;
+		z-index: 10001 !important;
+		position: relative !important;
+		margin-left: auto !important;
+	}
+	
+	body .header nav,
+	html .header nav,
+	div.header nav,
+	header.header nav {
+		position: absolute !important;
+		top: 100% !important;
+		left: 0 !important;
+		width: 100% !important;
+		background: rgba(183, 28, 28, 0.98) !important;
+		box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
+		padding: 1.5rem !important;
+		border-radius: 0 0 20px 20px !important;
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+		visibility: hidden !important;
+		transition: all .4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+		z-index: 10000 !important;
+		border: 1px solid rgba(255,255,255,0.2) !important;
+		border-top: none !important;
+		margin-top: 0 !important;
+		backdrop-filter: blur(10px) !important;
+		flex-direction: column !important;
+		gap: 0.8rem !important;
+	}
+	
+	body .nav-toggle-checkbox:checked ~ nav,
+	html .nav-toggle-checkbox:checked ~ nav,
+	div .nav-toggle-checkbox:checked ~ nav,
+	header .nav-toggle-checkbox:checked ~ nav {
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	body .header nav a,
+	html .header nav a,
+	div.header nav a,
+	header.header nav a {
+		padding: 1rem 1.5rem !important;
+		font-size: 1.1rem !important;
+		border-radius: 15px !important;
+		text-align: center !important;
+		margin: 0.3rem 0 !important;
+		border: 2px solid rgba(255,255,255,0.2) !important;
+		background: rgba(255,255,255,0.1) !important;
+		font-weight: 600 !important;
+		letter-spacing: 0.5px !important;
+		display: block !important;
+		width: 100% !important;
+		box-sizing: border-box !important;
+	}
+	
+	body .header nav a:hover,
+	html .header nav a:hover,
+	div.header nav a:hover,
+	header.header nav a:hover {
+		background: rgba(255,255,255,0.2) !important;
+		transform: translateY(-1px) !important;
+		border-color: rgba(255,255,255,0.3) !important;
+	}
+}
+
+/* FUNCIONALIDAD ADICIONAL SIN JAVASCRIPT */
+
+/* Auto-cerrar menú al hacer clic en enlace - Solo CSS */
+.header nav a:focus {
+	outline: 2px solid rgba(255,255,255,0.5) !important;
+	outline-offset: 2px !important;
+}
+
+/* Mejorar la transición del menú hamburguesa */
+.nav-toggle-checkbox:checked ~ .nav-toggle-label {
+	background: rgba(255,255,255,0.25) !important;
+	transform: scale(1.05) !important;
+}
+
+/* Efecto visual cuando el menú está abierto */
+.nav-toggle-checkbox:checked ~ nav {
+	animation: slideDown 0.4s ease-out !important;
+}
+
+@keyframes slideDown {
+	0% {
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+	}
+	100% {
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+	}
+}
+
+/* Scroll suave nativo */
+html {
+	scroll-behavior: smooth !important;
+}
+
+/* Mejorar la accesibilidad */
+.nav-toggle-label:focus {
+	outline: 2px solid rgba(255,255,255,0.7) !important;
+	outline-offset: 3px !important;
+}
+
+/* Estilos para cuando el menú está cerrado */
+@media (max-width: 768px) {
+	.header nav a {
+		transition: all 0.3s ease, transform 0.3s ease !important;
+	}
+	
+	/* Efecto de rebote suave en hover */
+	.header nav a:hover {
+		animation: bounceHover 0.3s ease !important;
+	}
+	
+	@keyframes bounceHover {
+		0% { transform: translateY(0) !important; }
+		50% { transform: translateY(-3px) !important; }
+		100% { transform: translateY(-1px) !important; }
+	}
+}
+
+/* ===================================================================
+   SOLUCION DEFINITIVA PARA WORDPRESS - FUERZA MAXIMA
+   =================================================================== */
+
+/* RESET COMPLETO PARA EL HEADER */
+.header {
+	display: flex !important;
+	justify-content: space-between !important;
+	align-items: center !important;
+	background: linear-gradient(135deg, #b71c1c, #d32f2f) !important;
+	color: white !important;
+	padding: 1rem 2rem !important;
+	position: relative !important;
+	width: 100% !important;
+	z-index: 9999 !important;
+	box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+	margin: 0 !important;
+	min-height: 70px !important;
+	box-sizing: border-box !important;
+}
+
+/* LOGO FORZADO */
+.header .logo {
+	font-weight: 800 !important;
+	font-size: 1.8rem !important;
+	color: white !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	flex-shrink: 0 !important;
+}
+
+/* NAVEGACION FORZADA */
+.header nav {
+	display: flex !important;
+	align-items: center !important;
+	gap: 1.5rem !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	list-style: none !important;
+	background: none !important;
+	border: none !important;
+}
+
+/* ENLACES CON ESPACIADO FORZADO */
+.header nav a {
+	color: white !important;
+	text-decoration: none !important;
+	font-weight: 500 !important;
+	font-size: 1rem !important;
+	padding: 0.8rem 1.5rem !important;
+	border-radius: 25px !important;
+	border: 1px solid transparent !important;
+	transition: all .3s ease !important;
+	display: inline-block !important;
+	white-space: nowrap !important;
+	margin: 0 0.5rem !important;
+	background: rgba(255,255,255,0.1) !important;
+	min-width: auto !important;
+	text-align: center !important;
+}
+
+.header nav a:hover {
+	background: rgba(255,255,255,0.2) !important;
+	transform: translateY(-2px) !important;
+	border-color: rgba(255,255,255,0.3) !important;
+	box-shadow: 0 8px 25px rgba(255,255,255,0.1) !important;
+	color: white !important;
+}
+
+/* CHECKBOX INVISIBLE */
+.nav-toggle-checkbox {
+	display: none !important;
+	position: absolute !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+}
+
+/* BOTON HAMBURGUESA */
+.nav-toggle-label {
+	display: none !important;
+	flex-direction: column !important;
+	cursor: pointer !important;
+	gap: 4px !important;
+	padding: 0.8rem !important;
+	border-radius: 8px !important;
+	background: rgba(255,255,255,0.1) !important;
+	border: 2px solid rgba(255,255,255,0.2) !important;
+	width: 50px !important;
+	height: 50px !important;
+	justify-content: center !important;
+	align-items: center !important;
+}
+
+.nav-toggle-label span {
+	width: 25px !important;
+	height: 3px !important;
+	background: white !important;
+	transition: all .3s ease !important;
+	border-radius: 2px !important;
+	display: block !important;
+}
+
+/* RESPONSIVE DEFINITIVO */
+@media screen and (max-width: 768px) {
+	.header {
+		flex-direction: row !important;
+		justify-content: space-between !important;
+		align-items: center !important;
+		padding: 1rem 1.5rem !important;
+	}
+	
+	.nav-toggle-label {
+		display: flex !important;
+		z-index: 10001 !important;
+	}
+	
+	.header nav {
+		position: absolute !important;
+		top: 100% !important;
+		left: 0 !important;
+		width: 100% !important;
+		background: rgba(183, 28, 28, 0.98) !important;
+		flex-direction: column !important;
+		gap: 0.5rem !important;
+		padding: 1.5rem !important;
+		border-radius: 0 0 15px 15px !important;
+		transform: translateY(-120%) !important;
+		opacity: 0 !important;
+		visibility: hidden !important;
+		transition: all .4s ease !important;
+		z-index: 10000 !important;
+		box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
+	}
+	
+	#nav-toggle:checked ~ .header nav {
+		transform: translateY(0) !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+	
+	.header nav a {
+		width: 100% !important;
+		padding: 1rem 1.5rem !important;
+		margin: 0.3rem 0 !important;
+		text-align: center !important;
+		border: 1px solid rgba(255,255,255,0.2) !important;
+		background: rgba(255,255,255,0.1) !important;
+		border-radius: 10px !important;
+	}
+}
+
+/* ANIMACIONES DEL BOTON HAMBURGUESA - DEFINITIVO */
+#nav-toggle:checked ~ .header .nav-toggle-label span:nth-child(1) {
+	transform: rotate(45deg) translate(5px, 5px) !important;
+}
+
+#nav-toggle:checked ~ .header .nav-toggle-label span:nth-child(2) {
+	opacity: 0 !important;
+}
+
+#nav-toggle:checked ~ .header .nav-toggle-label span:nth-child(3) {
+	transform: rotate(-45deg) translate(7px, -6px) !important;
+}
+
+/* REGLAS DESKTOP FORZADAS - DEFINITIVO */
+@media screen and (min-width: 769px) {
+	.nav-toggle-label {
+		display: none !important;
+	}
+	
+	.header nav {
+		position: static !important;
+		transform: none !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+		flex-direction: row !important;
+		background: none !important;
+		box-shadow: none !important;
+		padding: 0 !important;
+		width: auto !important;
+	}
+	
+	.header nav a {
+		width: auto !important;
+		margin: 0 0.5rem !important;
+		padding: 0.8rem 1.5rem !important;
+		background: rgba(255,255,255,0.1) !important;
+	}
+}
