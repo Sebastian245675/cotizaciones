@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 import { MIRG_LOGO_BASE64 } from '../assets/mirg-logo-base64';
 import { MIRG_DECORATIVE_BASE64 } from '../assets/mirg-decorative-base64';
@@ -352,10 +352,10 @@ const formatPriceString = (price: string): string => {
   
   if (isNaN(num)) return price;
   
-  // Formatear manualmente con comas mexicanas
+  // Formatear manualmente con comas mexicanas y agregar símbolo de dinero
   const parts = num.toFixed(2).split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const result = `${integerPart}.${parts[1]}`;
+  const result = `$${integerPart}.${parts[1]}`;
   console.log('formatPriceString result:', result);
   return result;
 };
@@ -440,7 +440,8 @@ export const useQuoteExport = () => {
    */
   const exportToPDF = async (
     submission: QuoteSubmission, 
-    companyInfo: CompanyInfo = defaultCompanyInfo
+    companyInfo: CompanyInfo = defaultCompanyInfo,
+    customFAQs?: Array<{ id: string; question: string; answer: string }>
   ): Promise<void> => {
     if (!submission?.id) {
       throw new Error('Invalid submission data: Missing required ID');
@@ -493,12 +494,14 @@ export const useQuoteExport = () => {
       doc.setFontSize(28);
       doc.setFont('helvetica', 'bold');
       // Centrar el texto MIRG
-      const companyTitle = companyInfo.name.split(' - ')[0] || companyInfo.name; // Tomar solo la primera parte antes del gui�n
+      const companyTitle = companyInfo.name.split(' - ')[0] || companyInfo.name; // Tomar solo la primera parte antes del guión
       const textWidth = doc.getTextWidth(companyTitle);
       const companyCenterX = (pageWidth - textWidth) / 2;
       doc.text(companyTitle, companyCenterX, 35);
       
-      // Línea decorativa bajo el nombre      doc.setLineWidth(1); // Reducido de 3 a 1 para más delgado
+      // Línea decorativa bajo el nombre
+      doc.setDrawColor(30, 79, 160);
+      doc.setLineWidth(1); // Reducido de 3 a 1 para más delgado
       const lineWidth = 60; // Ancho de la línea
       const lineStartX = (pageWidth - lineWidth) / 2;
       doc.line(lineStartX, 37, lineStartX + lineWidth, 37);
@@ -581,21 +584,31 @@ export const useQuoteExport = () => {
 
       // Sección izquierda - Info de cotización
       // === SECCIÓN IZQUIERDA - INFORMACIÓN DE COTIZACIÓN ===
-      doc.setFillColor(51, 100, 199)  // Azul profesional;
-      doc.rect(margin, yPosition, (pageWidth - (margin * 2)) / 2, 40, 'F');
-      
-      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+      // Dibujar solo una barra de encabezado azul (para ahorrar tinta)
+      const leftSectionWidth = (pageWidth - (margin * 2)) / 2;
+      doc.setFillColor(51, 100, 199);  // Azul profesional para la barra del encabezado
+      doc.rect(margin, yPosition, leftSectionWidth, 14, 'F');
+
+      // Área principal en blanco con borde sutil
+      doc.setFillColor(255, 255, 255);
+      doc.rect(margin, yPosition + 14, leftSectionWidth, 26, 'F');
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.6);
+      doc.rect(margin, yPosition, leftSectionWidth, 40, 'S');
+
+      // Encabezado - texto blanco sobre la barra azul
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('DATOS DE COTIZACIÓN', margin + 8, yPosition + 10);
-      
-      // Datos de cotización con alineación consistente
+
+      // Datos de cotización con alineación consistente (texto en tinta oscura para ahorrar color)
       const quoteInfoData = [
-        { label: 'N° Cotización:', value: quoteNumber, y: yPosition + 18 },
-        { label: 'Fecha de Emisión:', value: quoteDate, y: yPosition + 24 },
-        { label: 'Válida hasta:', value: validUntil, y: yPosition + 30 }
+        { label: 'N° Cotización:', value: quoteNumber, y: yPosition + 20 },
+        { label: 'Fecha de Emisión:', value: quoteDate, y: yPosition + 28 },
+        { label: 'Válida hasta:', value: validUntil, y: yPosition + 36 }
       ];
-      
+
       const quoteLabelWidth = 35; // Reducido de 50 a 35 para menos espacio
       quoteInfoData.forEach(item => {
         // Etiqueta
@@ -603,10 +616,10 @@ export const useQuoteExport = () => {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(60, 60, 60);
         doc.text(item.label, margin + 10, item.y);
-        
-        // Valor alineado
+
+        // Valor alineado: usar gris oscuro / negro para ahorrar tinta (no azul claro)
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(147, 197, 253);
+        doc.setTextColor(31, 41, 55);
         doc.text(item.value, margin + 10 + quoteLabelWidth, item.y);
       });
 
@@ -614,135 +627,152 @@ export const useQuoteExport = () => {
       const clientInfo: { [key: string]: any } = submission.data;
       const rightX = margin + (pageWidth - (margin * 2)) / 2;
       
+      // Estado: mantener diseño sobrio para ahorrar tinta
       doc.setFillColor(250, 250, 250);
       doc.rect(rightX, yPosition, (pageWidth - (margin * 2)) / 2, 40, 'F');
-      
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(14);
+
+      doc.setTextColor(51, 51, 51);
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('ESTADO DE PROCESO', rightX + 10, yPosition + 10);
-      
-      // Datos de estado con alineación consistente
+      doc.text('ESTADO DE PROCESO', rightX + 10, yPosition + 12);
+
+      // Datos de estado con colores neutros (evitar tonos azules grandes)
       const statusInfoData = [
-        { label: 'Estado:', value: getStatusText(submission.status).toUpperCase(), y: yPosition + 18 },
-        { label: 'Prioridad:', value: 'ALTA', y: yPosition + 24 },
-        { label: 'Categoria:', value: getSector(clientInfo).toUpperCase(), y: yPosition + 30 }
+        { label: 'Estado:', value: getStatusText(submission.status).toUpperCase(), y: yPosition + 22 },
+        { label: 'Prioridad:', value: 'ALTA', y: yPosition + 30 }
       ];
-      
-      const statusLabelWidth = 25; // Reducido de 35 a 25 para menos espacio
+
+      const statusLabelWidth = 30; // Ajustado para alineación
       statusInfoData.forEach(item => {
         // Etiqueta
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(60, 60, 60);
+        doc.setTextColor(80, 80, 80);
         doc.text(item.label, rightX + 10, item.y);
-        
-        // Valor alineado
+
+        // Valor alineado: color oscuro (no azul) para ahorrar tinta
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 58, 138);
+        doc.setTextColor(31, 41, 55);
         doc.text(item.value, rightX + 10 + statusLabelWidth, item.y);
       });
 
-      yPosition += 55;      // === DATOS DEL CLIENTE - ESTILO SIMPLE ===
-      // Título simple
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PERFIL DEL CLIENTE', margin, yPosition);
-      
-      // Línea decorativa      doc.line(margin, yPosition + 3, margin + 80, yPosition + 3);
-      
-      yPosition += 15;
+  yPosition += 55;      // === DATOS DEL CLIENTE - ESTILO SIMPLE ===
+  // Título simple
+  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PERFIL DEL CLIENTE', margin, yPosition);
 
-      // Marco principal del cliente simple      doc.rect(margin, yPosition, pageWidth - (margin * 2), 65, 'F');
-      
-      
-      doc.setDrawColor(200, 200, 200);      doc.rect(margin, yPosition, pageWidth - (margin * 2), 65, 'S');
+  // Línea decorativa
+  // doc.line(margin, yPosition + 3, margin + 80, yPosition + 3);
 
-      // Línea divisoria vertical simple
-      const centerX = pageWidth / 2;      doc.line(centerX, yPosition, centerX, yPosition + 65);
+  yPosition += 15;
 
-      // === COLUMNA IZQUIERDA - DATOS PRINCIPALES ===
-      doc.setFillColor(51, 100, 199)  // Azul profesional;
-      doc.rect(margin, yPosition, centerX - margin, 25, 'F');
-      
-      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('INFORMACION CORPORATIVA', margin + 10, yPosition + 12);
+  // ALT: calcular dinámicamente la altura del box de cliente para evitar desbordes
+  const clientHeaderHeight = 18; // alto del encabezado azul reducido
+  const centerX = pageWidth / 2;
 
-      let clientY = yPosition + 32;
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      
-      // Definir etiquetas y valores con alineación consistente
-      const leftColumnLabels = [
-        { label: 'Razon Social:', value: getCompanyName(clientInfo), y: clientY },
-        { label: 'Contacto:', value: getClientName(clientInfo, submission), y: clientY + 10 },
-        { label: 'Email:', value: clientInfo["2"] || clientInfo.email || submission.customerEmail || 'No especificado', y: clientY + 20 },
-        { label: 'Telefono:', value: getPhone(clientInfo, submission), y: clientY + 30 }
-      ];
+  // Definir items para ambas columnas (valores sin Y fijo)
+  const leftColumnItems = [
+    { label: 'Razon Social:', value: getCompanyName(clientInfo) },
+    { label: 'Contacto:', value: getClientName(clientInfo, submission) },
+    { label: 'Email:', value: clientInfo["2"] || clientInfo.email || submission.customerEmail || 'No especificado' },
+    { label: 'Telefono:', value: getPhone(clientInfo, submission) }
+  ];
 
-      // Dibujar etiquetas y valores alineados
-      const clientLabelWidth = 25; // Reducido de 35 a 25 para menos espacio
-      leftColumnLabels.forEach(item => {
-        // Etiqueta
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(60, 60, 60);
-        doc.text(item.label, margin + 10, item.y);
-        
-        // Valor alineado
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(30, 58, 138);
-        
-        // Manejo especial para email largo
-        if (item.label === 'Email:') {
-          const emailText = doc.splitTextToSize(item.value, centerX - (margin + 10 + clientLabelWidth) - 5);
-          doc.text(emailText, margin + 10 + clientLabelWidth, item.y);
-        } else {
-          doc.text(item.value, margin + 10 + clientLabelWidth, item.y);
-        }
-      });
+  const rightColumnItems = [
+    { label: 'Direccion:', value: getAddress(clientInfo) },
+    { label: 'Sector:', value: getSector(clientInfo) }
+  ];
 
-      // === COLUMNA DERECHA - DATOS ADICIONALES ===
-      doc.setFillColor(250, 250, 250);
-      doc.rect(centerX, yPosition, pageWidth - margin - centerX, 25, 'F');
-      
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('DETALLES ADICIONALES', centerX + 10, yPosition + 12);
-      
-      // Definir etiquetas y valores para columna derecha
-      const rightColumnLabels = [
-        { label: 'Direccion:', value: getAddress(clientInfo), y: clientY },
-        { label: 'Sector:', value: getSector(clientInfo), y: clientY + 20 }
-      ];
+  const clientLabelWidth = 25;
+  const rightLabelWidth = 20;
+  const rightStartX = centerX + 10 + rightLabelWidth;
+  const leftValueWidth = Math.max(80, Math.floor(centerX - (margin + 10 + clientLabelWidth) - 10));
+  // Give a touch more horizontal room and use a slightly smaller font for the right column
+  const rightValueWidth = Math.max(60, Math.floor(pageWidth - margin - rightStartX - 6));
 
-      // Dibujar etiquetas y valores alineados en columna derecha
-      const rightLabelWidth = 20; // Reducido de 30 a 20 para menos espacio
-      rightColumnLabels.forEach(item => {
-        // Etiqueta
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(60, 60, 60);
-        doc.setFontSize(10);
-        doc.text(item.label, centerX + 10, item.y);
-        
-        // Valor alineado
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(30, 58, 138);
-        
-        // Manejo especial para dirección larga
-        if (item.label === 'Direccion:') {
-          const addressLines = doc.splitTextToSize(item.value, pageWidth - margin - centerX - 10 - rightLabelWidth - 5);
-          doc.text(addressLines, centerX + 10 + rightLabelWidth, item.y);
-        } else {
-          doc.text(item.value, centerX + 10 + rightLabelWidth, item.y);
-        }
-      });
+  // Calcular altura requerida para cada columna
+  let leftContentHeight = 0;
+  // Ensure font size used for splitting matches drawing
+  doc.setFontSize(10);
+  leftColumnItems.forEach(item => {
+    const valueLines = doc.splitTextToSize(String(item.value || ''), leftValueWidth);
+    leftContentHeight += Math.max(1, valueLines.length) * 8 + 6;
+  });
 
-      yPosition += 75;
+  let rightContentHeight = 0;
+  rightColumnItems.forEach(item => {
+    const valueLines = doc.splitTextToSize(String(item.value || ''), rightValueWidth);
+    rightContentHeight += Math.max(1, valueLines.length) * 8 + 6;
+  });
+
+  const minBoxHeight = 56;
+  const contentHeight = Math.max(leftContentHeight, rightContentHeight);
+  const clientBoxHeight = Math.max(minBoxHeight, Math.ceil(contentHeight + clientHeaderHeight + 8));
+
+  // Dibujar el marco del cliente con fill blanco explícito
+  doc.setFillColor(255, 255, 255);
+  doc.rect(margin, yPosition, pageWidth - (margin * 2), clientBoxHeight, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(margin, yPosition, pageWidth - (margin * 2), clientBoxHeight, 'S');
+
+  // Línea divisoria vertical simple
+  doc.line(centerX, yPosition, centerX, yPosition + clientBoxHeight);
+
+  // === COLUMNA IZQUIERDA - DATOS PRINCIPALES ===
+  doc.setFillColor(51, 100, 199);  // Azul profesional para encabezado izquierdo
+  doc.rect(margin, yPosition, centerX - margin, clientHeaderHeight, 'F');
+
+  doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INFORMACION CORPORATIVA', margin + 10, yPosition + 11);
+
+  // === COLUMNA DERECHA - ENCABEZADO Y FONDO ===
+  doc.setFillColor(250, 250, 250);
+  doc.rect(centerX, yPosition, pageWidth - margin - centerX, clientHeaderHeight, 'F');
+  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DETALLES ADICIONALES', centerX + 10, yPosition + 11);
+
+  // Posición base para el contenido en ambas columnas
+  const initialClientY = yPosition + clientHeaderHeight + 6;
+
+  // Dibujar columna izquierda (wrapping dinámico)
+  let drawLeftY = initialClientY;
+  doc.setFontSize(10);
+  leftColumnItems.forEach(item => {
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60, 60, 60);
+    doc.text(item.label, margin + 10, drawLeftY);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 58, 138);
+    const valueLines = doc.splitTextToSize(String(item.value || ''), leftValueWidth);
+    doc.text(valueLines, margin + 10 + clientLabelWidth, drawLeftY);
+    drawLeftY += Math.max(10, (valueLines.length * 8) + 4);
+  });
+
+  // Dibujar columna derecha (wrapping dinámico)
+  let drawRightY = initialClientY;
+  rightColumnItems.forEach(item => {
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60, 60, 60);
+    doc.text(item.label, centerX + 10, drawRightY);
+
+    // Right column: smaller font and tighter line spacing to fit long addresses
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 58, 138);
+    doc.setFontSize(9);
+    const valueLines = doc.splitTextToSize(String(item.value || ''), rightValueWidth);
+    doc.text(valueLines, rightStartX, drawRightY);
+    drawRightY += Math.max(9, (valueLines.length * 7) + 3);
+  });
+
+  // Mover Y un poco más (altura del box + margen inferior)
+  yPosition += clientBoxHeight + 14; // antes era 75
 
       // === NUEVA PÁGINA PARA PRODUCTOS Y SERVICIOS - ESTILO PREMIUM ===
       doc.addPage();
@@ -753,41 +783,34 @@ export const useQuoteExport = () => {
       yPosition = 30;
 
       // Header estilizado para segunda página
-      doc.setFillColor(240, 240, 240);
-      doc.rect(0, 0, pageWidth, 8, 'F');
-      
-      doc.setFillColor(51, 100, 199)  // Azul profesional;
-      doc.rect(0, 8, pageWidth, 6, 'F');
-      
-      doc.setFillColor(235, 235, 235);
-      doc.rect(0, 14, pageWidth, 4, 'F');
-      
-      doc.setFillColor(250, 250, 250);
-      doc.rect(0, 18, pageWidth, 2, 'F');
-      
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, 20, pageWidth, 25, 'F');
-      
-      // Logo pequeño con marco      doc.rect(margin - 1, 23, 22, 16, 'F');      doc.rect(margin - 1, 23, 22, 16, 'S');
-      
-      try {
-        doc.addImage(logoToUse, 'PNG', margin, 20, 35, 25);
-      } catch (error) {
-        console.log('Error adding logo to second page:', error);
-        try {
-          doc.addImage(MIRG_LOGO_BASE64, 'PNG', margin, 20, 35, 25);
-        } catch (fallbackError) {
-          console.log('Error adding MIRG logo to second page:', fallbackError);
-        }
-      }
-      
-      // Información de cotización en segunda página (sin nombre de empresa)
-      doc.setTextColor(100, 116, 139);
-      doc.setFontSize(10);
-      const quoteNumberDisplay = submission.trackingCode || `COT-${submission.id.substring(0, 8).toUpperCase()}`;
-      doc.text(`Cotización: ${quoteNumberDisplay}`, pageWidth - margin - 45, 30);
+  // Compact header for second page: single light band to save vertical space
+  doc.setFillColor(248, 250, 252);
+  doc.rect(0, 0, pageWidth, 32, 'F');
 
-      yPosition = 50;
+  // subtle divider line below header
+  doc.setFillColor(240, 240, 240);
+  doc.rect(0, 32, pageWidth, 1, 'F');
+
+  // Logo (smaller and positioned higher to save space)
+  try {
+    doc.addImage(logoToUse, 'PNG', margin, 8, 28, 18);
+  } catch (error) {
+    console.log('Error adding logo to second page:', error);
+    try {
+      doc.addImage(MIRG_LOGO_BASE64, 'PNG', margin, 8, 28, 18);
+    } catch (fallbackError) {
+      console.log('Error adding MIRG logo to second page:', fallbackError);
+    }
+  }
+
+  // Cotización a la derecha, alineada verticalmente con el logo
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(10);
+  const quoteNumberDisplay = submission.trackingCode || `COT-${submission.id.substring(0, 8).toUpperCase()}`;
+  doc.text(`Cotización: ${quoteNumberDisplay}`, pageWidth - margin - 60, 20);
+
+  // Start page content a bit higher to reduce wasted space
+  yPosition = 42;
 
       // === TÍTULO DE PRODUCTOS - DISEÑO IMPACTANTE ===
       // === TÍTULO DE PRODUCTOS ORGANIZADO ===
@@ -1084,8 +1107,9 @@ export const useQuoteExport = () => {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPosition + 10);
-        doc.text('CANT.', margin + 120, yPosition + 10, { align: 'center' });
-        doc.text('TOTAL', pageWidth - margin - 15, yPosition + 10, { align: 'right' });
+        doc.text('CANT.', margin + 80, yPosition + 10, { align: 'center' });
+        doc.text('PRECIO UNIT.', margin + 110, yPosition + 10, { align: 'center' });
+        doc.text('TOTAL', margin + 150, yPosition + 10, { align: 'center' });
         
         yPosition += tableHeaderHeight;
         
@@ -1093,15 +1117,12 @@ export const useQuoteExport = () => {
         productsWithImages.forEach((product, index) => {
           // Calcular altura necesaria para la fila
           let rowHeight = 25; // Altura base
-          
-          // Si hay imagen, aumentar altura
+
+          // Si hay imagen, aumentar altura base
+          let imageHeight = 0;
           if (product.imageUrl && product.imageUrl.trim()) {
-            rowHeight = 35;
-          }
-          
-          // Si hay descripción larga, aumentar altura
-          if (product.description && product.description.length > 50) {
-            rowHeight = Math.max(rowHeight, 45); // Aumentado para permitir 2 l�neas de descripci�n
+            imageHeight = 35;
+            rowHeight = Math.max(rowHeight, imageHeight);
           }
           
           // Verificar si necesitamos nueva página
@@ -1118,8 +1139,9 @@ export const useQuoteExport = () => {
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
             doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPosition + 10);
-            doc.text('CANT.', margin + 120, yPosition + 10, { align: 'center' });
-            doc.text('TOTAL', pageWidth - margin - 15, yPosition + 10, { align: 'right' });
+        doc.text('CANT.', margin + 80, yPosition + 10, { align: 'center' });
+        doc.text('PRECIO UNIT.', margin + 110, yPosition + 10, { align: 'center' });
+        doc.text('TOTAL', margin + 150, yPosition + 10, { align: 'center' });
             
             yPosition += tableHeaderHeight;
           }
@@ -1139,8 +1161,33 @@ export const useQuoteExport = () => {
           
           // Coordenadas para el contenido
           let contentStartX = margin + 5;
-          const centerY = yPosition + (rowHeight / 2);
           
+          // Calcular espacio disponible para texto basado en la X de la columna CANT.
+          const quantityX = margin + 80;
+          const paddingBetweenColumns = 6;
+          const textAreaWidth = Math.max(40, quantityX - contentStartX - paddingBetweenColumns);
+
+          // Nombre del producto y posible wrapping en hasta 2 líneas
+          doc.setFontSize(10);
+          const productNameLines = doc.splitTextToSize(product.name, textAreaWidth);
+          const nameLinesToShow = productNameLines.slice(0, 2);
+          const nameHeight = nameLinesToShow.length * 8;
+
+          // Descripción (hasta 2 líneas adicionales)
+          let descriptionLines: string[] = [];
+          let descHeight = 0;
+          if (product.description && product.description.trim()) {
+            doc.setFontSize(8);
+            const descMaxWidth = Math.max(30, quantityX - contentStartX - paddingBetweenColumns);
+            descriptionLines = doc.splitTextToSize(product.description, descMaxWidth).slice(0, 2);
+            descHeight = descriptionLines.length * 8 + (descriptionLines.length ? 4 : 0);
+          }
+
+          // Altura mínima necesaria para el contenido textual
+          const textContentHeight = nameHeight + descHeight + 8; // padding interior
+          rowHeight = Math.max(rowHeight, textContentHeight, imageHeight);
+
+          const centerY = yPosition + (rowHeight / 2);
           // Agregar imagen si existe
           if (product.imageUrl && product.imageUrl.trim()) {
             try {
@@ -1156,45 +1203,43 @@ export const useQuoteExport = () => {
             }
           }
           
-          // Texto del producto - centrado verticalmente
+          // Texto del producto
           doc.setTextColor(31, 41, 55);
-          doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
-          
-          // Calcular espacio disponible para texto
-          const textAreaWidth = 105 - (contentStartX - margin - 5);
-          
-          // Nombre del producto
-          const productNameLines = doc.splitTextToSize(product.name, textAreaWidth);
-          const nameY = centerY - (productNameLines.length > 1 ? 3 : 0);
-          doc.text(productNameLines[0], contentStartX, nameY);
-          
-          // Descripción si existe
-          if (product.description && product.description.trim()) {
+          doc.setFontSize(10);
+
+          // Dibujar nombre en hasta 2 líneas, desde la parte superior del área de contenido
+          const textStartY = yPosition + 6;
+          nameLinesToShow.forEach((line: string, idx: number) => {
+            doc.text(line, contentStartX, textStartY + (idx * 8));
+          });
+
+          // Dibujar descripción debajo del nombre (si existe)
+          if (descriptionLines.length > 0) {
             doc.setFontSize(8);
             doc.setTextColor(100, 116, 139);
-            doc.setFont('helvetica', 'normal');
-            // Dividir texto en hasta 2 lineas
-            const maxWidth = pageWidth - contentStartX - margin - 60; // Aumentado el espacio disponible
-            const descriptionLines = doc.splitTextToSize(product.description, maxWidth);
-            const linesToShow = descriptionLines.slice(0, 2);
-            linesToShow.forEach((line: string, index: number) => {
-              doc.text(line, contentStartX, nameY + 8 + (index * 10));
+            descriptionLines.forEach((line: string, idx: number) => {
+              const descY = textStartY + (nameLinesToShow.length * 8) + 4 + (idx * 8);
+              doc.text(line, contentStartX, descY);
             });
           }
           
-          // Columnas alineadas - centradas verticalmente
+          // Columnas alineadas - centradas verticalmente respecto a rowHeight
           doc.setFontSize(10);
           doc.setTextColor(31, 41, 55);
           doc.setFont('helvetica', 'normal');
-          
+
           // Cantidad
-          doc.text(product.quantity.toString(), margin + 120, centerY, { align: 'center' });
-          
+          doc.text(product.quantity.toString(), margin + 80, centerY, { align: 'center' });
+
+          // Precio unitario
+          doc.text(formatPriceString(product.unitPrice || 'A cotizar'), margin + 110, centerY, { align: 'center' });
+
           // Total (en negrita)
           doc.setFont('helvetica', 'bold');
-          doc.text(formatPriceString(product.total || 'A cotizar'), pageWidth - margin - 5, centerY, { align: 'right' });
-          
+          doc.text(formatPriceString(product.total || 'A cotizar'), margin + 150, centerY, { align: 'center' });
+
+          // Avanzar Y según altura calculada
           yPosition += rowHeight;
         });
         
@@ -1210,8 +1255,8 @@ export const useQuoteExport = () => {
         try {
           (doc as any).autoTable({
             startY: yPosition,
-            head: [['PRODUCTOS / SERVICIOS', 'CANT.', 'TOTAL']],
-            body: productsWithImages.map(product => { const nameWithDescription = product.description && product.description.trim() ? `${product.name}\n${product.description}` : product.name; return [nameWithDescription, product.quantity.toString(), formatPriceString(product.total || "A cotizar")]; }), // Solo nombre, cantidad y total
+            head: [['PRODUCTOS / SERVICIOS', 'CANT.', 'PRECIO UNIT.', 'TOTAL']],
+            body: productsWithImages.map(product => { const nameWithDescription = product.description && product.description.trim() ? `${product.name}\n${product.description}` : product.name; return [nameWithDescription, product.quantity.toString(), formatPriceString(product.unitPrice || "A cotizar"), formatPriceString(product.total || "A cotizar")]; }), // Solo nombre, cantidad y total
             theme: 'grid',
             headStyles: {
               fillColor: [15, 23, 42],
@@ -1232,9 +1277,10 @@ export const useQuoteExport = () => {
               lineWidth: 0.5
             },
             columnStyles: {
-              0: { cellWidth: 110, halign: "left", valign: "top", fontSize: 8, lineHeight: 1.2 },
+              0: { cellWidth: 70, halign: "left", valign: "top", fontSize: 8, lineHeight: 1.2 },
               1: { cellWidth: 25, halign: 'center' },
-              2: { cellWidth: 35, halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] }
+              2: { cellWidth: 35, halign: 'center', fontStyle: 'bold' },
+              3: { cellWidth: 35, halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] }
             },
             alternateRowStyles: {
               fillColor: [248, 250, 252]
@@ -1268,38 +1314,54 @@ export const useQuoteExport = () => {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPosition + 10);
-        doc.text('CANT.', margin + 120, yPosition + 10, { align: 'center' });
-        doc.text('TOTAL', pageWidth - margin - 15, yPosition + 10, { align: 'right' });
+        doc.text('CANT.', margin + 80, yPosition + 10, { align: 'center' });
+        doc.text('PRECIO UNIT.', margin + 110, yPosition + 10, { align: 'center' });
+        doc.text('TOTAL', margin + 150, yPosition + 10, { align: 'center' });
         
         yPosition += tableHeaderHeight;
         
         // Filas de productos
         productData.forEach((row, index) => {
-          const rowHeight = 14;
+          // Allow product name to wrap up to 2 lines in the fallback table
+          const quantityX = margin + 80;
+          const paddingBetweenColumns = 6;
+          const nameMaxWidth = Math.max(40, quantityX - (margin + 3) - paddingBetweenColumns);
+          const nameLines = doc.splitTextToSize(String(row[0] || ''), nameMaxWidth).slice(0, 2);
+          const nameHeight = nameLines.length * 8;
+
+          const baseRowHeight = 14;
+          const rowHeight = Math.max(baseRowHeight, nameHeight + 8);
           const isEven = index % 2 === 0;
-          
+
           // Fondo alternado
           if (isEven) {
             doc.setFillColor(249, 250, 251);
             doc.rect(margin, yPosition, pageWidth - (margin * 2), rowHeight, 'F');
           }
-          
+
           // Borde de la fila
           doc.setDrawColor(229, 231, 235);
           doc.setLineWidth(0.5);
           doc.rect(margin, yPosition, pageWidth - (margin * 2), rowHeight, 'S');
-          
+
           // Texto de la fila
           doc.setTextColor(55, 65, 81);
           doc.setFontSize(8);
           doc.setFont('helvetica', 'normal');
-          
-          // Limitar texto del producto si es muy largo
-          const productName = doc.splitTextToSize(row[0], 110);
-          doc.text(productName[0] + (productName.length > 1 ? '...' : ''), margin + 3, yPosition + 9);
-          doc.text(row[1], margin + 120, yPosition + 9, { align: 'center' }); // Cantidad
-          doc.text(formatPriceString(row[3]), pageWidth - margin - 3, yPosition + 9, { align: 'right' }); // Total (saltamos precio unitario)
-          
+
+          // Draw product name lines starting a few pts from top of row
+          const textStartY = yPosition + 6;
+          nameLines.forEach((line: string, idx: number) => {
+            const isTruncated = idx === nameLines.length - 1 && doc.splitTextToSize(String(row[0] || ''), nameMaxWidth).length > nameLines.length;
+            doc.text(line + (isTruncated ? '...' : ''), margin + 3, textStartY + (idx * 8));
+          });
+
+          // Center other columns vertically within the row
+          const centerY = yPosition + (rowHeight / 2);
+          doc.text(row[1], margin + 80, centerY, { align: 'center' }); // Cantidad
+          doc.text(formatPriceString(row[2] || 'A cotizar'), margin + 110, centerY, { align: 'center' }); // Precio unitario
+          doc.text(formatPriceString(row[3] || ''), margin + 150, centerY, { align: 'center' }); // Total
+
           yPosition += rowHeight;
         });
         
@@ -1533,10 +1595,12 @@ export const useQuoteExport = () => {
       doc.setLineWidth(0.5);
       doc.rect(termsX, termsY - 5, termsWidth, 15, 'S');
       
-      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TÉRMINOS Y CONDICIONES', termsX + 8, termsY + 4);
+  doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  // Center the title inside the blue header
+  const termsCenterX = termsX + (termsWidth / 2);
+  doc.text('TÉRMINOS Y CONDICIONES', termsCenterX, termsY + 4, { align: 'center' });
 
       termsY += 20;
 
@@ -1544,9 +1608,12 @@ export const useQuoteExport = () => {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
 
+      // Extraer tiempo de entrega de los datos de la cotización o usar valor por defecto
+      const deliveryTime = submission.data?.deliveryTime || '7 días hábiles';
+
       const termsAndConditions1 = [
         '1. Condiciones de pago: Acuerdo con el cliente',
-        '2. Tiempo de entrega: 7 días hábiles',
+        `2. Tiempo de entrega: ${deliveryTime}`,
         '3. Enviar cotización firmada al email indicado'
       ];
 
@@ -1631,7 +1698,11 @@ export const useQuoteExport = () => {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
 
-      const faqs = [
+      // Use custom FAQs if provided, otherwise use default ones
+      const faqs = customFAQs && customFAQs.length > 0 ? customFAQs.map(faq => ({
+        q: faq.question,
+        a: faq.answer
+      })) : [
         {
           q: '¿Qué tipo de maquinados industriales realizan?',
           a: 'Realizamos mecanizado CNC de precisión, torneado, fresado, rectificado y fabricación de piezas especiales según planos y especificaciones técnicas. Trabajamos con diversos materiales como acero, aluminio, bronce y materiales especiales.'
@@ -1741,7 +1812,8 @@ export const useQuoteExport = () => {
   const exportToPDFAndEmail = async (
     submission: QuoteSubmission, 
     companyInfo: CompanyInfo = defaultCompanyInfo,
-    sendEmail: boolean = false
+    sendEmail: boolean = false,
+    customFAQs?: Array<{ id: string; question: string; answer: string }>
   ) => {
     setLoading(true);
     
@@ -1883,21 +1955,31 @@ export const useQuoteExport = () => {
 
       // Sección izquierda - Info de cotización
       // === SECCIÓN IZQUIERDA - INFORMACIÓN DE COTIZACIÓN ===
-      doc.setFillColor(51, 100, 199)  // Azul profesional;
-      doc.rect(margin, yPosition, (pageWidth - (margin * 2)) / 2, 40, 'F');
-      
-      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+      // Dibujar solo una barra de encabezado azul (para ahorrar tinta)
+      const leftSectionWidth = (pageWidth - (margin * 2)) / 2;
+      doc.setFillColor(51, 100, 199);  // Azul profesional para la barra del encabezado
+      doc.rect(margin, yPosition, leftSectionWidth, 14, 'F');
+
+      // Área principal en blanco con borde sutil
+      doc.setFillColor(255, 255, 255);
+      doc.rect(margin, yPosition + 14, leftSectionWidth, 26, 'F');
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.6);
+      doc.rect(margin, yPosition, leftSectionWidth, 40, 'S');
+
+      // Encabezado - texto blanco sobre la barra azul
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('DATOS DE COTIZACIÓN', margin + 8, yPosition + 10);
-      
-      // Datos de cotización con alineación consistente
+
+      // Datos de cotización con alineación consistente (texto en tinta oscura para ahorrar color)
       const quoteInfoData = [
-        { label: 'N° Cotización:', value: quoteNumber, y: yPosition + 18 },
-        { label: 'Fecha de Emisión:', value: quoteDate, y: yPosition + 24 },
-        { label: 'Válida hasta:', value: validUntil, y: yPosition + 30 }
+        { label: 'N° Cotización:', value: quoteNumber, y: yPosition + 20 },
+        { label: 'Fecha de Emisión:', value: quoteDate, y: yPosition + 28 },
+        { label: 'Válida hasta:', value: validUntil, y: yPosition + 36 }
       ];
-      
+
       const quoteLabelWidth = 35; // Reducido de 50 a 35 para menos espacio
       quoteInfoData.forEach(item => {
         // Etiqueta
@@ -1905,10 +1987,10 @@ export const useQuoteExport = () => {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(60, 60, 60);
         doc.text(item.label, margin + 10, item.y);
-        
-        // Valor alineado
+
+        // Valor alineado: usar gris oscuro / negro para ahorrar tinta (no azul claro)
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(147, 197, 253);
+        doc.setTextColor(31, 41, 55);
         doc.text(item.value, margin + 10 + quoteLabelWidth, item.y);
       });
 
@@ -1916,176 +1998,190 @@ export const useQuoteExport = () => {
       const clientInfo: { [key: string]: any } = submission.data;
       const rightX = margin + (pageWidth - (margin * 2)) / 2;
       
+      // Estado: mantener diseño sobrio para ahorrar tinta
       doc.setFillColor(250, 250, 250);
       doc.rect(rightX, yPosition, (pageWidth - (margin * 2)) / 2, 40, 'F');
-      
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(14);
+
+      doc.setTextColor(51, 51, 51);
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('ESTADO DE PROCESO', rightX + 10, yPosition + 10);
-      
-      // Datos de estado con alineación consistente
+      doc.text('ESTADO DE PROCESO', rightX + 10, yPosition + 12);
+
+      // Datos de estado con colores neutros (evitar tonos azules grandes)
       const statusInfoData = [
-        { label: 'Estado:', value: getStatusText(submission.status).toUpperCase(), y: yPosition + 18 },
-        { label: 'Prioridad:', value: 'ALTA', y: yPosition + 24 },
-        { label: 'Categoria:', value: getSector(clientInfo).toUpperCase(), y: yPosition + 30 }
+        { label: 'Estado:', value: getStatusText(submission.status).toUpperCase(), y: yPosition + 22 },
+        { label: 'Prioridad:', value: 'ALTA', y: yPosition + 30 }
       ];
-      
-      const statusLabelWidth = 25; // Reducido de 35 a 25 para menos espacio
+
+      const statusLabelWidth = 30; // Ajustado para alineación
       statusInfoData.forEach(item => {
         // Etiqueta
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(60, 60, 60);
+        doc.setTextColor(80, 80, 80);
         doc.text(item.label, rightX + 10, item.y);
-        
-        // Valor alineado
+
+        // Valor alineado: color oscuro (no azul) para ahorrar tinta
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 58, 138);
+        doc.setTextColor(31, 41, 55);
         doc.text(item.value, rightX + 10 + statusLabelWidth, item.y);
       });
 
-      yPosition += 55;      // === DATOS DEL CLIENTE - ESTILO SIMPLE ===
-      // Título simple
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PERFIL DEL CLIENTE', margin, yPosition);
-      
-      // Línea decorativa      doc.line(margin, yPosition + 3, margin + 80, yPosition + 3);
-      
-      yPosition += 15;
+  yPosition += 55;      // === DATOS DEL CLIENTE - ESTILO SIMPLE ===
+  // Título simple
+  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PERFIL DEL CLIENTE', margin, yPosition);
 
-      // Marco principal del cliente simple      doc.rect(margin, yPosition, pageWidth - (margin * 2), 65, 'F');
+  // Línea decorativa
+  // doc.line(margin, yPosition + 3, margin + 80, yPosition + 3);
+
+  yPosition += 15;
+  yPosition += 15;
+
+  // Marco principal del cliente: calcular altura dinámica para evitar desbordes
+  const clientHeaderHeight = 18; // alto del encabezado azul reducido
+  const minClientBoxHeight = 56;
+  const centerX = pageWidth / 2;
+
+  // Definir etiquetas y valores para columnas (sin y fijo)
+  const leftColumnItems = [
+    { label: 'Razon Social:', value: getCompanyName(clientInfo) },
+    { label: 'Contacto:', value: getClientName(clientInfo, submission) },
+    { label: 'Email:', value: clientInfo["2"] || clientInfo.email || submission.customerEmail || 'No especificado' },
+    { label: 'Telefono:', value: getPhone(clientInfo, submission) }
+  ];
+
+  const rightColumnItems = [
+    { label: 'Direccion:', value: getAddress(clientInfo) },
+    { label: 'Sector:', value: getSector(clientInfo) }
+  ];
+
+  const clientLabelWidth = 25; // espacio para la etiqueta
+  const rightLabelWidth = 20;
+  const leftValueWidth = Math.max(80, Math.floor(centerX - (margin + 10 + clientLabelWidth) - 10));
+  // Slightly more room for the right column and more compact text
+  const rightValueWidth = Math.max(80, Math.floor(pageWidth - margin - centerX - 8 - rightLabelWidth - 15));
+
+  // Calcular altura requerida para cada columna
+  let leftHeight = 0;
+  leftColumnItems.forEach(item => {
+    const valueLines = doc.splitTextToSize(String(item.value || ''), leftValueWidth);
+    leftHeight += Math.max(1, valueLines.length) * 8 + 6;
+  });
+
+  let rightHeight = 0;
+  rightColumnItems.forEach(item => {
+    const valueLines = doc.splitTextToSize(String(item.value || ''), rightValueWidth);
+    rightHeight += Math.max(1, valueLines.length) * 8 + 6;
+  });
+
+  const clientBoxHeight = Math.max(minClientBoxHeight, Math.ceil(clientHeaderHeight + Math.max(leftHeight, rightHeight) + 8));
+
+  // Dibujar el marco del cliente con fill blanco explícito
+  doc.setFillColor(255, 255, 255);
+  doc.rect(margin, yPosition, pageWidth - (margin * 2), clientBoxHeight, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(margin, yPosition, pageWidth - (margin * 2), clientBoxHeight, 'S');
+
+  // Línea divisoria vertical simple
+  doc.line(centerX, yPosition, centerX, yPosition + clientBoxHeight);
+
+  // === COLUMNA IZQUIERDA - ENCABEZADO ===
+  doc.setFillColor(51, 100, 199);  // Azul profesional
+  doc.rect(margin, yPosition, centerX - margin, clientHeaderHeight, 'F');
+
+  doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INFORMACION CORPORATIVA', margin + 10, yPosition + 11);
+
+  // === COLUMNA DERECHA - ENCABEZADO Y FONDO ===
+  doc.setFillColor(250, 250, 250);
+  doc.rect(centerX, yPosition, pageWidth - margin - centerX, clientHeaderHeight, 'F');
+  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DETALLES ADICIONALES', centerX + 10, yPosition + 11);
+
+  // Posición base para el contenido en ambas columnas
+  const initialClientY = yPosition + clientHeaderHeight + 6;
+
+  // Dibujar columna izquierda (wrapping dinámico)
+  let drawLeftY = initialClientY;
+  doc.setFontSize(10);
+  leftColumnItems.forEach(item => {
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60, 60, 60);
+    doc.text(item.label, margin + 10, drawLeftY);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 58, 138);
+    const valueLines = doc.splitTextToSize(String(item.value || ''), leftValueWidth);
+    doc.text(valueLines, margin + 10 + clientLabelWidth, drawLeftY);
+    drawLeftY += Math.max(10, (valueLines.length * 8) + 4);
+  });
+
+  // Dibujar columna derecha (wrapping dinámico) para evitar desbordes largos en Dirección
+  let drawRightY = initialClientY;
+  const rightStartX = centerX + 10 + rightLabelWidth;
+  rightColumnItems.forEach(item => {
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60, 60, 60);
+    doc.text(item.label, centerX + 10, drawRightY);
+
+    // Compact right column text
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 58, 138);
+    doc.setFontSize(9);
+    const valueLines = doc.splitTextToSize(String(item.value || ''), rightValueWidth);
+    doc.text(valueLines, rightStartX, drawRightY);
+    drawRightY += Math.max(9, (valueLines.length * 7) + 3);
+  });
+
+  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DETALLES ADICIONALES', centerX + 10, yPosition + 11);
       
-      
-      doc.setDrawColor(200, 200, 200);      doc.rect(margin, yPosition, pageWidth - (margin * 2), 65, 'S');
 
-      // Línea divisoria vertical simple
-      const centerX = pageWidth / 2;      doc.line(centerX, yPosition, centerX, yPosition + 65);
-
-      // === COLUMNA IZQUIERDA - DATOS PRINCIPALES ===
-      doc.setFillColor(51, 100, 199)  // Azul profesional;
-      doc.rect(margin, yPosition, centerX - margin, 25, 'F');
-      
-      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('INFORMACION CORPORATIVA', margin + 10, yPosition + 12);
-
-      let clientY = yPosition + 32;
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      
-      // Definir etiquetas y valores con alineación consistente
-      const leftColumnLabels = [
-        { label: 'Razon Social:', value: getCompanyName(clientInfo), y: clientY },
-        { label: 'Contacto:', value: getClientName(clientInfo, submission), y: clientY + 10 },
-        { label: 'Email:', value: clientInfo["2"] || clientInfo.email || submission.customerEmail || 'No especificado', y: clientY + 20 },
-        { label: 'Telefono:', value: getPhone(clientInfo, submission), y: clientY + 30 }
-      ];
-
-      // Dibujar etiquetas y valores alineados
-      const clientLabelWidth = 25; // Reducido de 35 a 25 para menos espacio
-      leftColumnLabels.forEach(item => {
-        // Etiqueta
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(60, 60, 60);
-        doc.text(item.label, margin + 10, item.y);
-        
-        // Valor alineado
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(30, 58, 138);
-        
-        // Manejo especial para email largo
-        if (item.label === 'Email:') {
-          const emailText = doc.splitTextToSize(item.value, centerX - (margin + 10 + clientLabelWidth) - 5);
-          doc.text(emailText, margin + 10 + clientLabelWidth, item.y);
-        } else {
-          doc.text(item.value, margin + 10 + clientLabelWidth, item.y);
-        }
-      });
-
-      // === COLUMNA DERECHA - DATOS ADICIONALES ===
-      doc.setFillColor(250, 250, 250);
-      doc.rect(centerX, yPosition, pageWidth - margin - centerX, 25, 'F');
-      
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('DETALLES ADICIONALES', centerX + 10, yPosition + 12);
-      
-      // Definir etiquetas y valores para columna derecha
-      const rightColumnLabels = [
-        { label: 'Direccion:', value: getAddress(clientInfo), y: clientY },
-        { label: 'Sector:', value: getSector(clientInfo), y: clientY + 20 }
-      ];
-
-      // Dibujar etiquetas y valores alineados para columna derecha
-      const rightLabelWidth = 20; // Reducido de 30 a 20 para menos espacio
-      rightColumnLabels.forEach(item => {
-        // Etiqueta
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(60, 60, 60);
-        doc.setFontSize(10);
-        doc.text(item.label, centerX + 10, item.y);
-        
-        // Valor alineado
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(30, 58, 138);
-        
-        // Manejo especial para dirección larga
-        if (item.label === 'Direccion:') {
-          const addressLines = doc.splitTextToSize(item.value, pageWidth - margin - centerX - 10 - rightLabelWidth - 5);
-          doc.text(addressLines, centerX + 10 + rightLabelWidth, item.y);
-        } else {
-          doc.text(item.value, centerX + 10 + rightLabelWidth, item.y);
-        }
-      });
-
-      yPosition += 75;
+  // Mover Y un poco más (altura del box + margen inferior)
+  yPosition += clientBoxHeight + 14; // antes era 75
 
       // === NUEVA PÁGINA PARA PRODUCTOS ===
       doc.addPage();
         // addDecorativeBackground(doc, pageWidth, pageHeight); // Removido: solo página de totales tiene fondo
       yPosition = 30;
 
-      // === HEADER SIMPLIFICADO EN SEGUNDA PÁGINA ===
-      doc.setFillColor(240, 240, 240);
-      doc.rect(0, 0, pageWidth, 8, 'F');
-      
-      doc.setFillColor(51, 100, 199)  // Azul profesional;
-      doc.rect(0, 8, pageWidth, 6, 'F');
-      
-      doc.setFillColor(235, 235, 235);
-      doc.rect(0, 14, pageWidth, 4, 'F');
-      
-      doc.setFillColor(250, 250, 250);
-      doc.rect(0, 18, pageWidth, 2, 'F');
-      
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, 20, pageWidth, 25, 'F');
-      
-      // Logo pequeño en segunda página      doc.rect(margin - 1, 23, 22, 16, 'F');      doc.rect(margin - 1, 23, 22, 16, 'S');
-      
-      try {
-        doc.addImage(logoToUse, 'PNG', margin, 24, 20, 14);
-      } catch (error) {
-        try {
-          doc.addImage(MIRG_LOGO_BASE64, 'PNG', margin, 24, 20, 14);
-        } catch (fallbackError) {
-          console.log('Error adding logo to second page');
-        }
-      }
-      
-      // Título empresarial simplificado removido - solo información de cotización
-      doc.setTextColor(100, 116, 139);
-      doc.setFontSize(10);
-      const quoteNumberDisplay = submission.trackingCode || `COT-${submission.id.substring(0, 8).toUpperCase()}`;
-      doc.text(`Cotización: ${quoteNumberDisplay}`, pageWidth - margin - 45, 30);
+          // === HEADER SIMPLIFICADO EN SEGUNDA PÁGINA (COMPACTO) ===
+          // Un único banda ligera en la parte superior y un divisor sutil
+          doc.setFillColor(248, 249, 251);
+          doc.rect(0, 0, pageWidth, 32, 'F');
 
-      yPosition = 50;
+          // Divisor sutil bajo el header
+          doc.setFillColor(235, 235, 235);
+          doc.rect(0, 32, pageWidth, 1, 'F');
+
+          // Logo más pequeño y colocado más arriba para ahorrar espacio
+          try {
+            doc.addImage(logoToUse, 'PNG', margin, 8, 28, 18);
+          } catch (error) {
+            try {
+              doc.addImage(MIRG_LOGO_BASE64, 'PNG', margin, 8, 28, 18);
+            } catch (fallbackError) {
+              console.log('Error adding logo to second page (compact header)');
+            }
+          }
+
+          // Información de cotización alineada verticalmente con el logo
+          doc.setTextColor(100, 116, 139);
+          doc.setFontSize(10);
+          const quoteNumberDisplay = submission.trackingCode || `COT-${submission.id.substring(0, 8).toUpperCase()}`;
+          doc.text(`Cotización: ${quoteNumberDisplay}`, pageWidth - margin - 45, 20);
+
+          // Empezar el contenido de la página justo debajo del header compacto
+          yPosition = 42;
 
       // === TÍTULO DE PRODUCTOS ULTRA ELEGANTE ===
       doc.setFillColor(240, 240, 240);
@@ -2377,24 +2473,22 @@ export const useQuoteExport = () => {
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPosition + 10);
-        doc.text('CANT.', margin + 120, yPosition + 10, { align: 'center' });
-        doc.text('TOTAL', pageWidth - margin - 15, yPosition + 10, { align: 'right' });
-        
-        yPosition += tableHeaderHeight;
+        doc.text('CANT.', margin + 80, yPosition + 10, { align: 'center' });
+        doc.text('PRECIO UNIT.', margin + 110, yPosition + 10, { align: 'center' });
+        doc.text('TOTAL', margin + 150, yPosition + 10, { align: 'center' });
+            
+            yPosition += tableHeaderHeight;
         
         // Procesar cada producto con altura dinámica
         productsWithImages.forEach((product, index) => {
           // Calcular altura necesaria para la fila
           let rowHeight = 25; // Altura base
-          
-          // Si hay imagen, aumentar altura
+
+          // Si hay imagen, aumentar altura base
+          let imageHeight = 0;
           if (product.imageUrl && product.imageUrl.trim()) {
-            rowHeight = 35;
-          }
-          
-          // Si hay descripción larga, aumentar altura
-          if (product.description && product.description.length > 50) {
-            rowHeight = Math.max(rowHeight, 45); // Aumentado para permitir 2 l�neas de descripci�n
+            imageHeight = 35;
+            rowHeight = Math.max(rowHeight, imageHeight);
           }
           
           // Verificar si necesitamos nueva página
@@ -2411,8 +2505,9 @@ export const useQuoteExport = () => {
             doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
             doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPosition + 10);
-            doc.text('CANT.', margin + 120, yPosition + 10, { align: 'center' });
-            doc.text('TOTAL', pageWidth - margin - 15, yPosition + 10, { align: 'right' });
+        doc.text('CANT.', margin + 80, yPosition + 10, { align: 'center' });
+        doc.text('PRECIO UNIT.', margin + 110, yPosition + 10, { align: 'center' });
+        doc.text('TOTAL', margin + 150, yPosition + 10, { align: 'center' });
             
             yPosition += tableHeaderHeight;
           }
@@ -2432,8 +2527,34 @@ export const useQuoteExport = () => {
           
           // Coordenadas para el contenido
           let contentStartX = margin + 5;
+
+          // Calcular espacio disponible para texto basado en la X de la columna CANT.
+          const quantityX = margin + 80;
+          const paddingBetweenColumns = 6;
+          const textAreaWidth = Math.max(40, quantityX - contentStartX - paddingBetweenColumns);
+
+          // Nombre del producto y posible wrapping en hasta 2 líneas
+          doc.setFontSize(10);
+          const productNameLines = doc.splitTextToSize(product.name, textAreaWidth);
+          const nameLinesToShow = productNameLines.slice(0, 2);
+          const nameHeight = nameLinesToShow.length * 8;
+
+          // Descripción (hasta 2 líneas adicionales)
+          let descriptionLines: string[] = [];
+          let descHeight = 0;
+          if (product.description && product.description.trim()) {
+            doc.setFontSize(8);
+            const descMaxWidth = Math.max(30, quantityX - contentStartX - paddingBetweenColumns);
+            descriptionLines = doc.splitTextToSize(product.description, descMaxWidth).slice(0, 2);
+            descHeight = descriptionLines.length * 8 + (descriptionLines.length ? 4 : 0);
+          }
+
+          // Altura mínima necesaria para el contenido textual
+          const textContentHeight = nameHeight + descHeight + 8; // padding interior
+          rowHeight = Math.max(rowHeight, textContentHeight, imageHeight);
+
           const centerY = yPosition + (rowHeight / 2);
-          
+
           // Agregar imagen si existe
           if (product.imageUrl && product.imageUrl.trim()) {
             try {
@@ -2448,46 +2569,44 @@ export const useQuoteExport = () => {
               console.log('Error al cargar imagen:', imageError);
             }
           }
-          
-          // Texto del producto - centrado verticalmente
+
+          // Texto del producto
           doc.setTextColor(31, 41, 55);
-          doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
-          
-          // Calcular espacio disponible para texto
-          const textAreaWidth = 105 - (contentStartX - margin - 5);
-          
-          // Nombre del producto
-          const productNameLines = doc.splitTextToSize(product.name, textAreaWidth);
-          const nameY = centerY - (productNameLines.length > 1 ? 3 : 0);
-          doc.text(productNameLines[0], contentStartX, nameY);
-          
-          // Descripción si existe
-          if (product.description && product.description.trim()) {
+          doc.setFontSize(10);
+
+          // Dibujar nombre en hasta 2 líneas, desde la parte superior del área de contenido
+          const textStartY = yPosition + 6;
+          nameLinesToShow.forEach((line: string, idx: number) => {
+            doc.text(line, contentStartX, textStartY + (idx * 8));
+          });
+
+          // Dibujar descripción debajo del nombre (si existe)
+          if (descriptionLines.length > 0) {
             doc.setFontSize(8);
             doc.setTextColor(100, 116, 139);
-            doc.setFont('helvetica', 'normal');
-            // Dividir texto en hasta 2 lineas
-            const maxWidth = pageWidth - contentStartX - margin - 60; // Aumentado el espacio disponible
-            const descriptionLines = doc.splitTextToSize(product.description, maxWidth);
-            const linesToShow = descriptionLines.slice(0, 2);
-            linesToShow.forEach((line: string, index: number) => {
-              doc.text(line, contentStartX, nameY + 8 + (index * 10));
+            descriptionLines.forEach((line: string, idx: number) => {
+              const descY = textStartY + (nameLinesToShow.length * 8) + 4 + (idx * 8);
+              doc.text(line, contentStartX, descY);
             });
           }
-          
-          // Columnas alineadas - centradas verticalmente
+
+          // Columnas alineadas - centradas verticalmente respecto a rowHeight
           doc.setFontSize(10);
           doc.setTextColor(31, 41, 55);
           doc.setFont('helvetica', 'normal');
-          
+
           // Cantidad
-          doc.text(product.quantity.toString(), margin + 120, centerY, { align: 'center' });
-          
+          doc.text(product.quantity.toString(), margin + 80, centerY, { align: 'center' });
+
+          // Precio unitario
+          doc.text(formatPriceString(product.unitPrice || 'A cotizar'), margin + 110, centerY, { align: 'center' });
+
           // Total (en negrita)
           doc.setFont('helvetica', 'bold');
-          doc.text(formatPriceString(product.total || 'A cotizar'), pageWidth - margin - 5, centerY, { align: 'right' });
-          
+          doc.text(formatPriceString(product.total || 'A cotizar'), margin + 150, centerY, { align: 'center' });
+
+          // Avanzar Y según altura calculada
           yPosition += rowHeight;
         });
         
@@ -2503,8 +2622,8 @@ export const useQuoteExport = () => {
         try {
           (doc as any).autoTable({
             startY: yPosition,
-            head: [['PRODUCTOS / SERVICIOS', 'CANT.', 'TOTAL']],
-            body: productsWithImages.map(product => { const nameWithDescription = product.description && product.description.trim() ? `${product.name}\n${product.description}` : product.name; return [nameWithDescription, product.quantity.toString(), formatPriceString(product.total || "A cotizar")]; }), // Solo nombre, cantidad y total
+            head: [['PRODUCTOS / SERVICIOS', 'CANT.', 'PRECIO UNIT.', 'TOTAL']],
+            body: productsWithImages.map(product => { const nameWithDescription = product.description && product.description.trim() ? `${product.name}\n${product.description}` : product.name; return [nameWithDescription, product.quantity.toString(), formatPriceString(product.unitPrice || "A cotizar"), formatPriceString(product.total || "A cotizar")]; }), // Solo nombre, cantidad y total
             theme: 'grid',
             headStyles: {
               fillColor: [15, 23, 42],
@@ -2525,9 +2644,10 @@ export const useQuoteExport = () => {
               lineWidth: 0.5
             },
             columnStyles: {
-              0: { cellWidth: 110, halign: "left", valign: "top", fontSize: 8, lineHeight: 1.2 },
+              0: { cellWidth: 70, halign: "left", valign: "top", fontSize: 8, lineHeight: 1.2 },
               1: { cellWidth: 25, halign: 'center' },
-              2: { cellWidth: 35, halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] }
+              2: { cellWidth: 35, halign: 'center', fontStyle: 'bold' },
+              3: { cellWidth: 35, halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] }
             },
             alternateRowStyles: {
               fillColor: [248, 250, 252]
@@ -2561,10 +2681,11 @@ export const useQuoteExport = () => {
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPosition + 10);
-        doc.text('CANT.', margin + 120, yPosition + 10, { align: 'center' });
-        doc.text('TOTAL', pageWidth - margin - 15, yPosition + 10, { align: 'right' });
-        
-        yPosition += tableHeaderHeight;
+        doc.text('CANT.', margin + 80, yPosition + 10, { align: 'center' });
+        doc.text('PRECIO UNIT.', margin + 110, yPosition + 10, { align: 'center' });
+        doc.text('TOTAL', margin + 150, yPosition + 10, { align: 'center' });
+            
+            yPosition += tableHeaderHeight;
         
         // Filas de productos
         productData.forEach((row, index) => {
@@ -2590,8 +2711,9 @@ export const useQuoteExport = () => {
           // Limitar texto del producto si es muy largo
           const productName = doc.splitTextToSize(row[0], 110);
           doc.text(productName[0] + (productName.length > 1 ? '...' : ''), margin + 3, yPosition + 9);
-          doc.text(row[1], margin + 120, yPosition + 9, { align: 'center' }); // Cantidad
-          doc.text(formatPriceString(row[3]), pageWidth - margin - 3, yPosition + 9, { align: 'right' }); // Total (saltamos precio unitario)
+          doc.text(row[1], margin + 80, yPosition + 9, { align: 'center' }); // Cantidad
+          doc.text(formatPriceString(row[2] || 'A cotizar'), margin + 110, yPosition + 9, { align: 'center' }); // Precio unitario
+          doc.text(formatPriceString(row[3]), margin + 150, yPosition + 9, { align: 'center' }); // Total
           
           yPosition += rowHeight;
         });
@@ -2816,10 +2938,11 @@ export const useQuoteExport = () => {
       doc.setLineWidth(0.5);
       doc.rect(termsX, termsY - 5, termsWidth, 15, 'S');
       
-      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TÉRMINOS Y CONDICIONES', termsX + 8, termsY + 4);
+  doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  const termsCenterX2 = termsX + (termsWidth / 2);
+  doc.text('TÉRMINOS Y CONDICIONES', termsCenterX2, termsY + 4, { align: 'center' });
 
       termsY += 20;
 
@@ -2827,9 +2950,12 @@ export const useQuoteExport = () => {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
 
+      // Extraer tiempo de entrega de los datos de la cotización o usar valor por defecto
+      const deliveryTime3 = submission.data?.deliveryTime || '7 días hábiles';
+
       const termsAndConditions3 = [
         '1. Condiciones de pago: Acuerdo con el cliente',
-        '2. Tiempo de entrega: 7 días hábiles',
+        `2. Tiempo de entrega: ${deliveryTime3}`,
         '3. Enviar cotización firmada al email indicado'
       ];
 
@@ -2914,7 +3040,11 @@ export const useQuoteExport = () => {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
 
-      const faqs = [
+      // Use custom FAQs if provided, otherwise use default ones
+      const faqs = customFAQs && customFAQs.length > 0 ? customFAQs.map(faq => ({
+        q: faq.question,
+        a: faq.answer
+      })) : [
         {
           q: '¿Qué tipo de maquinados industriales realizan?',
           a: 'Realizamos mecanizado CNC de precisión, torneado, fresado, rectificado y fabricación de piezas especiales según planos y especificaciones técnicas. Trabajamos con diversos materiales como acero, aluminio, bronce y materiales especiales.'
@@ -3013,10 +3143,11 @@ export const useQuoteExport = () => {
       doc.setLineWidth(0.5);
       doc.rect(termsXNew, termsYNew - 5, termsWidthNew, 15, 'S');
       
-      doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TÉRMINOS Y CONDICIONES', termsXNew + 8, termsYNew + 4);
+  doc.setTextColor(255, 255, 255);  // Texto blanco para fondo azul
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  const termsCenterXNew = termsXNew + (termsWidthNew / 2);
+  doc.text('TÉRMINOS Y CONDICIONES', termsCenterXNew, termsYNew + 4, { align: 'center' });
 
       termsYNew += 20;
 
@@ -3024,9 +3155,12 @@ export const useQuoteExport = () => {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
 
+      // Extraer tiempo de entrega de los datos de la cotización o usar valor por defecto
+      const deliveryTime4 = submission.data?.deliveryTime || '7 días hábiles';
+
       const termsAndConditions4 = [
         '1. Condiciones de pago: Acuerdo con el cliente',
-        '2. Tiempo de entrega: 7 días hábiles',
+        `2. Tiempo de entrega: ${deliveryTime4}`,
         '3. Enviar cotización firmada al email indicado'
       ];
 
@@ -3118,7 +3252,8 @@ export const useQuoteExport = () => {
 
   const exportToWord = async (
     submission: QuoteSubmission, 
-    companyInfo: CompanyInfo = defaultCompanyInfo
+    companyInfo: CompanyInfo = defaultCompanyInfo,
+    customFAQs?: Array<{ id: string; question: string; answer: string }>
   ) => {
     setLoading(true);
     
@@ -3269,11 +3404,12 @@ export const useQuoteExport = () => {
             new Paragraph({
               text: 'TÉRMINOS Y CONDICIONES',
               heading: HeadingLevel.HEADING_3,
-              spacing: { after: 200 }
+              spacing: { after: 200 },
+              alignment: AlignmentType.CENTER
             }),
 
             new Paragraph({
-              text: '1. Condiciones de pago: Acuerdo con el cliente\n2. Tiempo de entrega: 7 días hábiles\n3. Enviar cotización firmada al email indicado',
+              text: `1. Condiciones de pago: Acuerdo con el cliente\n2. Tiempo de entrega: ${submission.data?.deliveryTime || '7 días hábiles'}\n3. Enviar cotización firmada al email indicado`,
               spacing: { after: 300 }
             }),
 
@@ -3311,11 +3447,14 @@ export const useQuoteExport = () => {
    */
   return {
     /** Export quote to PDF format */
-    exportToPDF,
+    exportToPDF: (submission: QuoteSubmission, companyInfo?: CompanyInfo, customFAQs?: Array<{ id: string; question: string; answer: string }>) => 
+      exportToPDF(submission, companyInfo, customFAQs),
     /** Export quote to PDF and optionally send via email */
-    exportToPDFAndEmail,
+    exportToPDFAndEmail: (submission: QuoteSubmission, companyInfo?: CompanyInfo, sendEmail?: boolean, customFAQs?: Array<{ id: string; question: string; answer: string }>) => 
+      exportToPDFAndEmail(submission, companyInfo, sendEmail, customFAQs),
     /** Export quote to Word document format */
-    exportToWord,
+    exportToWord: (submission: QuoteSubmission, companyInfo?: CompanyInfo, customFAQs?: Array<{ id: string; question: string; answer: string }>) => 
+      exportToWord(submission, companyInfo, customFAQs),
     /** Loading state indicator */
     loading
   };

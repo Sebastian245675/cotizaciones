@@ -66,7 +66,7 @@ import { cleanFirestoreData, prepareQuoteFormFields } from '@/lib/firebase-utils
 import { useQuoteExport } from '@/hooks/useQuoteExport';
 import CompanySettings from './CompanySettings';
 import QuoteTracking from '../QuoteTracking';
-import { createPOSClient, getPOSClients } from '@/lib/pos-clients-service';
+import { createPOSClient, getPOSClients, type POSClient } from '@/lib/pos-clients-service';
 
 // DEBUG: Verificar que las funciones están disponibles
 console.log('🔍 VERIFICANDO IMPORTACIONES:', {
@@ -124,6 +124,12 @@ interface CompanyInfo {
   email: string;
   website?: string;
   logo?: string;
+}
+
+interface FAQ {
+  id: string;
+  question: string;
+  answer: string;
 }
 
 // Componente especial para productos/servicios
@@ -316,7 +322,9 @@ const QuotesManager: React.FC = () => {
     clientAddress: '',
     clientProfession: '',
     description: '',
+    deliveryTime: '7 días hábiles',
     products: [] as Array<{
+
       id: string;
       name: string;
       description: string;
@@ -327,10 +335,51 @@ const QuotesManager: React.FC = () => {
     }>
   });
 
+  // Client selection states
+  const [existingClients, setExistingClients] = useState<POSClient[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [useExistingClient, setUseExistingClient] = useState<boolean>(false);
+  const [loadingClients, setLoadingClients] = useState<boolean>(false);
+
   // URL sharing states
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [selectedFormForShare, setSelectedFormForShare] = useState<QuoteForm | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState('');
+
+  // FAQ management states
+  const [showFAQEditor, setShowFAQEditor] = useState(false);
+  const [faqs, setFaqs] = useState<FAQ[]>([
+    {
+      id: '1',
+      question: '¿Qué tipo de maquinados industriales realizan?',
+      answer: 'Realizamos mecanizado CNC de precisión, torneado, fresado, rectificado y fabricación de piezas especiales según planos y especificaciones técnicas. Trabajamos con diversos materiales como acero, aluminio, bronce y materiales especiales.'
+    },
+    {
+      id: '2',
+      question: '¿Cuál es el tiempo de entrega típico?',
+      answer: 'Los tiempos varían según la complejidad del proyecto. Piezas estándar: 3-5 días hábiles. Proyectos complejos: 1-3 semanas. Siempre confirmamos tiempos específicos en cada cotización.'
+    },
+    {
+      id: '3',
+      question: '¿Qué certificaciones y estándares manejan?',
+      answer: 'Contamos con certificación ISO 9001 y seguimos estándares de calidad industrial. Todas nuestras piezas son inspeccionadas con equipos de medición calibrados y certificados.'
+    },
+    {
+      id: '4',
+      question: '¿Realizan trabajos de prototipado?',
+      answer: 'Sí, ofrecemos servicios completos de prototipado rápido, desde el diseño asistido por computadora hasta la fabricación de prototipos funcionales para validación y pruebas.'
+    },
+    {
+      id: '5',
+      question: '¿Qué garantía ofrecen en sus trabajos?',
+      answer: 'Ofrecemos garantía de 90 días por defectos de fabricación. Adicionalmente, respaldamos la calidad dimensional y funcional de todas nuestras piezas según especificaciones acordadas.'
+    },
+    {
+      id: '6',
+      question: '¿Manejan proyectos de gran volumen?',
+      answer: 'Sí, tenemos capacidad para proyectos desde piezas unitarias hasta series de producción medianas y grandes. Contamos con múltiples centros de mecanizado para cumplir con volúmenes importantes.'
+    }
+  ]);
 
   // Quote tracking states
   const [showTrackingDialog, setShowTrackingDialog] = useState(false);
@@ -370,6 +419,113 @@ const QuotesManager: React.FC = () => {
     loadCompanySettings();
   }, []);
 
+  // Load existing clients when dialog opens
+  useEffect(() => {
+    if (showManualQuoteDialog && useExistingClient) {
+      loadExistingClients();
+    }
+  }, [showManualQuoteDialog, useExistingClient]);
+
+  // Load existing clients
+  const loadExistingClients = async () => {
+    try {
+      setLoadingClients(true);
+      const clients = await getPOSClients();
+      setExistingClients(clients);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los clientes existentes",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
+  // Handle client selection
+  const handleClientSelection = (clientId: string) => {
+    setSelectedClientId(clientId);
+    const selectedClient = existingClients.find(client => client.id === clientId);
+    
+    if (selectedClient) {
+      setManualQuoteData(prev => ({
+        ...prev,
+        clientName: selectedClient.nombre,
+        clientEmail: selectedClient.email || '',
+        clientPhone: selectedClient.telefono,
+        clientCompany: selectedClient.empresa || '', // Nuevo campo
+        clientAddress: selectedClient.residencia || '',
+        clientProfession: selectedClient.profesion || '' // Nuevo campo
+      }));
+      
+      toast({
+        title: "Cliente seleccionado",
+        description: `Datos de ${selectedClient.nombre} cargados automáticamente`,
+      });
+    }
+  };
+
+  // Reset manual quote form
+  const resetManualQuoteForm = () => {
+    setManualQuoteData({
+      clientName: '',
+      clientEmail: '',
+      clientPhone: '',
+      clientCompany: '',
+      clientAddress: '',
+      clientProfession: '',
+      description: '',
+      deliveryTime: '7 días hábiles',
+      products: []
+    });
+    setSelectedClientId('');
+    setUseExistingClient(false);
+  };
+
+  // FAQ management functions
+  const addFAQ = () => {
+    const newFAQ: FAQ = {
+      id: Date.now().toString(),
+      question: '',
+      answer: ''
+    };
+    setFaqs(prev => [...prev, newFAQ]);
+  };
+
+  const updateFAQ = (id: string, field: 'question' | 'answer', value: string) => {
+    setFaqs(prev => prev.map(faq => 
+      faq.id === id ? { ...faq, [field]: value } : faq
+    ));
+  };
+
+  const removeFAQ = (id: string) => {
+    setFaqs(prev => prev.filter(faq => faq.id !== id));
+  };
+
+  const saveFAQs = () => {
+    // Aquí se podrían guardar las FAQs en localStorage o en Firebase
+    localStorage.setItem('custom-faqs', JSON.stringify(faqs));
+    setShowFAQEditor(false);
+    toast({
+      title: "Guardado",
+      description: "Las preguntas frecuentes han sido actualizadas.",
+    });
+  };
+
+  // Load FAQs from localStorage on component mount
+  useEffect(() => {
+    const savedFAQs = localStorage.getItem('custom-faqs');
+    if (savedFAQs) {
+      try {
+        setFaqs(JSON.parse(savedFAQs));
+      } catch (error) {
+        console.error('Error loading saved FAQs:', error);
+      }
+    }
+  }, []);
+
   const loadCompanySettings = () => {
     // Cargar configuración de la empresa desde localStorage
     const savedCompany = localStorage.getItem('companySettings');
@@ -389,7 +545,7 @@ const QuotesManager: React.FC = () => {
 
   const handleExportToPDF = async (submission: QuoteSubmission) => {
     try {
-      await exportToPDF(submission, companyInfo);
+      await exportToPDF(submission, companyInfo, faqs);
       toast({
         title: "PDF Generado",
         description: "La cotización se ha exportado exitosamente a PDF"
@@ -594,7 +750,7 @@ const QuotesManager: React.FC = () => {
       };
       
       // Exportar PDF con precios
-      await exportToPDF(modifiedSubmission, companyInfo);
+      await exportToPDF(modifiedSubmission, companyInfo, faqs);
       
       toast({
         title: "Cotización Respondida",
@@ -645,7 +801,7 @@ const QuotesManager: React.FC = () => {
       };
       
       // Exportar PDF con precios y enviar por correo si se solicita
-      const result = await exportToPDFAndEmail(modifiedSubmission, companyInfo, sendEmail);
+      const result = await exportToPDFAndEmail(modifiedSubmission, companyInfo, sendEmail, faqs);
       
       if (result.emailSent) {
         toast({
@@ -827,6 +983,8 @@ const QuotesManager: React.FC = () => {
       telefono: manualQuoteData.clientPhone || '',
       email: manualQuoteData.clientEmail,
       residencia: manualQuoteData.clientAddress || '',
+      empresa: manualQuoteData.clientCompany || '', // Nuevo campo
+      profesion: manualQuoteData.clientProfession || '', // Nuevo campo
       estado: 'activo' as const,
       origen: 'cotizacion' as const,
       codigoCotizacion: quoteId
@@ -871,10 +1029,10 @@ const QuotesManager: React.FC = () => {
     
     try {
       // Validation
-      if (!manualQuoteData.clientName || !manualQuoteData.clientEmail || manualQuoteData.products.length === 0) {
+      if (!manualQuoteData.clientName || manualQuoteData.products.length === 0) {
         toast({
           title: "Error",
-          description: "Por favor complete al menos el nombre, email del cliente y agregue productos.",
+          description: "Por favor complete al menos el nombre del cliente y agregue productos.",
           variant: "destructive"
         });
         return;
@@ -892,9 +1050,10 @@ const QuotesManager: React.FC = () => {
           address: manualQuoteData.clientAddress,
           profession: manualQuoteData.clientProfession,
           description: manualQuoteData.description,
+          deliveryTime: manualQuoteData.deliveryTime,
           products: manualQuoteData.products
         },
-        status: 'responded' as const,
+        status: 'pending' as const,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
         customerEmail: manualQuoteData.clientEmail,
@@ -945,17 +1104,16 @@ const QuotesManager: React.FC = () => {
       console.log('🔍 VERIFICANDO CONDICIÓN PARA CREAR CLIENTE:');
       console.log('  - clientName existe:', !!manualQuoteData.clientName, manualQuoteData.clientName);
       console.log('  - clientEmail existe:', !!manualQuoteData.clientEmail, manualQuoteData.clientEmail);
-      console.log('  - Condición cumplida:', !!(manualQuoteData.clientName && manualQuoteData.clientEmail));
+      console.log('  - Condición cumplida:', !!manualQuoteData.clientName); // Solo requiere nombre
       
-      if (manualQuoteData.clientName && manualQuoteData.clientEmail) {
+      if (manualQuoteData.clientName) {
         console.log('✅ CONDICIÓN CUMPLIDA - Iniciando creación automática de cliente...');
         console.log('📄 ID de cotización creada:', docRef.id);
         await crearClienteDirecto(docRef.id);
       } else {
         console.log('❌ CONDICIÓN NO CUMPLIDA - No se creará cliente automáticamente');
         console.log('   Faltan datos:', {
-          nombre: !manualQuoteData.clientName ? 'FALTANTE' : 'OK',
-          email: !manualQuoteData.clientEmail ? 'FALTANTE' : 'OK'
+          nombre: !manualQuoteData.clientName ? 'FALTANTE' : 'OK'
         });
       }
 
@@ -970,7 +1128,7 @@ const QuotesManager: React.FC = () => {
             formId: 'manual-quote',
             formName: 'Cotización Manual',
             data: quoteSubmission.data,
-            status: 'responded' as const,
+            status: 'pending' as const,
             createdAt: new Date(),
             updatedAt: new Date(),
             customerEmail: manualQuoteData.clientEmail,
@@ -984,7 +1142,7 @@ const QuotesManager: React.FC = () => {
             }
           };
           
-          await exportToPDF(tempSubmission, companyInfo);
+          await exportToPDF(tempSubmission, companyInfo, faqs);
           
           toast({
             title: "PDF generado",
@@ -1009,6 +1167,7 @@ const QuotesManager: React.FC = () => {
         clientAddress: '',
         clientProfession: '',
         description: '',
+        deliveryTime: '7 días hábiles',
         products: []
       });
       setShowManualQuoteDialog(false);
@@ -1041,10 +1200,20 @@ const QuotesManager: React.FC = () => {
     
     try {
       // Validation
-      if (!manualQuoteData.clientName || !manualQuoteData.clientEmail || manualQuoteData.products.length === 0) {
+      if (!manualQuoteData.clientName || manualQuoteData.products.length === 0) {
         toast({
           title: "Error",
-          description: "Por favor complete al menos el nombre, email del cliente y agregue productos.",
+          description: "Por favor complete al menos el nombre del cliente y agregue productos.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Additional validation for email if sending email
+      if (sendEmail && !manualQuoteData.clientEmail) {
+        toast({
+          title: "Error",
+          description: "Para enviar por correo es necesario el email del cliente.",
           variant: "destructive"
         });
         return;
@@ -1062,9 +1231,10 @@ const QuotesManager: React.FC = () => {
           address: manualQuoteData.clientAddress,
           profession: manualQuoteData.clientProfession,
           description: manualQuoteData.description,
+          deliveryTime: manualQuoteData.deliveryTime,
           products: manualQuoteData.products
         },
-        status: 'responded' as const,
+        status: 'pending' as const,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
         customerEmail: manualQuoteData.clientEmail,
@@ -1109,18 +1279,16 @@ const QuotesManager: React.FC = () => {
       // CREAR CLIENTE AUTOMÁTICAMENTE EN SISTEMA POS (FUNCIÓN EMAIL)
       console.log('🔍 VERIFICANDO CONDICIÓN PARA CREAR CLIENTE (EMAIL):');
       console.log('  - clientName existe:', !!manualQuoteData.clientName, manualQuoteData.clientName);
-      console.log('  - clientEmail existe:', !!manualQuoteData.clientEmail, manualQuoteData.clientEmail);
-      console.log('  - Condición cumplida:', !!(manualQuoteData.clientName && manualQuoteData.clientEmail));
+      console.log('  - Condición cumplida:', !!manualQuoteData.clientName);
       
-      if (manualQuoteData.clientName && manualQuoteData.clientEmail) {
+      if (manualQuoteData.clientName) {
         console.log('✅ CONDICIÓN CUMPLIDA (EMAIL) - Iniciando creación automática de cliente...');
         console.log('📄 ID de cotización creada:', docRef.id);
         await crearClienteDirecto(docRef.id);
       } else {
         console.log('❌ CONDICIÓN NO CUMPLIDA (EMAIL) - No se creará cliente automáticamente');
         console.log('   Faltan datos:', {
-          nombre: !manualQuoteData.clientName ? 'FALTANTE' : 'OK',
-          email: !manualQuoteData.clientEmail ? 'FALTANTE' : 'OK'
+          nombre: !manualQuoteData.clientName ? 'FALTANTE' : 'OK'
         });
       }
 
@@ -1130,7 +1298,7 @@ const QuotesManager: React.FC = () => {
         formId: 'manual-quote',
         formName: 'Cotización Manual',
         data: quoteSubmission.data,
-        status: 'responded' as const,
+        status: 'pending' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
         customerEmail: manualQuoteData.clientEmail,
@@ -1145,7 +1313,7 @@ const QuotesManager: React.FC = () => {
       };
 
       // Generate PDF and send email
-      const result = await exportToPDFAndEmail(tempSubmission, companyInfo, sendEmail);
+      const result = await exportToPDFAndEmail(tempSubmission, companyInfo, sendEmail, faqs);
 
       if (result.emailSent) {
         toast({
@@ -1174,6 +1342,7 @@ const QuotesManager: React.FC = () => {
         clientAddress: '',
         clientProfession: '',
         description: '',
+        deliveryTime: '7 días hábiles',
         products: []
       });
       setShowManualQuoteDialog(false);
@@ -1618,7 +1787,10 @@ const QuotesManager: React.FC = () => {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => setShowManualQuoteDialog(true)}
+            onClick={() => {
+              resetManualQuoteForm();
+              setShowManualQuoteDialog(true);
+            }}
             className="bg-green-50 text-green-700 border-green-300 hover:bg-green-100"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -1638,6 +1810,13 @@ const QuotesManager: React.FC = () => {
           >
             <Building className="h-4 w-4 mr-2" />
             Configurar Empresa
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowFAQEditor(true)}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Editar Preguntas Frecuentes
           </Button>
         </div>
       </div>
@@ -2343,6 +2522,93 @@ const QuotesManager: React.FC = () => {
         initialData={companyInfo}
       />
 
+      {/* FAQ Editor Dialog */}
+      <Dialog open={showFAQEditor} onOpenChange={setShowFAQEditor}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Editar Preguntas Frecuentes
+            </DialogTitle>
+            <DialogDescription>
+              Personaliza las preguntas frecuentes que aparecerán en los PDFs de cotización.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-medium">Preguntas y Respuestas</Label>
+              <Button onClick={addFAQ} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Pregunta
+              </Button>
+            </div>
+
+            {faqs.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-500">No hay preguntas agregadas</p>
+                <Button onClick={addFAQ} variant="outline" className="mt-2">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Primera Pregunta
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {faqs.map((faq, index) => (
+                  <Card key={faq.id} className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Pregunta {index + 1}</Label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeFAQ(faq.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor={`question-${faq.id}`}>Pregunta</Label>
+                        <Input
+                          id={`question-${faq.id}`}
+                          value={faq.question}
+                          onChange={(e) => updateFAQ(faq.id, 'question', e.target.value)}
+                          placeholder="Escribe la pregunta aquí..."
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor={`answer-${faq.id}`}>Respuesta</Label>
+                        <Textarea
+                          id={`answer-${faq.id}`}
+                          value={faq.answer}
+                          onChange={(e) => updateFAQ(faq.id, 'answer', e.target.value)}
+                          placeholder="Escribe la respuesta aquí..."
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFAQEditor(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveFAQs}>
+              <Save className="h-4 w-4 mr-2" />
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Share Form Dialog */}
       <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
         <DialogContent className="max-w-md">
@@ -2603,15 +2869,111 @@ const QuotesManager: React.FC = () => {
             <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                 <User className="h-4 w-4" />
-                <span className="text-sm font-medium">Creación automática de cliente</span>
+                <span className="text-sm font-medium">Gestión de Clientes</span>
               </div>
               <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                Al crear la cotización, el cliente se agregará automáticamente al sistema de clientes si no existe.
+                Puede seleccionar un cliente existente del sistema POS o crear uno nuevo. Los datos se autocompletarán al seleccionar un cliente existente.
               </p>
             </div>
           </DialogHeader>
 
           <div className="space-y-6">
+            {/* Client Selection Mode */}
+            <div className="border rounded-lg p-4 bg-slate-50">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-slate-600" />
+                  <span className="font-medium text-slate-800">Información del Cliente</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={!useExistingClient ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setUseExistingClient(false);
+                      setSelectedClientId('');
+                      setManualQuoteData(prev => ({
+                        ...prev,
+                        clientName: '',
+                        clientEmail: '',
+                        clientPhone: '',
+                        clientCompany: '',
+                        clientAddress: '',
+                        clientProfession: ''
+                      }));
+                    }}
+                  >
+                    Nuevo Cliente
+                  </Button>
+                  <Button
+                    variant={useExistingClient ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setUseExistingClient(true);
+                      if (!existingClients.length) {
+                        loadExistingClients();
+                      }
+                    }}
+                  >
+                    Cliente Existente
+                  </Button>
+                </div>
+              </div>
+
+              {useExistingClient && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="existingClient">Seleccionar Cliente Existente</Label>
+                    {loadingClients ? (
+                      <div className="flex items-center gap-2 p-3 border rounded-md bg-white">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span className="text-sm text-muted-foreground">Cargando clientes...</span>
+                      </div>
+                    ) : (
+                      <Select value={selectedClientId} onValueChange={handleClientSelection}>
+                        <SelectTrigger className="bg-white">
+                          <SelectValue placeholder="Seleccione un cliente existente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {existingClients.map((client) => (
+                            <SelectItem key={client.id} value={client.id || ''}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{client.nombre}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  {client.email || client.telefono} • ID: {client.clienteId}
+                                </span>
+                                {(client.empresa || client.profesion) && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {client.empresa && `${client.empresa}`}
+                                    {client.empresa && client.profesion && ' • '}
+                                    {client.profesion && `${client.profesion}`}
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  
+                  {existingClients.length === 0 && !loadingClients && (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <p className="text-sm">No hay clientes registrados en el sistema.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => setUseExistingClient(false)}
+                      >
+                        Crear Nuevo Cliente
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Client Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -2621,17 +2983,19 @@ const QuotesManager: React.FC = () => {
                   value={manualQuoteData.clientName}
                   onChange={(e) => setManualQuoteData(prev => ({ ...prev, clientName: e.target.value }))}
                   placeholder="Nombre completo del cliente"
+                  disabled={useExistingClient && selectedClientId !== ''}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="clientEmail">Email *</Label>
+                <Label htmlFor="clientEmail">Email</Label>
                 <Input
                   id="clientEmail"
                   type="email"
                   value={manualQuoteData.clientEmail}
                   onChange={(e) => setManualQuoteData(prev => ({ ...prev, clientEmail: e.target.value }))}
-                  placeholder="cliente@ejemplo.com"
+                  placeholder="cliente@ejemplo.com (opcional)"
+                  disabled={useExistingClient && selectedClientId !== ''}
                 />
               </div>
 
@@ -2642,6 +3006,7 @@ const QuotesManager: React.FC = () => {
                   value={manualQuoteData.clientPhone}
                   onChange={(e) => setManualQuoteData(prev => ({ ...prev, clientPhone: e.target.value }))}
                   placeholder="+52 811-123-4567"
+                  disabled={useExistingClient && selectedClientId !== ''}
                 />
               </div>
 
@@ -2652,6 +3017,7 @@ const QuotesManager: React.FC = () => {
                   value={manualQuoteData.clientCompany}
                   onChange={(e) => setManualQuoteData(prev => ({ ...prev, clientCompany: e.target.value }))}
                   placeholder="Nombre de la empresa"
+                  disabled={useExistingClient && selectedClientId !== ''}
                 />
               </div>
 
@@ -2662,6 +3028,7 @@ const QuotesManager: React.FC = () => {
                   value={manualQuoteData.clientAddress}
                   onChange={(e) => setManualQuoteData(prev => ({ ...prev, clientAddress: e.target.value }))}
                   placeholder="Dirección completa"
+                  disabled={useExistingClient && selectedClientId !== ''}
                 />
               </div>
 
@@ -2672,6 +3039,7 @@ const QuotesManager: React.FC = () => {
                   value={manualQuoteData.clientProfession}
                   onChange={(e) => setManualQuoteData(prev => ({ ...prev, clientProfession: e.target.value }))}
                   placeholder="Profesión u ocupación"
+                  disabled={useExistingClient && selectedClientId !== ''}
                 />
               </div>
             </div>
@@ -2684,6 +3052,16 @@ const QuotesManager: React.FC = () => {
                 onChange={(e) => setManualQuoteData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Descripción detallada del proyecto o servicio requerido"
                 rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deliveryTime">Tiempo de Entrega</Label>
+              <Input
+                id="deliveryTime"
+                value={manualQuoteData.deliveryTime}
+                onChange={(e) => setManualQuoteData(prev => ({ ...prev, deliveryTime: e.target.value }))}
+                placeholder="Ej: 7 días hábiles, 2-3 semanas, 1 mes"
               />
             </div>
 

@@ -21,6 +21,8 @@ export interface POSClient {
   telefono: string;
   email?: string;
   residencia?: string;
+  empresa?: string; // Nuevo campo para empresa
+  profesion?: string; // Nuevo campo para profesión
   puntos: number;
   totalCompras: number;
   cantidadCompras: number;
