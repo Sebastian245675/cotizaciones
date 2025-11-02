@@ -96,7 +96,7 @@ const CompanySettings: React.FC<CompanySettingsProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building className="h-5 w-5 text-blue-600" />

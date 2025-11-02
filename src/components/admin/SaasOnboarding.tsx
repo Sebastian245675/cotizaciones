@@ -465,6 +465,7 @@ const SaasOnboarding: React.FC<SaasOnboardingProps> = ({ onComplete }) => {
                         value={industry}
                         onChange={(e) => setIndustry(e.target.value)}
                         className="w-full px-6 py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition-all duration-300 text-lg bg-white/50 backdrop-blur-sm"
+                        aria-label="Seleccionar sector empresarial"
                       >
                         <option value="">Selecciona tu sector</option>
                         {industries.map((ind) => (
