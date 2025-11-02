@@ -504,7 +504,7 @@ export const useQuoteExport = () => {
       // Información de contacto - derecha, compacta
       const contactX = pageWidth - margin - 68;
       
-      doc.setFontSize(7);
+      doc.setFontSize(8.5);
       
       // Email
       doc.setFont('helvetica', 'bold');
@@ -547,21 +547,21 @@ export const useQuoteExport = () => {
       doc.setFont('helvetica', 'bold');
       doc.text('DOCUMENTO OFICIAL', margin + 27.5, yPosition + 5, { align: 'center' });
       
-      yPosition += 11;
+      yPosition += 10;
       
       // Título principal proporcional
       doc.setTextColor(45, 45, 45);
-      doc.setFontSize(20);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text('COTIZACIÓN', margin, yPosition);
+      doc.text('COTIZACIÓN', margin + 27.5, yPosition - 0, { align: 'center' });
       
       // Subtítulo
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(120, 120, 120);
-      doc.text('Propuesta Comercial', margin, yPosition + 7.5);
+      doc.text('Propuesta Comercial', margin, yPosition + 7);
       
-      yPosition += 16;
+      yPosition += 15;
 
       // === INFORMACIÓN DE LA COTIZACIÓN - BADGES COMPACTOS ===
       const quoteDate = new Date().toLocaleDateString('es-ES');
@@ -1111,13 +1111,13 @@ export const useQuoteExport = () => {
           
           // Fondo alternado (sin bordes individuales - el borde exterior redondeado los cubre)
           if (isEven) {
-            doc.setFillColor(248, 250, 252);
+            doc.setFillColor(59, 130, 246);
             doc.rect(margin, yPosition, pageWidth - (margin * 2), rowHeight, 'F');
           }
           
           // Línea divisoria horizontal entre filas (solo si no es la última fila, sin llegar a los bordes)
           if (index < productsWithImages.length - 1) {
-            doc.setDrawColor(229, 231, 235);
+            doc.setDrawColor(59, 130, 246);
             doc.setLineWidth(0.3);
             doc.line(margin + 2, yPosition + rowHeight, pageWidth - margin - 2, yPosition + rowHeight);
           }
@@ -1189,7 +1189,7 @@ export const useQuoteExport = () => {
           
           // Columnas alineadas - centradas verticalmente respecto a rowHeight
           doc.setFontSize(10);
-          doc.setTextColor(31, 41, 55);
+          doc.setTextColor(59, 130, 246);
           doc.setFont('helvetica', 'normal');
 
           // Cantidad
@@ -1242,7 +1242,7 @@ export const useQuoteExport = () => {
               fontSize: 9,
               cellPadding: 4,
               textColor: PDF_CONFIG.colors.text,
-              lineColor: [229, 231, 235], // Borde de fila gris claro
+              lineColor: [59, 130, 246], // Borde de fila gris claro
               lineWidth: 0.5
             },
             columnStyles: {
@@ -1252,7 +1252,7 @@ export const useQuoteExport = () => {
               3: { cellWidth: 30, halign: 'right', valign: 'middle', fontStyle: 'bold' }
             },
             alternateRowStyles: {
-              fillColor: [255, 255, 255] // Sin color de fondo alterno
+              fillColor: [59, 130, 246] // Sin color de fondo alterno
             },
             margin: { left: margin, right: margin },
             styles: {

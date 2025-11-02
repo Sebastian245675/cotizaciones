@@ -2,6 +2,7 @@
   "name": "covenant-pos-desktop",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "main": "pos-desktop.js",
   "pkg": {
     "scripts": [
