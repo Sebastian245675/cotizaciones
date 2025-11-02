@@ -1,0 +1,376 @@
+/* ============================================
+   ESTILOS RESPONSIVE PARA POS SALES SYSTEM
+   Optimizado para móviles y tablets
+   ============================================ */
+
+/* === MOBILE FIRST: Base styles para móviles === */
+@media (max-width: 640px) {
+  /* Header compacto */
+  .pos-container .bg-blue-600 {
+    padding: 0.375rem !important;
+  }
+  
+  .pos-container h1 {
+    font-size: 0.875rem !important;
+  }
+  
+  /* Ocultar elementos no esenciales en móvil */
+  .pos-container .hidden-mobile {
+    display: none !important;
+  }
+  
+  /* Pestañas de ventas - Stack vertical en móvil */
+  .pos-container .tabs-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .pos-container .tab-button {
+    font-size: 0.75rem !important;
+    padding: 0.5rem !important;
+    min-width: 80px;
+  }
+  
+  /* Tabla de carrito - Responsive */
+  .pos-container table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 0.75rem;
+  }
+  
+  .pos-container thead {
+    display: none; /* Ocultar encabezados en móvil */
+  }
+  
+  .pos-container tbody,
+  .pos-container tr {
+    display: block;
+    width: 100%;
+  }
+  
+  .pos-container tr {
+    margin-bottom: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: white;
+  }
+  
+  .pos-container td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0 !important;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  
+  .pos-container td:last-child {
+    border-bottom: none;
+  }
+  
+  .pos-container td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #374151;
+    margin-right: 1rem;
+    flex-shrink: 0;
+  }
+  
+  /* Botones de cantidad más grandes para tocar */
+  .pos-container button {
+    min-height: 44px; /* Touch target size recomendado */
+    min-width: 44px;
+  }
+  
+  /* Input más grandes */
+  .pos-container input[type="text"],
+  .pos-container input[type="number"],
+  .pos-container input[type="search"] {
+    font-size: 16px !important; /* Evita zoom en iOS */
+    min-height: 44px;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    pointer-events: auto !important;
+    cursor: text !important;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  /* Asegurar que el input de búsqueda sea clickeable */
+  .pos-container input[placeholder*="buscar"],
+  .pos-container input[placeholder*="Buscar"],
+  .pos-container input[placeholder*="Escanear"] {
+    position: relative !important;
+    z-index: 100 !important;
+    background: white !important;
+    border: 2px solid #e5e7eb !important;
+    padding: 0.75rem !important;
+    width: 100% !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+  
+  /* Contenedor del input de búsqueda */
+  .pos-container .relative:has(input[placeholder*="buscar"]),
+  .pos-container .relative:has(input[placeholder*="Escanear"]) {
+    position: relative !important;
+    z-index: 100 !important;
+    display: block !important;
+    width: 100% !important;
+  }
+  
+  /* Iconos dentro del input - no deben bloquear clicks */
+  .pos-container input + .absolute,
+  .pos-container .absolute:has(+ input) {
+    pointer-events: none !important;
+  }
+  
+  /* Cards más compactos */
+  .pos-container .card {
+    margin: 0.5rem !important;
+  }
+  
+  .pos-container .card-header {
+    padding: 0.75rem !important;
+  }
+  
+  .pos-container .card-content {
+    padding: 0.75rem !important;
+  }
+  
+  /* Grid de productos - 1 columna en móvil */
+  .pos-container .products-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+  
+  /* Producto card más compacto */
+  .pos-container .product-card {
+    padding: 0.75rem !important;
+  }
+  
+  /* Botones de acción flotantes */
+  .pos-container .floating-actions {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 1000;
+  }
+  
+  /* Modal de pago - Full screen en móvil */
+  .pos-container .payment-modal {
+    max-width: 100% !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Teclado numérico más grande */
+  .pos-container .numeric-keypad button {
+    font-size: 1.5rem !important;
+    min-height: 60px !important;
+  }
+  
+  /* Resumen de venta sticky en móvil */
+  .pos-container .sale-summary {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 2px solid #3b82f6;
+    padding: 1rem;
+    box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+  }
+  
+  /* Búsqueda de productos sticky */
+  .pos-container .search-bar {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 50;
+    padding: 0.75rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Espaciado reducido */
+  .pos-container .space-y-4 {
+    gap: 0.5rem !important;
+  }
+  
+  /* Scroll suave */
+  .pos-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Ocultar sidebar automáticamente en móvil */
+  .pos-container .sidebar-container {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .pos-container .sidebar-container.open {
+    transform: translateX(0);
+  }
+}
+
+/* === TABLET: 640px - 1024px === */
+@media (min-width: 640px) and (max-width: 1024px) {
+  /* Grid de productos - 2 columnas en tablet */
+  .pos-container .products-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  /* Tabla más legible */
+  .pos-container table {
+    font-size: 0.875rem;
+  }
+  
+  /* Mostrar algunos elementos ocultos en móvil */
+  .pos-container .hidden-mobile {
+    display: flex !important;
+  }
+}
+
+/* === DESKTOP: > 1024px === */
+@media (min-width: 1024px) {
+  /* Grid de productos - 3-4 columnas en desktop */
+  .pos-container .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important;
+  }
+  
+  /* Layout de dos columnas */
+  .pos-container .two-column-layout {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 1rem;
+  }
+}
+
+/* === OPTIMIZACIONES TOUCH === */
+@media (hover: none) and (pointer: coarse) {
+  /* Dispositivos táctiles */
+  .pos-container button,
+  .pos-container a,
+  .pos-container [role="button"] {
+    min-height: 48px;
+    min-width: 48px;
+    touch-action: manipulation;
+  }
+  
+  /* Eliminar hover effects en touch */
+  .pos-container *:hover {
+    transform: none !important;
+  }
+  
+  /* Active state visible */
+  .pos-container button:active,
+  .pos-container a:active {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+/* === ORIENTACIÓN LANDSCAPE EN MÓVIL === */
+@media (max-width: 896px) and (orientation: landscape) {
+  .pos-container {
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .pos-container .card-header {
+    padding: 0.5rem !important;
+  }
+  
+  .pos-container h1,
+  .pos-container h2,
+  .pos-container h3 {
+    font-size: 0.875rem !important;
+  }
+}
+
+/* === ACCESIBILIDAD === */
+@media (prefers-reduced-motion: reduce) {
+  .pos-container * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* === DARK MODE (opcional) === */
+@media (prefers-color-scheme: dark) {
+  .pos-container {
+    background: #1f2937;
+    color: #f9fafb;
+  }
+  
+  .pos-container .bg-white {
+    background: #374151 !important;
+  }
+  
+  .pos-container .text-gray-900 {
+    color: #f9fafb !important;
+  }
+}
+
+/* === FIX PARA iOS === */
+@supports (-webkit-touch-callout: none) {
+  .pos-container input {
+    font-size: 16px !important; /* Previene zoom automático en iOS */
+  }
+  
+  .pos-container {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+  }
+}
+
+/* === LOADING STATES === */
+.pos-container .loading-skeleton {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* === MEJORAS DE RENDIMIENTO === */
+.pos-container {
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.pos-container * {
+  box-sizing: border-box;
+}
+
+/* === SCROLLBAR CUSTOM PARA MÓVIL === */
+.pos-container ::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.pos-container ::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.pos-container ::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 2px;
+}
+
+.pos-container ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}

@@ -88,6 +88,7 @@
     "crypto-js": "^4.2.0",
     "date-fns": "^3.6.0",
     "docx": "^9.5.1",
+    "electron-is-dev": "^3.0.1",
     "embla-carousel-react": "^8.3.0",
     "file-saver": "^2.0.5",
     "firebase": "^11.10.0",
@@ -131,7 +132,6 @@
     "cross-env": "^10.0.0",
     "electron": "^38.1.2",
     "electron-builder": "^26.0.12",
-    "electron-is-dev": "^3.0.1",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
@@ -149,14 +149,18 @@
   },
   "build": {
     "appId": "com.covenant.pos",
-    "productName": "Covenant POS",
+    "productName": "CovenantPOS",
+    "asar": true,
     "files": [
       "pos-desktop.js",
-      "dist/**/*",
-      "backend/src/**/*",
-      "backend/data/**/*",
-      "backend/package.json",
-      "backend/node_modules/**/*"
+      "backend/src/electron-main.js",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "dist"
+      }
     ],
     "directories": {
       "output": "builds"
@@ -167,19 +171,10 @@
           "target": "portable",
           "arch": ["x64"]
         }
-      ],
-      "forceCodeSigning": false,
-      "signAndEditExecutable": false
+      ]
     },
     "portable": {
       "artifactName": "CovenantPOS.exe"
-    },
-    "extraResources": [
-      {
-        "from": "backend/",
-        "to": "backend/",
-        "filter": ["**/*"]
-      }
-    ]
+    }
   }
 }

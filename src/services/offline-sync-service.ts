@@ -11,11 +11,19 @@ export class OfflineSyncService {
     if (this.isInitialized) return;
 
     try {
+      // Detectar si estamos en móvil
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        console.log('📱 Dispositivo móvil detectado - Usando solo Firebase (sin backend local)');
+        this.isInitialized = true;
+        return;
+      }
+
       // Verificar si es la primera vez (base local vacía)
       const isFirstTime = await this.isFirstTimeSetup();
       
       if (isFirstTime && navigator.onLine) {
-
         await this.performInitialSync();
       }
 
@@ -23,6 +31,8 @@ export class OfflineSyncService {
       console.log('✅ Servicio de sincronización inicializado');
     } catch (error) {
       console.error('❌ Error inicializando servicio de sincronización:', error);
+      // No lanzar error, solo loguear
+      this.isInitialized = true;
     }
   }
 
@@ -32,7 +42,7 @@ export class OfflineSyncService {
       const productsData = products.data as any[];
       return !products.success || !productsData || productsData.length === 0;
     } catch {
-      return true; // Si no puede conectar al backend, asumir primera vez
+      return false; // Si no puede conectar al backend, no intentar sync
     }
   }
 

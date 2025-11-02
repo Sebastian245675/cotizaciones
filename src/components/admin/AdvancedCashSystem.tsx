@@ -356,22 +356,13 @@ const AdvancedAlert: React.FC<{ alert: AlertSystem; onResolve: (id: string) => v
 
 export const CashRegisterSystem: React.FC = () => {
   
-  // 🚨 RESET FORZADO: Limpiar completamente el estado al iniciar
+  // ⚠️ NO hacer reset de localStorage - necesitamos preservar activeShiftId del módulo de ventas
   useEffect(() => {
-    console.log('🔄 RESET FORZADO COMPLETO - Iniciando con estado limpio');
+    console.log('✅ CashRegisterSystem iniciado - Preservando activeShiftId:', localStorage.getItem('activeShiftId'));
     
-    // Limpiar storage
-    if (typeof window !== 'undefined') {
-      localStorage.clear();
-      sessionStorage.clear();
-    }
-    
-    // Forzar recarga del DOM para limpiar cualquier estado residual
-    const interval = setTimeout(() => {
-      console.log('✅ Estado inicial limpiado');
-    }, 100);
-    
-    return () => clearTimeout(interval);
+    return () => {
+      console.log('🔄 CashRegisterSystem desmontado');
+    };
   }, []);
   
   // Función auxiliar para convertir fechas de Firebase
@@ -757,10 +748,26 @@ export const CashRegisterSystem: React.FC = () => {
         (snapshot) => {
           const reportsData = snapshot.docs.map(doc => {
             const data = doc.data();
+            
+            // Manejar diferentes formatos de fecha
+            let dateValue = new Date();
+            if (data.date) {
+              if (typeof data.date.toDate === 'function') {
+                // Es un Timestamp de Firebase
+                dateValue = data.date.toDate();
+              } else if (data.date instanceof Date) {
+                // Ya es un objeto Date
+                dateValue = data.date;
+              } else if (typeof data.date === 'string') {
+                // Es un string de fecha
+                dateValue = new Date(data.date);
+              }
+            }
+            
             return {
               id: doc.id,
               ...data,
-              date: data.date?.toDate() || new Date(),
+              date: dateValue,
               movements: data.movements || [],
               alerts: data.alerts || []
             } as DailyCashReport;
@@ -777,7 +784,7 @@ export const CashRegisterSystem: React.FC = () => {
           
           // 1. Primero intentar obtener el ID del turno activo desde localStorage
           const activeShiftId = localStorage.getItem('activeShiftId');
-          console.log('� activeShiftId desde localStorage:', activeShiftId);
+          console.log('📍 activeShiftId desde localStorage:', activeShiftId);
           
           let todayReport = null;
 
@@ -785,27 +792,36 @@ export const CashRegisterSystem: React.FC = () => {
           if (activeShiftId) {
             // Buscar por el ID específico del turno activo
             todayReport = reportsData.find(report => report.id === activeShiftId);
-
+            
+            // Si se encontró el turno activo, usarlo
+            if (todayReport) {
+              console.log('✅ Turno activo encontrado en reportsData:', todayReport.id);
+            } else {
+              console.log('⚠️ activeShiftId en localStorage pero no encontrado en reportsData');
+            }
           }
           
-          // 2. Si no hay activeShiftId o no se encuentra, buscar el último turno abierto del día
+          // 2. SOLO si NO hay activeShiftId válido, buscar el último turno abierto del día
           if (!todayReport) {
-
             const dayReports = reportsData.filter(report => 
               report.id.startsWith(selectedDate) && report.status === 'open'
             );
             todayReport = dayReports.sort((a, b) => b.id.localeCompare(a.id))[0]; // Último turno del día
             
-            // 🔧 CRUCIAL: Actualizar localStorage con el turno encontrado
-            if (todayReport) {
+            // 🔧 CRÍTICO: SOLO actualizar localStorage si:
+            // - NO había activeShiftId previo Y
+            // - El turno encontrado está ABIERTO
+            if (todayReport && !activeShiftId && todayReport.status === 'open') {
               localStorage.setItem('activeShiftId', todayReport.id);
-              console.log('🔄 localStorage actualizado con turno encontrado:', todayReport.id);
+              console.log('🔄 localStorage actualizado con turno abierto:', todayReport.id);
+            } else if (todayReport && activeShiftId) {
+              console.log('⚠️ NO sobrescribir activeShiftId existente:', activeShiftId);
+            } else if (todayReport && todayReport.status === 'closed') {
+              console.log('⚠️ NO actualizar localStorage con turno cerrado:', todayReport.id);
             }
-            
-
           }
           
-          console.log('� Resultado búsqueda por ID:', {
+          console.log('📊 Resultado búsqueda por ID:', {
             selectedDate,
             encontrado: !!todayReport,
             reportId: todayReport?.id,
@@ -820,6 +836,18 @@ export const CashRegisterSystem: React.FC = () => {
           }
           
           if (todayReport) {
+            // 🔍 Verificar si el turno está cerrado
+            if (todayReport.status === 'closed') {
+              console.log('⚠️ Turno encontrado pero está CERRADO - Necesita crear turno automático...');
+              // No usar el turno cerrado, marcar para crear uno nuevo
+              setCurrentReport(defaultReport);
+              // Disparar creación automática en el siguiente ciclo
+              setTimeout(() => {
+                createAutomaticShift();
+              }, 100);
+              return; // Salir aquí
+            }
+            
             // Turno activo encontrado - mostrar datos del turno
             
             // Solo actualizar si cambió el reporte o si es la primera carga
@@ -844,15 +872,13 @@ export const CashRegisterSystem: React.FC = () => {
             }
             
           } else {
-            console.log('❌ NO se encontró reporte para la fecha:', {
-              selectedDate,
-              totalReports: reportsData.length,
-              reportIds: reportsData.map(r => ({ id: r.id, status: r.status }))
-            });
-            // Si no hay reporte del día, usar reporte por defecto
-            if (currentReport.id !== 'default') {
-              setCurrentReport(defaultReport);
-            }
+            console.log('❌ NO se encontró reporte para la fecha - Disparando creación automática...');
+            // 🤖 No hay turno abierto, crear uno automáticamente
+            setCurrentReport(defaultReport);
+            // Disparar creación automática en el siguiente ciclo
+            setTimeout(() => {
+              createAutomaticShift();
+            }, 100);
           }
         }
       );
@@ -996,10 +1022,25 @@ export const CashRegisterSystem: React.FC = () => {
       );
       const reportsData = querySnapshot.docs.map(doc => {
         const data = doc.data();
+        
+        // 🔧 Manejo robusto de diferentes formatos de fecha
+        let dateValue = new Date();
+        if (data.date) {
+          if (typeof data.date.toDate === 'function') {
+            dateValue = data.date.toDate(); // Firebase Timestamp
+          } else if (data.date instanceof Date) {
+            dateValue = data.date; // Date object
+          } else if (typeof data.date === 'string') {
+            dateValue = new Date(data.date); // String
+          } else if (typeof data.date === 'number') {
+            dateValue = new Date(data.date); // Unix timestamp
+          }
+        }
+        
         return {
           id: doc.id,
           ...data,
-          date: data.date?.toDate() || new Date(),
+          date: dateValue,
           movements: data.movements || [],
           alerts: data.alerts || []
         } as DailyCashReport;
@@ -1041,7 +1082,6 @@ export const CashRegisterSystem: React.FC = () => {
         where("status", "==", "open"),
         where("date", ">=", today),
         where("date", "<", tomorrow),
-        orderBy("date", "desc"),
         limit(1)
       );
       
@@ -1052,10 +1092,24 @@ export const CashRegisterSystem: React.FC = () => {
         const reportData = querySnapshot.docs[0].data();
         console.log(`📋 Turno encontrado - CreatedBy: ${reportData.createdBy} - Balance: $${reportData.openingBalance}`);
         
+        // 🔧 Manejo robusto de diferentes formatos de fecha
+        let dateValue = new Date();
+        if (reportData.date) {
+          if (typeof reportData.date.toDate === 'function') {
+            dateValue = reportData.date.toDate(); // Firebase Timestamp
+          } else if (reportData.date instanceof Date) {
+            dateValue = reportData.date; // Date object
+          } else if (typeof reportData.date === 'string') {
+            dateValue = new Date(reportData.date); // String
+          } else if (typeof reportData.date === 'number') {
+            dateValue = new Date(reportData.date); // Unix timestamp
+          }
+        }
+        
         const report = {
           id: querySnapshot.docs[0].id,
           ...reportData,
-          date: reportData.date?.toDate() || new Date(),
+          date: dateValue,
           movements: reportData.movements || [],
           alerts: reportData.alerts || []
         } as DailyCashReport;
@@ -1079,7 +1133,6 @@ export const CashRegisterSystem: React.FC = () => {
       const openReportsQuery = query(
         collection(db, "cash_reports"),
         where("status", "==", "open"),
-        orderBy("date", "desc"),
         limit(1)
       );
       
@@ -1092,7 +1145,6 @@ export const CashRegisterSystem: React.FC = () => {
           collection(db, "cash_reports"),
           where("date", ">=", today),
           where("date", "<", tomorrow),
-          orderBy("date", "desc"),
           limit(1)
         );
         
@@ -1101,10 +1153,25 @@ export const CashRegisterSystem: React.FC = () => {
       
       if (!querySnapshot.empty) {
         const reportData = querySnapshot.docs[0].data();
+        
+        // 🔧 Manejo robusto de diferentes formatos de fecha
+        let dateValue = new Date();
+        if (reportData.date) {
+          if (typeof reportData.date.toDate === 'function') {
+            dateValue = reportData.date.toDate(); // Firebase Timestamp
+          } else if (reportData.date instanceof Date) {
+            dateValue = reportData.date; // Date object
+          } else if (typeof reportData.date === 'string') {
+            dateValue = new Date(reportData.date); // String
+          } else if (typeof reportData.date === 'number') {
+            dateValue = new Date(reportData.date); // Unix timestamp
+          }
+        }
+        
         const report = {
           id: querySnapshot.docs[0].id,
           ...reportData,
-          date: reportData.date?.toDate() || new Date(),
+          date: dateValue,
           movements: reportData.movements || [],
           alerts: reportData.alerts || []
         } as DailyCashReport;
@@ -1115,11 +1182,123 @@ export const CashRegisterSystem: React.FC = () => {
         // Sincronizar con BD interna
         await syncWithInternalDB(report.id);
       } else {
-        console.log('❌ No se encontrado reporte para hoy');
-        setCurrentReport(defaultReport);
+        // 🤖 MODO AUTOMÁTICO: Si no hay turno, crear uno automáticamente
+        console.log('🤖 No hay turno disponible - Creando turno automático...');
+        await createAutomaticShift();
       }
     } catch (error) {
       console.error("❌ Error loading today's report:", error);
+      // 🤖 En caso de error, intentar crear turno automático
+      console.log('🤖 Error al cargar turno - Creando turno automático como fallback...');
+      await createAutomaticShift();
+    }
+  };
+
+  // 🤖 Función para crear turno automático (igual que en POSSalesSystem)
+  const createAutomaticShift = async () => {
+    try {
+      console.log('🤖 Creando turno automático...');
+      
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      
+      // Consultar turnos del día actual
+      const todayQuery = query(
+        collection(db, "cash_reports"),
+        where("date", ">=", Timestamp.fromDate(new Date(dateStr + "T00:00:00"))),
+        where("date", "<=", Timestamp.fromDate(new Date(dateStr + "T23:59:59")))
+      );
+      
+      const existingShifts = await getDocs(todayQuery);
+      const shiftsCount = existingShifts.size;
+      const shiftNumber = shiftsCount + 1;
+      const newReportId = `${dateStr}-turno-${shiftNumber}`;
+      
+      console.log('🤖 ID del nuevo turno automático:', newReportId);
+      
+      const newReport = {
+        date: Timestamp.fromDate(today),
+        openingBalance: 0,
+        closingBalance: 0,
+        totalSales: 0,
+        cashInBox: 0,
+        cashSales: 0,
+        creditCardSales: 0,
+        creditSales: 0,
+        digitalPayments: 0,
+        cashPayments: 0,
+        cashEntries: 0,
+        cashExits: 0,
+        cashReturns: 0,
+        expenses: 0,
+        vaultDeposits: 0,
+        bankTransfers: 0,
+        movements: [],
+        sales: [],
+        createdBy: 'sistema-automatico',
+        status: 'open',
+        shiftStart: Timestamp.now(),
+        automatic: true
+      };
+      
+      const newDocRef = doc(db, 'cash_reports', newReportId);
+      const docSnapshot = await getDoc(newDocRef);
+      
+      if (!docSnapshot.exists()) {
+        await setDoc(newDocRef, newReport);
+        console.log('✅ Turno automático creado:', newReportId);
+      } else {
+        console.log('ℹ️ Turno automático ya existía:', newReportId);
+      }
+      
+      // Actualizar localStorage
+      localStorage.setItem('activeShiftId', newReportId);
+      
+      // Actualizar estado local
+      setCurrentReport({
+        id: newReportId,
+        date: today,
+        openingBalance: 0,
+        closingBalance: 0,
+        totalSales: 0,
+        cashInBox: 0,
+        cashSales: 0,
+        creditCardSales: 0,
+        creditSales: 0,
+        digitalPayments: 0,
+        cashPayments: 0,
+        cashEntries: 0,
+        cashExits: 0,
+        cashReturns: 0,
+        expenses: 0,
+        vaultDeposits: 0,
+        bankTransfers: 0,
+        totalProfit: 0,
+        grossProfit: 0,
+        netProfit: 0,
+        operationalCosts: 0,
+        taxes: 0,
+        movements: [],
+        sales: [],
+        alerts: [],
+        createdBy: 'sistema-automatico',
+        status: 'open' as const,
+        shiftStart: new Date()
+      });
+      
+      toast({
+        title: "✅ Turno Automático Creado",
+        description: `Nuevo turno iniciado con balance $0`,
+        duration: 3000
+      });
+      
+    } catch (error) {
+      console.error('❌ Error creando turno automático:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudo crear el turno automático",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1748,10 +1927,6 @@ export const CashRegisterSystem: React.FC = () => {
         closedBy: currentReport.createdBy || 'admin'
       });
 
-      // 🧹 Limpiar ID del turno activo del localStorage
-      localStorage.removeItem('activeShiftId');
-      console.log('🗑️ activeShiftId eliminado del localStorage');
-
       // Actualizar estado local
       setCurrentReport({
         ...currentReport,
@@ -1767,6 +1942,84 @@ export const CashRegisterSystem: React.FC = () => {
       });
 
       console.log('✅ Turno cerrado exitosamente');
+
+      // 🤖 MODO AUTOMÁTICO: Crear nuevo turno inmediatamente después de cerrar
+      console.log('🤖 Iniciando turno automático tras cierre...');
+      setTimeout(async () => {
+        try {
+          const emailToUse = currentReport.createdBy || 'admin@sistema.com';
+          
+          // Crear nuevo turno automático
+          const today = new Date();
+          const dateStr = today.toISOString().split('T')[0];
+          
+          // Consultar turnos del día actual
+          const todayQuery = query(
+            collection(db, "cash_reports"),
+            where("date", ">=", Timestamp.fromDate(new Date(dateStr + "T00:00:00"))),
+            where("date", "<=", Timestamp.fromDate(new Date(dateStr + "T23:59:59")))
+          );
+          
+          const existingShifts = await getDocs(todayQuery);
+          const shiftsCount = existingShifts.size;
+          const shiftNumber = shiftsCount + 1;
+          const newReportId = `${dateStr}-turno-${shiftNumber}`;
+          
+          const newReport = {
+            date: Timestamp.fromDate(today),
+            openingBalance: 0,
+            closingBalance: 0,
+            totalSales: 0,
+            cashInBox: 0,
+            cashSales: 0,
+            creditCardSales: 0,
+            creditSales: 0,
+            digitalPayments: 0,
+            cashPayments: 0,
+            cashEntries: 0,
+            cashExits: 0,
+            cashReturns: 0,
+            expenses: 0,
+            vaultDeposits: 0,
+            bankTransfers: 0,
+            movements: [],
+            sales: [],
+            createdBy: emailToUse,
+            status: 'open',
+            shiftStart: Timestamp.now(),
+            automatic: true
+          };
+          
+          const newDocRef = doc(db, 'cash_reports', newReportId);
+          await setDoc(newDocRef, newReport);
+          
+          // Actualizar localStorage con el nuevo turno
+          localStorage.setItem('activeShiftId', newReportId);
+          console.log('✅ Nuevo turno automático creado:', newReportId);
+          
+          // Actualizar estado local con el nuevo turno
+          setCurrentReport({
+            id: newReportId,
+            ...newReport,
+            date: today,
+            shiftStart: new Date(),
+            movements: [],
+            alerts: []
+          } as DailyCashReport);
+          
+          toast({
+            title: "✅ Nuevo turno iniciado",
+            description: "El sistema creó automáticamente un nuevo turno",
+          });
+        } catch (error) {
+          console.error('❌ Error creando turno automático:', error);
+          toast({
+            title: "⚠️ Advertencia",
+            description: "Turno cerrado pero hubo un problema al crear el nuevo turno automático",
+            variant: "destructive"
+          });
+        }
+      }, 1000); // Esperar 1 segundo para que el toast de cierre se vea
       
     } catch (error) {
       console.error('❌ Error cerrando turno:', error);
@@ -2289,31 +2542,21 @@ export const CashRegisterSystem: React.FC = () => {
               Reset Día
             </Button>
 
-            {!currentReport ? (
-              <Button
-                onClick={() => setIsCreatingReport(true)}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-xl"
-              >
-                <Rocket className="h-4 w-4 mr-2" />
-                Iniciar Corte
+            {/* 🤖 SISTEMA AUTOMÁTICO: Siempre debe haber un turno abierto */}
+            <div className="flex gap-2">
+              <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
+                <Share2 className="h-4 w-4 mr-2" />
+                Exportar
               </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
-                {currentReport.status === 'open' && (
-                  <Button 
-                    variant="destructive"
-                    onClick={closeCurrentShift}
-                  >
-                    <Archive className="h-4 w-4 mr-2" />
-                    Cerrar Corte
-                  </Button>
-                )}
-              </div>
-            )}
+              <Button 
+                variant="destructive"
+                onClick={closeCurrentShift}
+                disabled={!currentReport}
+              >
+                <Archive className="h-4 w-4 mr-2" />
+                Cerrar Corte
+              </Button>
+            </div>
           </div>
 
         {/* Estadísticas principales con animación */}

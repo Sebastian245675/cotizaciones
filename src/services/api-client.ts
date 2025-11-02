@@ -2,10 +2,43 @@
 class APIClient {
   private baseURL: string;
   private isOnline: boolean = navigator.onLine;
+  private useLocalBackend: boolean = false; // Deshabilitado por defecto para móviles
 
   constructor() {
-    this.baseURL = 'http://localhost:3001/api';
+    // Detectar si estamos en móvil o si hay backend local disponible
+    this.detectEnvironment();
+    this.baseURL = this.useLocalBackend ? 'http://localhost:3001/api' : '';
     this.setupConnectivityDetection();
+  }
+
+  private async detectEnvironment() {
+    // Verificar si es móvil
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Si es móvil, no intentar usar backend local
+    if (isMobile) {
+      this.useLocalBackend = false;
+      console.log('📱 Dispositivo móvil detectado - Usando solo Firebase');
+      return;
+    }
+
+    // Si es desktop, verificar si el backend está disponible
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000); // 1 segundo timeout
+      
+      await fetch('http://localhost:3001/api/health', { 
+        signal: controller.signal,
+        method: 'GET'
+      });
+      
+      clearTimeout(timeoutId);
+      this.useLocalBackend = true;
+      console.log('💻 Backend local disponible');
+    } catch (error) {
+      this.useLocalBackend = false;
+      console.log('☁️ Backend local no disponible - Usando solo Firebase');
+    }
   }
 
   private setupConnectivityDetection() {
@@ -22,6 +55,8 @@ class APIClient {
   }
 
   private async triggerSync() {
+    if (!this.useLocalBackend) return; // No intentar sync si no hay backend
+    
     try {
       await fetch(`${this.baseURL}/sync/trigger`, { method: 'POST' });
     } catch (error) {
@@ -33,6 +68,15 @@ class APIClient {
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<{ success: boolean; data?: T; error?: string }> {
+    // Si no hay backend local, retornar inmediatamente sin error
+    if (!this.useLocalBackend) {
+      return {
+        success: true,
+        data: undefined,
+        error: 'No local backend - using Firebase only'
+      };
+    }
+
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         headers: {

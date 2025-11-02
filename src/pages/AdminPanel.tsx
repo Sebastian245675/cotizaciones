@@ -806,37 +806,37 @@ export const AdminPanel: React.FC = () => {
   return (
     <PluginProvider posAPI={posAPI} dbAPI={dbAPI} uiAPI={uiAPI}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Professional Header */}
+      {/* Professional Header - Responsive */}
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            {/* Left side - Session Time */}
-            <div className="flex items-center space-x-2">
-              <Clock className="h-4 w-4 text-slate-600" />
+        <div className="container mx-auto px-2 sm:px-4 py-1.5 sm:py-3">
+          <div className="flex items-center justify-between gap-2">
+            {/* Left side - Session Time - Compacto en móvil */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-slate-600" />
               <div>
-                <p className="text-xs text-slate-600 font-medium">Sesión</p>
-                <p className="text-sm font-bold text-slate-900">{sessionTime}</p>
+                <p className="text-xs text-slate-600 font-medium hidden sm:block">Sesión</p>
+                <p className="text-xs sm:text-sm font-bold text-slate-900">{sessionTime}</p>
               </div>
             </div>
 
-            {/* Center - Logo and Company Name */}
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center shadow-sm">
-                <Settings className="h-5 w-5 text-white" />
+            {/* Center - Logo and Company Name - Compacto en móvil */}
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-1 justify-center">
+              <div className="w-7 h-7 sm:w-10 sm:h-10 bg-slate-900 rounded-md sm:rounded-lg flex items-center justify-center shadow-sm">
+                <Settings className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 flex items-center" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  {saasConfig?.companyName || "CONETING POS"}
-                  <span className="text-sm ml-3 font-semibold text-slate-600">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xs sm:text-xl font-bold text-slate-900 flex items-center truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  <span className="truncate">{saasConfig?.companyName || "CONETING POS"}</span>
+                  <span className="text-xs sm:text-sm ml-1 sm:ml-3 font-semibold text-slate-600 whitespace-nowrap hidden md:inline">
                     {saasConfig?.businessType === 'ecommerce' ? '🛒 E-commerce' : 
                      saasConfig?.businessType === 'pos' ? '🏪 Punto de Venta' : 
                      saasConfig?.businessType === 'hybrid' ? '✨ Sistema Híbrido' : 
                      '⚙️ Automatización Empresarial'}
                   </span>
                 </h1>
-                <div className="flex items-center mt-1">
+                <div className="hidden sm:flex items-center mt-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                  <p className="text-sm font-medium text-slate-600">
+                  <p className="text-xs sm:text-sm font-medium text-slate-600 truncate">
                     {saasConfig?.industry ? (
                       <span>{saasConfig.industry} • Sistema activo</span>
                     ) : (
@@ -847,13 +847,13 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Right side - Notifications, Settings, User Badge */}
-            <div className="flex items-center space-x-3">
-              {/* Notifications - First */}
-              <div className="relative group">
-                <button className="p-2 rounded-lg hover:bg-slate-100 transition-all duration-300 relative">
-                  <Bell className="h-4 w-4 text-slate-600" />
-                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full transform translate-x-0.5 -translate-y-0.5"></span>
+            {/* Right side - Notifications, Settings, User Badge - Compacto */}
+            <div className="flex items-center gap-1 sm:gap-3">
+              {/* Notifications - First - Oculto en móvil */}
+              <div className="relative group hidden sm:block">
+                <button className="p-1.5 sm:p-2 rounded-lg hover:bg-slate-100 transition-all duration-300 relative">
+                  <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600" />
+                  <span className="absolute top-0 right-0 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full transform translate-x-0.5 -translate-y-0.5"></span>
                 </button>
                 <div className="hidden group-hover:block absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl z-50 border border-slate-200 overflow-hidden">
                   <div className="bg-slate-50 p-3 border-b border-slate-200">
@@ -873,7 +873,7 @@ export const AdminPanel: React.FC = () => {
                     <div className="p-3 hover:bg-slate-50 transition-colors">
                       <p className="text-sm font-medium text-slate-900">Inventario bajo: Producto X</p>
                       <p className="text-xs text-slate-600 mt-1 flex items-center">
-                        <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1" />
+                        <Clock className="h-3 w-3 mr-1" />
                         Hace 2 horas
                       </p>
                     </div>
@@ -884,31 +884,31 @@ export const AdminPanel: React.FC = () => {
               {/* Settings - Second */}
               <button
                 onClick={toggleSettingsMenu}
-                className="settings-button p-2 rounded-lg hover:bg-slate-100 transition-all duration-300 relative"
+                className="settings-button p-1.5 sm:p-2 rounded-lg hover:bg-slate-100 transition-all duration-300 relative"
                 title="Configuraciones"
               >
-                <Settings className="h-4 w-4 text-slate-600" />
+                <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600" />
               </button>
 
-              {/* User Badge - Third (sin fondo gradient) with status menu */}
-              <div className="flex items-center space-x-3 text-slate-700 relative">
+              {/* User Badge - Third - Compacto en móvil */}
+              <div className="flex items-center gap-1 sm:gap-3 text-slate-700 relative">
                 <button
-                  className="flex items-center space-x-2 p-1 rounded hover:bg-slate-100 transition"
+                  className="flex items-center gap-1 sm:gap-2 p-1 rounded hover:bg-slate-100 transition"
                   onClick={() => setShowStatusMenu(prev => !prev)}
                   title={isAdmin ? 'Administrador' : 'Sub-admin'}
                 >
-                  {/* Admin icon instead of crown */}
-                  <Shield className="h-5 w-5 text-slate-700" />
+                  {/* Admin icon */}
+                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-slate-700" />
                   {/* Status dot */}
                   <span
-                    className={`w-2.5 h-2.5 rounded-full border ${adminStatus === 'activo' ? 'bg-green-500 border-white' : adminStatus === 'ocupado' ? 'bg-yellow-500 border-white' : 'bg-gray-400 border-white'}`}
+                    className={`w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full border ${adminStatus === 'activo' ? 'bg-green-500 border-white' : adminStatus === 'ocupado' ? 'bg-yellow-500 border-white' : 'bg-gray-400 border-white'}`}
                     aria-hidden
                   />
                 </button>
 
-                <div className="text-right">
+                <div className="text-right hidden md:block">
                   <p className="text-xs font-medium text-slate-600">{isAdmin ? 'Administrador' : 'Sub-admin'}</p>
-                  <p className="text-sm font-bold text-slate-900">{user?.name}</p>
+                  <p className="text-sm font-bold text-slate-900 truncate max-w-[120px]">{user?.name}</p>
                 </div>
 
                 {/* Status menu */}

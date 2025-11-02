@@ -4,9 +4,19 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: './', // Rutas relativas para Electron
   server: {
     host: "::",
     port: 8080,
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Evitar división excesiva de chunks
+      }
+    }
   },
   plugins: [
     react(),

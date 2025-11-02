@@ -303,6 +303,11 @@ const QuotesManager: React.FC = () => {
   const [showSubmissionDialog, setShowSubmissionDialog] = useState(false);
   const [responseNotes, setResponseNotes] = useState('');
   
+  // Edit mode states
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedData, setEditedData] = useState<Record<string, any>>({});
+  const [editedProducts, setEditedProducts] = useState<Array<any>>([]);
+  
   // Response form states
   const [showResponseDialog, setShowResponseDialog] = useState(false);
   const [responseProducts, setResponseProducts] = useState<Array<{
@@ -1609,7 +1614,113 @@ const QuotesManager: React.FC = () => {
   const viewSubmission = (submission: QuoteSubmission) => {
     setSelectedSubmission(submission);
     setResponseNotes(submission.notes || '');
+    setEditedData(submission.data || {});
+    
+    // Extraer productos si existen
+    const products: Array<any> = [];
+    Object.entries(submission.data || {}).forEach(([key, value]) => {
+      if (Array.isArray(value) && value.length > 0) {
+        const firstItem = value[0];
+        if (firstItem && typeof firstItem === 'object' && 
+            (firstItem.name || firstItem.id || firstItem.description)) {
+          value.forEach((product: any) => {
+            products.push({
+              id: product.id || Date.now().toString(),
+              name: product.name || product.nombre || product.producto || '',
+              description: product.description || product.descripcion || '',
+              quantity: parseInt(product.quantity || product.cantidad || '1'),
+              estimatedPrice: product.estimatedPrice || product.precioEstimado || ''
+            });
+          });
+        }
+      }
+    });
+    setEditedProducts(products.length > 0 ? products : []);
+    setIsEditMode(false);
     setShowSubmissionDialog(true);
+  };
+
+  const saveSubmissionChanges = async () => {
+    if (!selectedSubmission) return;
+    
+    try {
+      // Preparar datos actualizados
+      const updatedData = { ...editedData };
+      
+      // Si hay productos editados, actualizarlos en los datos
+      if (editedProducts.length > 0) {
+        // Buscar la clave de productos en los datos originales
+        let productsKey = 'products';
+        Object.keys(updatedData).forEach(key => {
+          if (Array.isArray(updatedData[key]) && updatedData[key].length > 0) {
+            const firstItem = updatedData[key][0];
+            if (firstItem && typeof firstItem === 'object' && 
+                (firstItem.name || firstItem.id || firstItem.description)) {
+              productsKey = key;
+            }
+          }
+        });
+        updatedData[productsKey] = editedProducts;
+      }
+
+      // Actualizar en Firebase
+      await updateDoc(doc(db, 'quoteSubmissions', selectedSubmission.id), {
+        data: updatedData,
+        notes: responseNotes,
+        updatedAt: Timestamp.now()
+      });
+
+      toast({
+        title: "Cambios guardados",
+        description: "La cotización ha sido actualizada exitosamente"
+      });
+
+      // Actualizar la vista local
+      setSelectedSubmission({
+        ...selectedSubmission,
+        data: updatedData,
+        notes: responseNotes
+      });
+      
+      setIsEditMode(false);
+      await loadQuoteSubmissions();
+      
+    } catch (error) {
+      console.error('Error saving submission changes:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los cambios",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateEditedField = (key: string, value: any) => {
+    setEditedData(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const addEditedProduct = () => {
+    const newProduct = {
+      id: Date.now().toString(),
+      name: '',
+      description: '',
+      quantity: 1,
+      estimatedPrice: ''
+    };
+    setEditedProducts(prev => [...prev, newProduct]);
+  };
+
+  const updateEditedProduct = (index: number, field: string, value: any) => {
+    setEditedProducts(prev => prev.map((product, i) => 
+      i === index ? { ...product, [field]: value } : product
+    ));
+  };
+
+  const removeEditedProduct = (index: number) => {
+    setEditedProducts(prev => prev.filter((_, i) => i !== index));
   };
 
   const updateSubmissionStatus = async (submissionId: string, status: QuoteSubmission['status'], notes?: string) => {
@@ -2371,18 +2482,57 @@ const QuotesManager: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Submission View Dialog */}
-      <Dialog open={showSubmissionDialog} onOpenChange={setShowSubmissionDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* Submission View/Edit Dialog */}
+      <Dialog open={showSubmissionDialog} onOpenChange={(open) => {
+        setShowSubmissionDialog(open);
+        if (!open) {
+          setIsEditMode(false);
+          setSelectedSubmission(null);
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalles de Cotización</DialogTitle>
-            <DialogDescription>
-              {selectedSubmission?.formName} - {selectedSubmission?.createdAt.toLocaleDateString()}
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  {isEditMode ? 'Editar Cotización' : 'Detalles de Cotización'}
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  {selectedSubmission?.formName} - {selectedSubmission?.createdAt.toLocaleDateString()}
+                </DialogDescription>
+              </div>
+              <Button
+                variant={isEditMode ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  if (isEditMode) {
+                    // Guardar cambios
+                    saveSubmissionChanges();
+                  } else {
+                    // Activar modo edición
+                    setIsEditMode(true);
+                  }
+                }}
+              >
+                {isEditMode ? (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar Cambios
+                  </>
+                ) : (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar Cotización
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogHeader>
 
           {selectedSubmission && (
             <div className="space-y-6">
+              {/* Estado de la cotización */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label>Estado Actual</Label>
@@ -2425,90 +2575,257 @@ const QuotesManager: React.FC = () => {
 
               <Separator />
 
+              {/* Datos del Cliente - Editable */}
               <div>
-                <h4 className="font-semibold mb-3">Datos del Cliente</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <User className="h-4 w-4 text-blue-600" />
+                    Datos del Cliente
+                  </h4>
+                  {isEditMode && (
+                    <Badge variant="outline" className="text-blue-600">
+                      Modo Edición
+                    </Badge>
+                  )}
+                </div>
                 <div className="space-y-3 bg-muted/50 p-4 rounded-lg">
-                  {Object.entries(selectedSubmission.data).map(([key, value]) => (
-                    <div key={key} className="grid grid-cols-3 gap-2">
-                      <Label className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</Label>
-                      <div className="col-span-2">
-                        {Array.isArray(value) ? value.join(', ') : value?.toString() || 'N/A'}
+                  {Object.entries(editedData).map(([key, value]) => {
+                    // Saltar arrays (productos) - se manejan por separado
+                    if (Array.isArray(value)) return null;
+                    
+                    const fieldLabel = key
+                      .replace(/([A-Z])/g, ' $1')
+                      .replace(/_/g, ' ')
+                      .trim()
+                      .split(' ')
+                      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                      .join(' ');
+
+                    return (
+                      <div key={key} className="grid grid-cols-3 gap-2 items-center">
+                        <Label className="font-medium text-sm">{fieldLabel}:</Label>
+                        <div className="col-span-2">
+                          {isEditMode ? (
+                            <Input
+                              value={value?.toString() || ''}
+                              onChange={(e) => updateEditedField(key, e.target.value)}
+                              className="h-9"
+                              placeholder={`Ingrese ${fieldLabel.toLowerCase()}`}
+                            />
+                          ) : (
+                            <span className="text-sm">{value?.toString() || 'N/A'}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Productos/Items - Editable */}
+              {(editedProducts.length > 0 || isEditMode) && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-green-600" />
+                      Productos o Servicios Solicitados
+                    </h4>
+                    {isEditMode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={addEditedProduct}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Agregar Item
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {editedProducts.length === 0 && isEditMode ? (
+                    <Card className="bg-muted/30 border-dashed">
+                      <CardContent className="py-8 text-center">
+                        <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          No hay productos agregados. Haz clic en "Agregar Item" para comenzar.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {editedProducts.map((product, index) => (
+                        <Card key={product.id || index} className={isEditMode ? 'border-blue-200' : ''}>
+                          <CardContent className="p-4">
+                            {isEditMode ? (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="text-sm font-medium text-blue-700">Item #{index + 1}</h5>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeEditedProduct(index)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div>
+                                    <Label className="text-xs">Nombre del Producto/Servicio</Label>
+                                    <Input
+                                      value={product.name || ''}
+                                      onChange={(e) => updateEditedProduct(index, 'name', e.target.value)}
+                                      placeholder="Ej: Diseño de Logo"
+                                      className="mt-1 h-9"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label className="text-xs">Cantidad</Label>
+                                    <Input
+                                      type="number"
+                                      value={product.quantity || 1}
+                                      onChange={(e) => updateEditedProduct(index, 'quantity', parseInt(e.target.value) || 1)}
+                                      placeholder="1"
+                                      min="1"
+                                      className="mt-1 h-9"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <Label className="text-xs">Descripción/Especificaciones</Label>
+                                  <Textarea
+                                    value={product.description || ''}
+                                    onChange={(e) => updateEditedProduct(index, 'description', e.target.value)}
+                                    placeholder="Describe las características o detalles..."
+                                    className="mt-1"
+                                    rows={2}
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label className="text-xs">Precio Estimado</Label>
+                                  <Input
+                                    value={product.estimatedPrice || ''}
+                                    onChange={(e) => updateEditedProduct(index, 'estimatedPrice', e.target.value)}
+                                    placeholder="Ej: $500 - $1000"
+                                    className="mt-1 h-9"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h5 className="font-medium text-sm">{product.name || 'Sin nombre'}</h5>
+                                    {product.description && (
+                                      <p className="text-xs text-muted-foreground mt-1">{product.description}</p>
+                                    )}
+                                  </div>
+                                  <Badge variant="secondary" className="ml-2">
+                                    x{product.quantity || 1}
+                                  </Badge>
+                                </div>
+                                {product.estimatedPrice && (
+                                  <p className="text-xs text-green-700 font-medium">
+                                    Precio estimado: {product.estimatedPrice}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <Separator />
+
+              {/* Notas */}
               <div>
-                <Label htmlFor="responseNotes">Notas y Respuesta</Label>
+                <Label htmlFor="responseNotes" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Notas y Respuesta
+                </Label>
                 <Textarea
                   id="responseNotes"
                   value={responseNotes}
                   onChange={(e) => setResponseNotes(e.target.value)}
                   placeholder="Agrega notas internas o una respuesta para el cliente..."
-                  className="mt-1"
+                  className="mt-2"
                   rows={4}
                 />
               </div>
             </div>
           )}
 
-          <DialogFooter>
-            <div className="flex justify-between w-full">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => selectedSubmission && handleExportToPDF(selectedSubmission)}
-                  disabled={exportLoading}
-                >
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Exportar PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => selectedSubmission && openResponseForm(selectedSubmission)}
-                  className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Responder Cotización
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (selectedSubmission) {
-                      deleteSubmission(selectedSubmission.id);
-                      setShowSubmissionDialog(false);
-                      setSelectedSubmission(null);
-                    }
-                  }}
-                  className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar Cotización
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedSubmission && handleExportToPDF(selectedSubmission)}
+                disabled={exportLoading}
+              >
+                <FileDown className="h-4 w-4 mr-2" />
+                Exportar PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedSubmission && openResponseForm(selectedSubmission)}
+                className="text-green-600 hover:text-green-700 border-green-300 hover:bg-green-50"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Responder
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (selectedSubmission) {
+                    deleteSubmission(selectedSubmission.id);
                     setShowSubmissionDialog(false);
                     setSelectedSubmission(null);
-                  }}
-                >
-                  Cerrar
-                </Button>
+                  }
+                }}
+                className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar
+              </Button>
+            </div>
+            <div className="flex gap-2 ml-auto">
+              {isEditMode && (
                 <Button 
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
+                    setIsEditMode(false);
                     if (selectedSubmission) {
-                      updateSubmissionStatus(selectedSubmission.id, selectedSubmission.status, responseNotes);
-                      setShowSubmissionDialog(false);
+                      setEditedData(selectedSubmission.data || {});
                     }
                   }}
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  Guardar Cambios
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
                 </Button>
-              </div>
+              )}
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowSubmissionDialog(false);
+                  setSelectedSubmission(null);
+                  setIsEditMode(false);
+                }}
+              >
+                Cerrar
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>

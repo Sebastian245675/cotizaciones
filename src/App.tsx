@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster as HotToaster } from "react-hot-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import AdvancedIndex from "./pages/AdvancedIndex";
@@ -56,7 +56,7 @@ const App = () => {
           <Sonner />
           <HotToaster position="top-right" />
           <SimulationNotice />
-          <BrowserRouter>
+          <HashRouter>
             <Routes>
               <Route path="/" element={<AdvancedIndex />} />
               <Route path="/admin" element={<AdminPanel />} />
@@ -75,7 +75,7 @@ const App = () => {
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
+          </HashRouter>
         </TooltipProvider>
       </CartProvider>
     </AuthProvider>
