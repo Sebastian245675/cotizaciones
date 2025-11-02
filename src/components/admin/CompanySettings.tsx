@@ -102,6 +102,10 @@ const CompanySettings: React.FC<CompanySettingsProps> = ({
             <Building className="h-5 w-5 text-blue-600" />
             Configuración de la Empresa
           </DialogTitle>
+          <p className="text-sm text-gray-600 mt-2">
+            Esta información aparecerá en todos los PDFs de cotización. 
+            Puedes cambiarla cuantas veces necesites para trabajar con diferentes razones sociales.
+          </p>
         </DialogHeader>
 
         <div className="space-y-6">

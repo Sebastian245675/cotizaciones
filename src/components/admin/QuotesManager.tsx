@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Dialog, 
   DialogContent, 
@@ -269,13 +270,28 @@ const QuotesManager: React.FC = () => {
   
   // Export functionality
   const { exportToPDF, exportToPDFAndEmail, exportToWord, loading: exportLoading } = useQuoteExport();
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
-    name: "MIRG - HECTOR ROLANDO RAMOS GARCIA",
-    address: "4TA VIDRIERA #927 COL 1 DE MAYO EN MONTERREY, C.P. 64220. NUEVO LEON MEXICO",
-    phone: "811-514-7756 / 811-796-7956",
-    email: "MIRGTALLER@GMAIL.COM",
-    website: "RFC: RAGH931025DP4"
-  });
+  
+  // Cargar la configuración de la empresa desde localStorage o usar valores por defecto
+  const getInitialCompanyInfo = (): CompanyInfo => {
+    const savedCompany = localStorage.getItem('companySettings');
+    if (savedCompany) {
+      try {
+        return JSON.parse(savedCompany);
+      } catch (error) {
+        console.error('Error loading company settings:', error);
+      }
+    }
+    // Valores por defecto solo si no hay nada guardado
+    return {
+      name: "MIRG - HECTOR ROLANDO RAMOS GARCIA",
+      address: "4TA VIDRIERA #927 COL 1 DE MAYO EN MONTERREY, C.P. 64220. NUEVO LEON MEXICO",
+      phone: "811-514-7756 / 811-796-7956",
+      email: "MIRGTALLER@GMAIL.COM",
+      website: "RFC: RAGH931025DP4"
+    };
+  };
+  
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(getInitialCompanyInfo());
   const [showCompanySettings, setShowCompanySettings] = useState(false);
   
   // Form creation states
@@ -2456,14 +2472,17 @@ const QuotesManager: React.FC = () => {
             )}
 
             <div className="flex items-center space-x-2">
-              <input
+              <Checkbox
                 id="fieldRequired"
-                type="checkbox"
                 checked={fieldRequired}
-                onChange={(e) => setFieldRequired(e.target.checked)}
-                className="rounded"
+                onCheckedChange={(checked) => setFieldRequired(checked === true)}
               />
-              <Label htmlFor="fieldRequired">Campo requerido</Label>
+              <Label 
+                htmlFor="fieldRequired"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Campo requerido
+              </Label>
             </div>
           </div>
 
