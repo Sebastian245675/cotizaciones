@@ -2,6 +2,8 @@
   "name": "covenant-pos-desktop",
   "private": true,
   "version": "1.0.0",
+  "description": "Sistema POS completo para Covenant Argentina con funcionalidad offline",
+  "author": "Covenant Argentina",
   "type": "module",
   "main": "pos-desktop.js",
   "pkg": {
@@ -152,30 +154,64 @@
     "appId": "com.covenant.pos",
     "productName": "CovenantPOS",
     "asar": true,
+    "compression": "maximum",
     "files": [
       "pos-desktop.js",
-      "backend/src/electron-main.js",
-      "!node_modules/**/*"
+      "backend/src/**/*",
+      "backend/package.json",
+      "backend/node_modules/**/*",
+      "dist/**/*",
+      "!backend/data/**/*",
+      "!backend/auth_wa_*/**/*",
+      "!node_modules/**/*",
+      "!src/**/*",
+      "!public/**/*"
     ],
     "extraResources": [
       {
-        "from": "dist",
-        "to": "dist"
+        "from": "backend/data.json",
+        "to": "backend/data.json"
       }
     ],
     "directories": {
-      "output": "builds"
+      "output": "builds",
+      "buildResources": "build"
     },
     "win": {
       "target": [
         {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
           "target": "portable",
           "arch": ["x64"]
         }
-      ]
+      ],
+      "verifyUpdateCodeSignature": false,
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "CovenantPOS-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "CovenantPOS.exe"
+      "artifactName": "CovenantPOS-Portable.exe"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
+      "category": "Office"
     }
   }
 }

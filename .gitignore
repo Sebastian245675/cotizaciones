@@ -15,9 +15,14 @@ node_modules/
 dist/
 dist-electron/
 builds/
-build/
 dist-ssr
 *.local
+
+# Build resources (except documentation)
+build/*.ico
+build/*.icns
+build/*.png
+build/*.svg
 
 # Executables
 *.exe

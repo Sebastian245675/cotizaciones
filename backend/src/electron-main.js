@@ -9,30 +9,46 @@ function createWindow() {
   console.log('__dirname:', __dirname);
   console.log('app.getAppPath():', app.getAppPath());
   console.log('process.resourcesPath:', process.resourcesPath);
+  console.log('isDev:', process.env.NODE_ENV === 'development');
   
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    minWidth: 800,
+    minHeight: 600,
     show: false, // No mostrar hasta que esté listo
+    backgroundColor: '#ffffff',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true
-    }
+      webSecurity: true,
+      devTools: process.env.NODE_ENV === 'development'
+    },
+    icon: path.join(__dirname, '..', '..', 'build', 'icon.png')
   });
 
+  // Determinar si estamos en desarrollo o producción
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  
   // Múltiples rutas posibles para encontrar index.html
-  const possiblePaths = [
-    path.join(__dirname, '..', '..', 'dist', 'index.html'), // Desarrollo
-    path.join(process.resourcesPath, 'dist', 'index.html'), // Producción (resources/dist/)
-    path.join(process.resourcesPath, '..', 'dist', 'index.html'), // Producción (../dist/)
-    path.join(app.getAppPath(), 'dist', 'index.html'), // Dentro del asar
-    path.join(app.getAppPath(), '..', 'dist', 'index.html'), // Fuera del asar
-    path.join(__dirname, 'dist', 'index.html'), // Otra alternativa
-    path.join(process.execPath, '..', 'resources', 'dist', 'index.html') // Ruta absoluta desde exe
+  const possiblePaths = isDev ? [
+    // Rutas de desarrollo
+    path.join(__dirname, '..', '..', 'dist', 'index.html'),
+    path.join(process.cwd(), 'dist', 'index.html'),
+    path.join(app.getAppPath(), 'dist', 'index.html')
+  ] : [
+    // Rutas de producción (empaquetado)
+    path.join(process.resourcesPath, 'app.asar', 'dist', 'index.html'),
+    path.join(process.resourcesPath, 'dist', 'index.html'),
+    path.join(app.getAppPath(), 'dist', 'index.html'),
+    path.join(__dirname, '..', '..', 'dist', 'index.html'),
+    path.join(path.dirname(process.execPath), 'resources', 'app.asar', 'dist', 'index.html'),
+    path.join(path.dirname(process.execPath), 'resources', 'dist', 'index.html')
   ];
 
   let indexPath = null;
+  
+  console.log(`🔍 Buscando index.html (modo: ${isDev ? 'desarrollo' : 'producción'})`);
   
   for (const testPath of possiblePaths) {
     console.log('Probando ruta:', testPath);
@@ -47,6 +63,7 @@ function createWindow() {
 
   if (!indexPath) {
     console.error('💥 ERROR: No se encontró index.html en ninguna ruta');
+    console.error('Rutas probadas:', possiblePaths);
     app.quit();
     return;
   }

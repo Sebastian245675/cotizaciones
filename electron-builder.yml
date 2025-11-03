@@ -1,0 +1,87 @@
+appId: com.covenant.pos
+productName: CovenantPOS
+copyright: Copyright © 2025 Covenant Argentina
+asar: true
+compression: maximum
+
+directories:
+  output: builds
+  buildResources: build
+
+files:
+  - pos-desktop.js
+  - backend/src/**/*
+  - backend/package.json
+  - backend/node_modules/**/*
+  - dist/**/*
+  - "!backend/data/**/*"
+  - "!backend/auth_wa_*/**/*"
+  - "!backend/frontend-dist/**/*"
+  - "!node_modules/**/*"
+  - "!src/**/*"
+  - "!public/**/*"
+  - "!*.md"
+  - "!*.ps1"
+  - "!*.txt"
+
+extraResources:
+  - from: backend/data.json
+    to: backend/data.json
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: build/icon.ico
+  
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: CovenantPOS
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  artifactName: CovenantPOS-Setup-${version}.${ext}
+  perMachine: false
+  deleteAppDataOnUninstall: false
+
+portable:
+  artifactName: CovenantPOS-Portable.exe
+
+mac:
+  target:
+    - dmg
+  icon: build/icon.icns
+  category: public.app-category.business
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+linux:
+  target:
+    - AppImage
+    - deb
+  icon: build/icon.png
+  category: Office
+  maintainer: Covenant Argentina
+  
+publish: null
