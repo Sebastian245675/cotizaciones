@@ -1260,7 +1260,12 @@ export const useQuoteExport = () => {
               cellWidth: 'wrap', 
               minCellHeight: 10, 
               valign: 'middle'
-            }
+            },
+            // Configuración para paginación automática
+            showHead: 'everyPage', // Mostrar encabezado en cada página
+            pageBreak: 'auto', // Salto de página automático
+            rowPageBreak: 'avoid', // Evitar romper filas entre páginas
+            tableWidth: 'auto'
           });
 
           yPosition = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : yPosition + 120;
@@ -1277,19 +1282,26 @@ export const useQuoteExport = () => {
         // TABLA MANUAL como respaldo
         // Header de la tabla - solo borde azul, sin fondo
         const tableHeaderHeight = 15;
-        doc.setDrawColor(41, 98, 255); // Azul para el borde
-        doc.setLineWidth(1);
-        doc.rect(margin, yPosition, pageWidth - (margin * 2), tableHeaderHeight, 'S'); // Solo borde, sin relleno
         
-        doc.setTextColor(60, 60, 60);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPosition + 10);
-        doc.text('CANT.', margin + 80, yPosition + 10, { align: 'center' });
-        doc.text('PRECIO UNIT.', margin + 110, yPosition + 10, { align: 'center' });
-        doc.text('TOTAL', margin + 150, yPosition + 10, { align: 'center' });
+        // Función para dibujar el header de la tabla
+        const drawTableHeader = (yPos: number) => {
+          doc.setDrawColor(41, 98, 255); // Azul para el borde
+          doc.setLineWidth(1);
+          doc.rect(margin, yPos, pageWidth - (margin * 2), tableHeaderHeight, 'S'); // Solo borde, sin relleno
+          
+          doc.setTextColor(60, 60, 60);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('PRODUCTOS / SERVICIOS', margin + 5, yPos + 10);
+          doc.text('CANT.', margin + 80, yPos + 10, { align: 'center' });
+          doc.text('PRECIO UNIT.', margin + 110, yPos + 10, { align: 'center' });
+          doc.text('TOTAL', margin + 150, yPos + 10, { align: 'center' });
+          
+          return yPos + tableHeaderHeight;
+        };
         
-        yPosition += tableHeaderHeight;
+        // Dibujar header inicial
+        yPosition = drawTableHeader(yPosition);
         
         // Filas de productos
         productData.forEach((row, index) => {
@@ -1302,6 +1314,17 @@ export const useQuoteExport = () => {
 
           const baseRowHeight = 14;
           const rowHeight = Math.max(baseRowHeight, nameHeight + 8);
+          
+          // Verificar si necesitamos una nueva página (dejar espacio para totales y footer)
+          if (yPosition + rowHeight > pageHeight - 100) {
+            // Agregar nueva página
+            doc.addPage();
+            yPosition = margin + 20;
+            
+            // Re-dibujar el header de la tabla en la nueva página
+            yPosition = drawTableHeader(yPosition);
+          }
+          
           const isEven = index % 2 === 0;
 
           // Fondo alternado
