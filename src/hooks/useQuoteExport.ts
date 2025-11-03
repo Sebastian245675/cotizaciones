@@ -34,6 +34,7 @@ interface CompanyInfo {
   phone: string;
   email: string;
   website?: string;
+  sub?: string;
 }
 
 interface PDFConfig {
@@ -86,7 +87,8 @@ const defaultCompanyInfo: CompanyInfo = {
   address: '4TA VIDRIERA #927 COL 1 DE MAYO EN MONTERREY, C.P. 64220. NUEVO LEON MEXICO',
   phone: '811-514-7756 / 811-796-7956',
   email: 'MIRGTALLER@GMAIL.COM',
-  website: 'RFC: RAGH931025DP4'
+  website: 'RFC: RAGH931025DP4',
+  sub: 'Maquinados Industriales de Precisión'
 };
 
 // === UTILITY FUNCTIONS ===
@@ -488,21 +490,34 @@ export const useQuoteExport = () => {
       // Información de la empresa - al lado del logo
       const infoStartX = margin + 38;
       
-      // Nombre de la empresa proporcional
-      const companyTitle = companyInfo.name.split(' - ')[0] || companyInfo.name;
+      // Información de contacto - derecha, compacta (se calcula antes para usar en la línea)
+      const contactX = pageWidth - margin - 45;
+      
+      // Nombre completo de la empresa de la configuración - bajado un poco para que quede sobre la línea
       doc.setTextColor(50, 50, 50);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text(companyTitle, infoStartX, 16);
+      // Dividir el nombre si es muy largo para que quepa bien
+      const companyNameLines = doc.splitTextToSize(companyInfo.name, pageWidth - infoStartX - margin - 20);
+      const nameStartY = 20; // Bajado un poco de 16 a 20 para que quede sobre la línea
+      doc.text(companyNameLines, infoStartX, nameStartY);
       
-      // Tagline
+      // Calcular la posición Y después del nombre (depende de cuántas líneas)
+      const companyNameLineHeight = 4.5; // Altura aproximada de cada línea
+      const nameEndY = nameStartY + (companyNameLines.length * companyNameLineHeight);
+      
+      // Línea divisoria azul debajo del nombre - no debe pasar la información de contacto
+      doc.setDrawColor(65, 90, 150); // Azul
+      doc.setLineWidth(0.8); // Línea un poco más gruesa
+      const lineEndX = contactX - 10; // Termina antes de la información de contacto (con margen de 10)
+      doc.line(infoStartX, nameEndY + 0.5, lineEndX, nameEndY + 0.5);
+      
+      // Texto debajo de la línea divisoria - desde configuración
       doc.setFontSize(7.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(110, 110, 110);
-      doc.text('Maquinados Industriales de Precisión', infoStartX, 22);
-      
-      // Información de contacto - derecha, compacta
-      const contactX = pageWidth - margin - 68;
+      const subText = companyInfo.sub || 'Maquinados Industriales de Precisión';
+      doc.text(subText, infoStartX, nameEndY + 4);
       
       doc.setFontSize(8.5);
       
@@ -528,7 +543,9 @@ export const useQuoteExport = () => {
       doc.text('RFC:', contactX, 24);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(60, 60, 60);
-      const rfcText = companyInfo.website || 'RAGH931025DP4';
+      // Limpiar el texto RFC si ya contiene "RFC:"
+      let rfcText = companyInfo.website || 'RAGH931025DP4';
+      rfcText = rfcText.replace(/^RFC:\s*/i, ''); // Remover "RFC:" del inicio si existe
       doc.text(rfcText, contactX + 14, 24);
       
       // Línea divisoria inferior

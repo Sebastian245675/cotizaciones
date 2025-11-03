@@ -20,6 +20,7 @@ interface CompanyInfo {
   phone: string;
   email: string;
   website?: string;
+  sub?: string;
   logo?: string;
 }
 
@@ -41,6 +42,7 @@ const CompanySettings: React.FC<CompanySettingsProps> = ({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
+  const [sub, setSub] = useState('');
 
   useEffect(() => {
     if (initialData) {
@@ -49,11 +51,12 @@ const CompanySettings: React.FC<CompanySettingsProps> = ({
       setPhone(initialData.phone);
       setEmail(initialData.email);
       setWebsite(initialData.website || '');
+      setSub(initialData.sub || '');
     }
   }, [initialData]);
 
   const handleSave = () => {
-    if (!companyName.trim() || !address.trim() || !phone.trim() || !email.trim()) {
+    if (!companyName.trim() || !address.trim() || !phone.trim() || !email.trim() || !sub.trim()) {
       toast({
         title: "Campos requeridos",
         description: "Por favor completa todos los campos obligatorios",
@@ -67,7 +70,8 @@ const CompanySettings: React.FC<CompanySettingsProps> = ({
       address: address.trim(),
       phone: phone.trim(),
       email: email.trim(),
-      website: website.trim() || undefined
+      website: website.trim() || undefined,
+      sub: sub.trim() || undefined
     };
 
     onSave(companyInfo);
@@ -85,12 +89,14 @@ const CompanySettings: React.FC<CompanySettingsProps> = ({
       setPhone(initialData.phone);
       setEmail(initialData.email);
       setWebsite(initialData.website || '');
+      setSub(initialData.sub || '');
     } else {
       setCompanyName('');
       setAddress('');
       setPhone('');
       setEmail('');
       setWebsite('');
+      setSub('');
     }
   };
 
@@ -178,6 +184,22 @@ const CompanySettings: React.FC<CompanySettingsProps> = ({
                 onChange={(e) => setWebsite(e.target.value)}
                 placeholder="www.miempresa.com"
               />
+            </div>
+
+            <div className="md:col-span-2">
+              <Label htmlFor="sub">
+                Sub *
+              </Label>
+              <Input
+                id="sub"
+                value={sub}
+                onChange={(e) => setSub(e.target.value)}
+                placeholder="Maquinados Industriales de Precisión"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Este texto aparecerá debajo del nombre de la empresa en todos los PDFs
+              </p>
             </div>
           </div>
 

@@ -21,13 +21,13 @@ import { simulatedDB } from "./lib/simulatedDB";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyD4Qi6WY1o0_i0e4fzkKUBa30y5RQRJDE0",
-  authDomain: "cumpleaos-d73b0.firebaseapp.com",
-  projectId: "cumpleaos-d73b0",
-  storageBucket: "cumpleaos-d73b0.firebasestorage.app",
-  messagingSenderId: "606342014715",
-  appId: "1:606342014715:web:accc621eb961eb85a1725e",
-  measurementId: "G-JEE4WT4CT2"
+  apiKey: "AIzaSyAg-e1g49FHAYfpEk6WdA6pfKAHJzmvjYM",
+  authDomain: "demos-d2610.firebaseapp.com",
+  projectId: "demos-d2610",
+  storageBucket: "demos-d2610.firebasestorage.app",
+  messagingSenderId: "545908718406",
+  appId: "1:545908718406:web:ec34672bc8894f90fb8347",
+  measurementId: "G-N7GKR55VN9"
 };
 
 // Initialize Firebase only if it hasn't been initialized

@@ -124,6 +124,7 @@ interface CompanyInfo {
   phone: string;
   email: string;
   website?: string;
+  sub?: string;
   logo?: string;
 }
 
@@ -287,7 +288,8 @@ const QuotesManager: React.FC = () => {
       address: "4TA VIDRIERA #927 COL 1 DE MAYO EN MONTERREY, C.P. 64220. NUEVO LEON MEXICO",
       phone: "811-514-7756 / 811-796-7956",
       email: "MIRGTALLER@GMAIL.COM",
-      website: "RFC: RAGH931025DP4"
+      website: "RFC: RAGH931025DP4",
+      sub: "Maquinados Industriales de Precisión"
     };
   };
   
