@@ -3195,8 +3195,12 @@ const QuotesManager: React.FC = () => {
       </Dialog>
 
       {/* Manual Quote Creation Dialog */}
-      <Dialog open={showManualQuoteDialog} onOpenChange={setShowManualQuoteDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={showManualQuoteDialog} onOpenChange={setShowManualQuoteDialog} modal={true}>
+        <DialogContent 
+          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Crear Cotización Manual</DialogTitle>
             <DialogDescription>
