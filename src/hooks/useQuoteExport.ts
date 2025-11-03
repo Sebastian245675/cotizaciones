@@ -493,14 +493,16 @@ export const useQuoteExport = () => {
       // Información de contacto - derecha, compacta (se calcula antes para usar en la línea)
       const contactX = pageWidth - margin - 45;
       
-      // Nombre completo de la empresa de la configuración - bajado un poco para que quede sobre la línea
+      // Nombre completo de la empresa de la configuración - centrado y con fuente más grande
       doc.setTextColor(50, 50, 50);
-      doc.setFontSize(11);
+      doc.setFontSize(16); // Aumentado de 11 a 16
       doc.setFont('helvetica', 'bold');
       // Dividir el nombre si es muy largo para que quepa bien
       const companyNameLines = doc.splitTextToSize(companyInfo.name, pageWidth - infoStartX - margin - 20);
       const nameStartY = 20; // Bajado un poco de 16 a 20 para que quede sobre la línea
-      doc.text(companyNameLines, infoStartX, nameStartY);
+      // Centrar el texto
+      const nameCenterX = (infoStartX + contactX - 10) / 2;
+      doc.text(companyNameLines, nameCenterX, nameStartY, { align: 'center' });
       
       // Calcular la posición Y después del nombre (depende de cuántas líneas)
       const companyNameLineHeight = 4.5; // Altura aproximada de cada línea
@@ -512,12 +514,12 @@ export const useQuoteExport = () => {
       const lineEndX = contactX - 10; // Termina antes de la información de contacto (con margen de 10)
       doc.line(infoStartX, nameEndY + 0.5, lineEndX, nameEndY + 0.5);
       
-      // Texto debajo de la línea divisoria - desde configuración
+      // Texto debajo de la línea divisoria - desde configuración, centrado
       doc.setFontSize(7.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(110, 110, 110);
       const subText = companyInfo.sub || 'Maquinados Industriales de Precisión';
-      doc.text(subText, infoStartX, nameEndY + 4);
+      doc.text(subText, nameCenterX, nameEndY + 4, { align: 'center' });
       
       doc.setFontSize(8.5);
       
@@ -570,13 +572,13 @@ export const useQuoteExport = () => {
       doc.setTextColor(45, 45, 45);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text('COTIZACIÓN', margin + 27.5, yPosition - 0, { align: 'center' });
+      doc.text('COTIZACIÓN', margin + 27.5, yPosition + 1, { align: 'center' });
       
       // Subtítulo
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(120, 120, 120);
-      doc.text('Propuesta Comercial', margin, yPosition + 7);
+      doc.text('Propuesta Comercial', margin, yPosition + 13);
       
       yPosition += 15;
 
@@ -1527,7 +1529,7 @@ export const useQuoteExport = () => {
         doc.setTextColor(70, 70, 70);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text('Subtotal:', totalsX + 20, totalsY);
+        doc.text('Subtotal: ', totalsX + 20, totalsY);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(65, 90, 150);
         doc.setFontSize(11);
@@ -1539,7 +1541,7 @@ export const useQuoteExport = () => {
         doc.setTextColor(70, 70, 70);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text(`IVA (${Math.round(PDF_CONFIG.taxRate * 100)}%):`, totalsX + 20, totalsY);
+        doc.text(`IVA (${Math.round(PDF_CONFIG.taxRate * 100)}%): `, totalsX + 20, totalsY);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(65, 90, 150);
         doc.setFontSize(11);
@@ -1551,11 +1553,11 @@ export const useQuoteExport = () => {
         doc.setTextColor(70, 70, 70);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text('Tot. Impuestos:', totalsX + 20, totalsY);
+        doc.text('Tot. Impuestos: ', totalsX + 20, totalsY);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(65, 90, 150);
         doc.setFontSize(11);
-        doc.text(formatCurrency(totalImpuestos), totalsX + totalsWidth - 20, totalsY, { align: 'right' });
+        doc.text(formatCurrency(totalImpuestos), totalsX + totalsWidth - 15, totalsY, { align: 'right' });
         
         totalsY += 16;
 
@@ -1574,7 +1576,7 @@ export const useQuoteExport = () => {
         
         doc.setFontSize(14);
         doc.setTextColor(41, 128, 185);
-        doc.text(formatCurrency(total), totalsX + totalsWidth - 20, totalsY, { align: 'right' });
+        doc.text(formatCurrency(total), totalsX + totalsWidth - 15, totalsY, { align: 'right' });
       } else {
         // === INFORMACIÓN PARA COTIZACIONES ===
         doc.setTextColor(31, 41, 55);
@@ -2885,7 +2887,7 @@ export const useQuoteExport = () => {
         doc.setTextColor(31, 41, 55);
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
-        doc.text('Subtotal:', totalsX + 10, totalsY);
+        doc.text('Subtotal: ', totalsX + 10, totalsY);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 58, 138);
         doc.text(`$${subtotalAmount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsX + totalsWidth - 10, totalsY, { align: 'right' });
@@ -2895,7 +2897,7 @@ export const useQuoteExport = () => {
         // === IVA ===
         doc.setTextColor(31, 41, 55);
         doc.setFont('helvetica', 'normal');
-        doc.text('IVA (16%):', totalsX + 10, totalsY);
+        doc.text('IVA (16%): ', totalsX + 10, totalsY);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 58, 138);
         doc.text(`$${iva.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsX + totalsWidth - 10, totalsY, { align: 'right' });
@@ -2905,7 +2907,7 @@ export const useQuoteExport = () => {
         // === TOTAL DE IMPUESTOS ===
         doc.setTextColor(31, 41, 55);
         doc.setFont('helvetica', 'normal');
-        doc.text('Tot. Impuestos:', totalsX + 10, totalsY);
+        doc.text('Tot. Impuestos: ', totalsX + 10, totalsY);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 58, 138);
         doc.text(`$${totalImpuestos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsX + totalsWidth - 10, totalsY, { align: 'right' });
@@ -2922,7 +2924,7 @@ export const useQuoteExport = () => {
         doc.setTextColor(60, 60, 60);
         doc.setFontSize(13);
         doc.setFont('helvetica', 'bold');
-        doc.text('TOTAL:', totalsX + 10, totalsY + 3);
+        doc.text('TOTAL: ', totalsX + 10, totalsY + 3);
         
         doc.setFontSize(15);
         doc.setTextColor(147, 197, 253);
