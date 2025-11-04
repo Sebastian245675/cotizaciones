@@ -5,7 +5,7 @@
   "description": "Sistema POS completo para Covenant Argentina con funcionalidad offline",
   "author": "Covenant Argentina",
   "type": "module",
-  "main": "pos-desktop.js",
+  "main": "pos-desktop.cjs",
   "pkg": {
     "scripts": [
       "backend/src/server.js"
@@ -27,11 +27,11 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron": "electron covenant-desktop.js",
-    "electron:dev": "npm run build && electron covenant-desktop.js",
-    "build:electron": "npm run build && electron covenant-desktop.js",
-    "start:electron": "electron covenant-desktop.js",
-    "desktop": "npm run build && electron covenant-desktop.js",
+    "electron": "electron pos-desktop.cjs",
+    "electron:dev": "npm run build && electron pos-desktop.cjs",
+    "build:electron": "npm run build && electron pos-desktop.cjs",
+    "start:electron": "electron pos-desktop.cjs",
+    "desktop": "npm run build && electron pos-desktop.cjs",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
@@ -156,7 +156,7 @@
     "asar": true,
     "compression": "maximum",
     "files": [
-      "pos-desktop.js",
+      "pos-desktop.cjs",
       "backend/src/**/*",
       "backend/package.json",
       "backend/node_modules/**/*",

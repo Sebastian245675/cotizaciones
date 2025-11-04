@@ -9,7 +9,7 @@ directories:
   buildResources: build
 
 files:
-  - pos-desktop.js
+  - pos-desktop.cjs
   - backend/src/**/*
   - backend/package.json
   - backend/node_modules/**/*
